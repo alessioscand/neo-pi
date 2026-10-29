@@ -25,7 +25,7 @@ img.px{image-rendering:pixelated}
 @keyframes dlscan{to{background-position:0 4px}}
 @media (prefers-reduced-motion: reduce){.dl::before{transition:none;animation:none !important}}
 .fx{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.45) 2px, rgba(0,0,0,0.45) 4px);-webkit-mask:url(img/logo.svg) center / 100% 100% no-repeat;mask:url(img/logo.svg) center / 100% 100% no-repeat}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:clip}
 @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
 .cf{transition:background-color 200ms, color 200ms}
 .cf path{transition:fill 200ms}
@@ -36,15 +36,16 @@ html{scroll-behavior:smooth}
 .ctl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 28px}
 @media (max-width: 520px){.ctl{grid-template-columns:minmax(0,1fr);gap:0}.ctl dd{margin-bottom:12px !important}}
 .nav{transition:color 180ms}
+@media (max-width: 520px){header.top{padding:20px 0 0 !important;justify-content:center !important}nav.mainnav{gap:8px 16px !important;justify-content:center;font-size:13px !important}}
 .nav:hover,.nav:focus-visible{color:#F8F8F8 !important}
 .glow{isolation:isolate}
-.glow::before{content:"";position:absolute;left:50%;top:50%;width:520px;height:340px;z-index:-1;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(70,120,255,.22),rgba(70,120,255,.08) 55%,rgba(6,14,30,0) 100%);pointer-events:none}
+.glow::before{content:"";position:absolute;left:50%;top:50%;width:min(520px,100vw);height:340px;z-index:-1;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(70,120,255,.22),rgba(70,120,255,.08) 55%,rgba(6,14,30,0) 100%);pointer-events:none}
 </style>
 </head>
 <body>
 <div style="background: #060E1E; color: #D8DEE8; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 17px; line-height: 1.6">
-  <header style="max-width: 1040px; margin: 0 auto; padding: 24px 24px 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 16px">
-    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 28px; font-family: 'Silkscreen', monospace; font-size: 14px; letter-spacing: 0.04em">
+  <header class="top" style="max-width: 1040px; margin: 0 auto; padding: 24px 24px 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 16px">
+    <nav class="mainnav" aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 28px; font-family: 'Silkscreen', monospace; font-size: 14px; letter-spacing: 0.04em">
       <a class="nav" href="#features" style="color: #96A0AF; text-decoration: none">Features</a>
       <a class="nav" href="#install" style="color: #96A0AF; text-decoration: none">Install</a>
       <a class="nav" href="#controls" style="color: #96A0AF; text-decoration: none">Controls</a>
@@ -65,10 +66,10 @@ html{scroll-behavior:smooth}
     </div>
   </section>
 
-  <section aria-label="Screenshots" style="max-width: 1040px; margin: 0 auto; padding: 0 24px 96px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px">
-    <figure style="margin: 0"><img class="px" src="img/game-list.png" alt="The game list" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Game list</figcaption></figure>
-    <figure style="margin: 0"><img class="px" src="img/in-game-menu.png" alt="Metal Slug 3 paused, with the in-game menu open" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">In-game menu</figcaption></figure>
-    <figure style="margin: 0"><img class="px" src="img/options.png" alt="The options menu" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Options</figcaption></figure>
+  <section aria-label="Screenshots" style="max-width: 1040px; margin: 0 auto; padding: 0 24px 96px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px">
+    <figure style="margin: 0"><img src="img/game-list.png" alt="The game list" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Game list</figcaption></figure>
+    <figure style="margin: 0"><img src="img/in-game-menu.png" alt="Metal Slug 3 paused, with the in-game menu open" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">In-game menu</figcaption></figure>
+    <figure style="margin: 0"><img src="img/options.png" alt="The options menu" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Options</figcaption></figure>
   </section>
 
   <section id="features" style="border-top: 1px solid #1C2A44">
@@ -131,7 +132,7 @@ html{scroll-behavior:smooth}
   <section id="support" style="border-top: 1px solid #1C2A44">
     <div style="max-width: 720px; margin: 0 auto; padding: 72px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px">
       <p style="margin: 0; color: #AAB3C2">neo-pi is <span style="color: #F8F8F8; font-weight: 600">free</span>. If you enjoy it, you can buy me a <em lang="it">crema caffè</em> :)</p>
-      <p style="margin: 0; font-size: 15px; color: #7C8696">Coming next: composite output for CRT TVs, UniBIOS support, Raspberry Pi 3 optimizations.</p>
+      <p style="margin: 0; font-size: 15px; color: #7C8696">Coming next: composite output for CRT TVs, UniBIOS support, further Raspberry Pi 3 optimizations.</p>
       <a class="cf" href="https://paypal.me/alescandy" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 28px; border: 2px solid #FF4FA8; color: #F8F8F8; text-decoration: none; font-family: 'Silkscreen', monospace; font-size: 16px; border-radius: 4px"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" style="flex: none"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"></path></svg>Buy me a coffee</a>
     </div>
   </section>
