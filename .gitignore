@@ -1,0 +1,18 @@
+# build output and toolchains
+build/
+toolchain/
+circle-*/
+firmware/
+*.o
+*.d
+*.img
+*.elf
+*.map
+# never commit BIOS, games or user data
+*.zip
+*.neo
+*.sfix
+dist/sd/neopi/*
+!dist/sd/neopi/PUT_BIOS_AND_GAMES_HERE.txt
+test/roms/
+test/out_*/

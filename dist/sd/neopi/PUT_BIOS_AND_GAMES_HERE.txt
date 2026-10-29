@@ -1,0 +1,1 @@
+Put neogeo.zip (Neo Geo BIOS, MAME/FBNeo set) and your .neo games here.

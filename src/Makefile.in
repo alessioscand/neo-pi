@@ -1,0 +1,35 @@
+#
+# neo-pi Makefile (generated per target by build.sh)
+#
+CIRCLEHOME = @CIRCLEHOME@
+GEO = @GEO@
+
+GEO_OBJS = m68kcpu.o m68kops.o z80.o ymfm_adpcm.o ymfm_opn.o ymfm_ssg.o \
+	   geo.o geo_cd.o geo_lc8951.o geo_lspc.o geo_m68k.o geo_memcard.o \
+	   geo_mixer.o geo_neo.o geo_rtc.o geo_serial.o geo_vfs.o geo_ymfm.o \
+	   geo_z80.o miniz.o resample.o
+
+OBJS	= main.o kernel.o video.o fontdata.o input.o audio.o ui.o vfs.o ziphelp.o shim.o geo_disc_stub.o $(GEO_OBJS) libc_a-setjmp.o
+
+LIBS	= $(CIRCLEHOME)/addon/fatfs/libfatfs.a \
+	  $(CIRCLEHOME)/addon/SDCard/libsdcard.a \
+	  $(CIRCLEHOME)/lib/usb/libusb.a \
+	  $(CIRCLEHOME)/lib/input/libinput.a \
+	  $(CIRCLEHOME)/lib/sound/libsound.a \
+	  $(CIRCLEHOME)/lib/fs/libfs.a \
+	  $(CIRCLEHOME)/lib/libcircle.a
+
+EXTRAINCLUDE = -I @SRC@ -I $(GEO)/src -I $(GEO)/src/m68k -I $(GEO)/src/z80 \
+	       -I $(GEO)/src/ymfm -I $(GEO)/deps -I $(GEO)/deps/miniz \
+	       -I $(GEO)/deps/speex -I $(GEO)/deps/dr
+
+C_STANDARD = -std=gnu11
+OPTIMIZE = -O2
+
+DEFINE += -DNDEBUG -DMINIZ_NO_STDIO -DMINIZ_NO_TIME \
+	  -DRANDOM_PREFIX=geo -DFIXED_POINT
+CFLAGS += -fno-math-errno -Wno-unused-parameter -Wno-sign-compare
+
+include $(CIRCLEHOME)/Rules.mk
+
+-include $(DEPS)
