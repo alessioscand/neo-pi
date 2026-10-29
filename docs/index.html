@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>neo-pi – bare-metal Neo Geo emulator for Raspberry Pi</title>
+<meta property="og:title" content="neo-pi">
+<meta property="og:description" content="A bare-metal Neo Geo emulator for Raspberry Pi. No operating system, nothing to configure: switch on and insert coin.">
+<meta property="og:type" content="website">
+<meta name="description" content="A bare-metal Neo Geo emulator for Raspberry Pi. No operating system, nothing to configure: switch on and insert coin.">
+<link rel="icon" type="image/svg+xml" href="img/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen&amp;family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+html{color-scheme:dark}
+body{margin:0;background:#060E1E;color:#D8DEE8;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+a:focus-visible{outline:2px solid #78C8FF;outline-offset:3px}
+h1{text-wrap:balance}
+a{color:#F0C81E}a:hover{color:#FFE27A}
+img.px{image-rendering:pixelated}
+.dl{position:relative;overflow:hidden;isolation:isolate;transition:color 220ms 80ms}
+.dl::before{content:"";position:absolute;inset:0;z-index:-1;background:repeating-linear-gradient(to bottom,#4678FF 0 2px,#2F57D9 2px 4px);background-size:100% 4px;transform:translateY(-101%);transition:transform 420ms cubic-bezier(.22,.8,.24,1)}
+.dl:hover,.dl:focus-visible{color:#FFFFFF !important}
+.dl:hover::before,.dl:focus-visible::before{transform:none;animation:dlscan 600ms linear infinite}
+@keyframes dlscan{to{background-position:0 4px}}
+@media (prefers-reduced-motion: reduce){.dl::before{transition:none;animation:none !important}}
+.fx{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.45) 2px, rgba(0,0,0,0.45) 4px);-webkit-mask:url(img/logo.svg) center / 100% 100% no-repeat;mask:url(img/logo.svg) center / 100% 100% no-repeat}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+.cf{transition:background-color 200ms, color 200ms}
+.cf path{transition:fill 200ms}
+.cf:hover,.cf:focus-visible{background:#FF4FA8;color:#141414 !important}
+.cf:hover path,.cf:focus-visible path{fill:#141414}
+@media (min-width: 760px){.nw{white-space:nowrap}}
+.dbr{display:none}@media (min-width: 760px){.dbr{display:inline}}
+.ctl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 28px}
+@media (max-width: 520px){.ctl{grid-template-columns:minmax(0,1fr);gap:0}.ctl dd{margin-bottom:12px !important}}
+.nav{transition:color 180ms}
+.nav:hover,.nav:focus-visible{color:#F8F8F8 !important}
+.glow{isolation:isolate}
+.glow::before{content:"";position:absolute;left:50%;top:50%;width:520px;height:340px;z-index:-1;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(70,120,255,.22),rgba(70,120,255,.08) 55%,rgba(6,14,30,0) 100%);pointer-events:none}
+</style>
+</head>
+<body>
+<div style="background: #060E1E; color: #D8DEE8; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 17px; line-height: 1.6">
+  <header style="max-width: 1040px; margin: 0 auto; padding: 24px 24px 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 16px">
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 28px; font-family: 'Silkscreen', monospace; font-size: 14px; letter-spacing: 0.04em">
+      <a class="nav" href="#features" style="color: #96A0AF; text-decoration: none">Features</a>
+      <a class="nav" href="#install" style="color: #96A0AF; text-decoration: none">Install</a>
+      <a class="nav" href="#controls" style="color: #96A0AF; text-decoration: none">Controls</a>
+      <a class="nav" href="#support" style="color: #96A0AF; text-decoration: none">Support</a>
+    </nav>
+  </header>
+
+  <section style="max-width: 1040px; margin: 0 auto; padding: 96px 24px 64px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">
+    <div class="glow" style="position: relative; width: 240px; height: 120px"><img class="px" src="img/logo.svg" alt="neo-pi" style="width: 240px; height: 120px; display: block"><div class="fx" aria-hidden="true"></div></div>
+    <h1 style="margin: 0; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-weight: 600; font-size: clamp(28px, 7vw, 38px); line-height: 1.25; letter-spacing: -0.01em; color: #F8F8F8">A <span style="border: 2px solid #78C8FF; padding: 0 10px; border-radius: 6px; color: #F8F8F8; white-space: nowrap">bare-metal</span> Neo&nbsp;Geo emulator<br class="dbr"> for Raspberry&nbsp;Pi.</h1>
+    <p class="nw" style="margin: 0; color: #AAB3C2">No operating system. No setup hassle. Just power on and insert&nbsp;coin.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 16px">
+      <a class="dl" href="https://github.com/alessioscand/neo-pi/releases/download/v0.6.1/neo-pi-0.6.1-sd.zip" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 28px; background: #F0C81E; color: #141414; text-decoration: none; font-family: 'Silkscreen', monospace; font-size: 16px; border-radius: 4px">Download 0.6.1</a>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px">
+      <p style="margin: 0; font-size: 14px; color: #7C8696">For RPi 4 · Free · GPLv3</p>
+      <a href="#support" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: #F8F8F8; font-size: 15px; text-decoration: none"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" style="flex: none"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"></path></svg><span>Enjoying it? <span style="color: #FF4FA8; text-decoration: underline">Buy me a <em lang="it">crema caffè</em></span></span></a>
+    </div>
+  </section>
+
+  <section aria-label="Screenshots" style="max-width: 1040px; margin: 0 auto; padding: 0 24px 96px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px">
+    <figure style="margin: 0"><img class="px" src="img/game-list.png" alt="The game list" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Game list</figcaption></figure>
+    <figure style="margin: 0"><img class="px" src="img/in-game-menu.png" alt="Metal Slug 3 paused, with the in-game menu open" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">In-game menu</figcaption></figure>
+    <figure style="margin: 0"><img class="px" src="img/options.png" alt="The options menu" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Options</figcaption></figure>
+  </section>
+
+  <section id="features" style="border-top: 1px solid #1C2A44">
+    <div style="max-width: 1040px; margin: 0 auto; padding: 80px 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px 56px">
+      <div>
+        <h2 style="margin: 0 0 8px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 18px; color: #F0C81E">Accurate</h2>
+        <p style="margin: 0; color: #AAB3C2">Powered by <span style="color: #F8F8F8; font-weight: 600">Geolith</span>, a highly accurate Neo Geo emulator. Play in MVS arcade mode or AES home-console mode, with support for all BIOS regions.</p>
+      </div>
+      <div>
+        <h2 style="margin: 0 0 8px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 18px; color: #F0C81E">Made for arcade</h2>
+        <p style="margin: 0; color: #AAB3C2">USB gamepads are polled <span style="color: #F8F8F8; font-weight: 600">every millisecond</span> for responsive input, with no operating system adding another layer between you and the game.</p>
+      </div>
+      <div>
+        <h2 style="margin: 0 0 8px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 18px; color: #F0C81E">Pixel-perfect</h2>
+        <p style="margin: 0; color: #AAB3C2">Crisp, square pixels at 1080p or 720p, with optional scanlines, <span style="color: #F8F8F8; font-weight: 600">lag-free</span>.</p>
+      </div>
+      <div>
+        <h2 style="margin: 0 0 8px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 18px; color: #F0C81E">Fast boot</h2>
+        <p style="margin: 0; color: #AAB3C2">Streamlined, <span style="color: #F8F8F8; font-weight: 600">bare metal</span>: from power on to the game in a few seconds.</p>
+      </div>
+      <div>
+        <h2 style="margin: 0 0 8px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 18px; color: #F0C81E">Pad optimized</h2>
+        <p style="margin: 0; color: #AAB3C2">Save states, BIOS settings, screenshots, <em>lazy finger</em> (turbo). All driven from the gamepad.</p>
+      </div>
+      <div>
+        <h2 style="margin: 0 0 8px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 18px; color: #F0C81E">Single-slot mode</h2>
+        <p style="margin: 0; color: #AAB3C2">Just one game on the card? neo-pi boots straight into it!</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" style="border-top: 1px solid #1C2A44">
+    <div style="max-width: 720px; margin: 0 auto; padding: 80px 24px">
+      <h2 style="margin: 0 0 24px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 24px; color: #F8F8F8">Get started in three steps</h2>
+      <ol style="margin: 0; padding-left: 24px; display: flex; flex-direction: column; gap: 10px; color: #AAB3C2">
+        <li>Download the neo-pi package and extract its contents to the root of a <span style="white-space: nowrap"><span style="color: #F8F8F8">FAT32</span>-formatted</span> microSD card.</li>
+        <li>Copy your <code style="color: #F8F8F8">neogeo.zip</code> BIOS file and your <code style="color: #F8F8F8">.neo</code> game files into the <code style="color: #F8F8F8">neopi</code> folder.</li>
+        <li>Connect a USB gamepad and an HDMI display to <span style="color: #F8F8F8">HDMI 0</span> (the port next to the power socket), insert the card and power on your Raspberry Pi.</li>
+      </ol>
+      <p style="margin: 28px 0 0; font-size: 15px; color: #7C8696">BIOS files and games are not included with neo-pi.</p>
+    </div>
+  </section>
+
+  <section id="controls" style="border-top: 1px solid #1C2A44">
+    <div style="max-width: 720px; margin: 0 auto; padding: 80px 24px">
+      <h2 style="margin: 0 0 24px; font-family: 'Silkscreen', monospace; font-weight: 400; font-size: 24px; color: #F8F8F8">Controls</h2>
+      <p style="margin: 0 0 20px; color: #AAB3C2">The first time you connect a pad, neo-pi asks you to press the buttons you want as A, B, C, D, Start and Select. Then, in game:</p>
+      <dl class="ctl" style="margin: 0; color: #AAB3C2">
+          <dt style="color: #F8F8F8; font-family: 'Silkscreen', monospace; font-size: 15px; white-space: nowrap">Select</dt><dd style="margin: 0">Insert a coin</dd>
+          <dt style="color: #F8F8F8; font-family: 'Silkscreen', monospace; font-size: 15px; white-space: nowrap">Select, held 1&nbsp;s</dt><dd style="margin: 0">In-game menu: save and load state, reset, BIOS settings, game list, power off</dd>
+          <dt style="color: #F8F8F8; font-family: 'Silkscreen', monospace; font-size: 15px; white-space: nowrap">Select + A</dt><dd style="margin: 0">Screenshot</dd>
+          <dt style="color: #F8F8F8; font-family: 'Silkscreen', monospace; font-size: 15px; white-space: nowrap">Select + B</dt><dd style="margin: 0"><em>Lazy finger</em> (turbo buttons) on/off</dd>
+          <dt style="color: #F8F8F8; font-family: 'Silkscreen', monospace; font-size: 15px; white-space: nowrap">Select + C</dt><dd style="margin: 0">Status line on/off</dd>
+          <dt style="color: #F8F8F8; font-family: 'Silkscreen', monospace; font-size: 15px; white-space: nowrap">Select + D</dt><dd style="margin: 0">Credits</dd>
+      </dl>
+      <p style="margin: 28px 0 0; font-size: 15px; color: #7C8696">In the game list: A or Start to play, D for the options. The second pad is player&nbsp;2.</p>
+    </div>
+  </section>
+
+  <section id="support" style="border-top: 1px solid #1C2A44">
+    <div style="max-width: 720px; margin: 0 auto; padding: 72px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px">
+      <p style="margin: 0; color: #AAB3C2">neo-pi is <span style="color: #F8F8F8; font-weight: 600">free</span>. If you enjoy it, you can buy me a <em lang="it">crema caffè</em> :)</p>
+      <p style="margin: 0; font-size: 15px; color: #7C8696">Coming next: composite output for CRT TVs, UniBIOS support, Raspberry Pi 3 optimizations.</p>
+      <a class="cf" href="#support" style="display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 28px; border: 2px solid #FF4FA8; color: #F8F8F8; text-decoration: none; font-family: 'Silkscreen', monospace; font-size: 16px; border-radius: 4px"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" style="flex: none"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"></path></svg>Buy me a coffee</a>
+    </div>
+  </section>
+
+  <footer style="border-top: 1px solid #1C2A44">
+    <div style="max-width: 1040px; margin: 0 auto; padding: 40px 24px 56px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; font-size: 14px; color: #7C8696">
+      <span>neo-pi by Alessio Scanderebech · free software, GPLv3</span>
+      <a href="https://github.com/alessioscand/neo-pi">Source code on GitHub</a>
+      <span>NEO GEO is a trademark of SNK. Not affiliated with SNK.</span>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
