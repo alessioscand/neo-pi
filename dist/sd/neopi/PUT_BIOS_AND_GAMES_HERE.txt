@@ -1,1 +1,15 @@
-Put neogeo.zip (Neo Geo BIOS, MAME/FBNeo set) and your .neo games here.
+Put here:
+
+- neogeo.zip   the Neo Geo BIOS, as in the MAME / FBNeo romsets
+
+- your games, one .neo file each.
+  .neo is the single-file format created by TerraOnion for the NeoSD
+  cartridge: it holds all the ROMs of a game plus a header with its name,
+  year and number. Files made for the NeoSD work as they are.
+  MAME / FBNeo zip romsets are not read directly: convert them to .neo
+  with TerraOnion's free NeoBuilder tool.
+
+The file names do not matter: the game list shows the names stored inside
+the .neo files. With only one game here, neo-pi starts it straight away.
+
+BIOS and games are not included with neo-pi.
