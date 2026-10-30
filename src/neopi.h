@@ -4,7 +4,7 @@
 #ifndef NEOPI_H
 #define NEOPI_H
 
-#define NEOPI_VERSION	"0.6.2"
+#define NEOPI_VERSION	"0.6.3"
 
 /* Error codes = number of green LED blinks when the screen is unusable */
 #define NEOPI_ERR_FB    2   /* framebuffer / HDMI */

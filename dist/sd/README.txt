@@ -1,4 +1,4 @@
-neo-pi 0.6.2 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.6.3 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
 
 SET-UP

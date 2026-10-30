@@ -16,11 +16,14 @@ Build host: Linux x86_64.
    ```
 
    KERNEL_MAX_SIZE is 16 MB because the core's Neo Geo CD buffers do not fit in the default 2 MB.
-3. **Circle patch** (USB pads polled every 1 ms instead of the interval the device asks for,
-   like `usbhid.jspoll=1` on Linux; hubs excluded):
+3. **Circle patches**: USB pads polled every 1 ms instead of the interval the device asks for,
+   like `usbhid.jspoll=1` on Linux (hubs excluded); third-party wired Xbox 360 (XInput)
+   pads handled by Circle's Xbox 360 driver, like Linux xpad:
 
        python3 patches/circle-usb-poll.py circle-rpi4
        python3 patches/circle-usb-poll.py circle-rpi3
+       python3 patches/circle-xinput.py circle-rpi4
+       python3 patches/circle-xinput.py circle-rpi3
 
    then `./makeall` in each copy, and `make` in `addon/SDCard` and `addon/fatfs`.
    `usbpoll=native` in `neopi/neopi.cfg` turns the faster polling off at run time.

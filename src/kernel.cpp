@@ -793,10 +793,19 @@ boolean CKernel::LoadGame (unsigned nIndex)
 
 // ---- video helpers ----------------------------------------------------------
 
-void CKernel::ShowUIFrame (boolean bWait)
+void CKernel::ShowUIFrame (boolean bWait, const char *pTopMessage)
 {
 	m_Video.DrawGame (m_pUI->GetBuffer ());
-	m_Video.DrawBandText (TRUE, 0, 0);		// no status line or message over menus
+	if (pTopMessage && pTopMessage[0])
+	{
+		// in the black band above the picture, like the in-game messages
+		const CVideoOut::TTextSpan Span = {pTopMessage, UI_ERR};
+		m_Video.DrawBandText (TRUE, &Span, 1);
+	}
+	else
+	{
+		m_Video.DrawBandText (TRUE, 0, 0);	// no status line or message over menus
+	}
 	m_Video.DrawBandText (FALSE, 0, 0);
 	m_Video.Flip ();
 	if (!bWait)
@@ -1645,8 +1654,8 @@ unsigned CKernel::RunList (unsigned nSel)
 		nPrev = n;
 
 		const char *pMsg = m_pInput->GetPadCount () == 0 ? "CONNECT A USB GAMEPAD" : "";
-		m_pUI->DrawList (m_pGames, m_nGames, nSel, pMsg, m_nLoaded >= 0);
-		ShowUIFrame ();
+		m_pUI->DrawList (m_pGames, m_nGames, nSel, "", m_nLoaded >= 0);
+		ShowUIFrame (TRUE, pMsg);
 	}
 }
 

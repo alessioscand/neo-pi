@@ -510,16 +510,52 @@ void CUI::DrawBlack (void)
 void CUI::DrawLoading (const char *pName, unsigned nPercent)
 {
 	Background ();
-	Panel (32, 84, UI_W - 33, 150);
-	char Name[34];
-	strncpy (Name, pName, 28);
-	Name[28] = '\0';
-	CText (98, "LOADING", UI_TITLE);
-	CText (112, Name, UI_WHITE);
+
+	// long titles go on two lines of up to 26 characters, split at a space
+	const unsigned nMax = 26;
+	char Line1[34], Line2[34];
+	size_t nLen = strlen (pName);
+	Line2[0] = '\0';
+	if (nLen <= nMax)
+	{
+		strncpy (Line1, pName, sizeof Line1 - 1);
+		Line1[sizeof Line1 - 1] = '\0';
+	}
+	else
+	{
+		unsigned nCut = nMax;
+		while (nCut > 0 && pName[nCut] != ' ')
+		{
+			nCut--;
+		}
+		if (nCut == 0)
+		{
+			nCut = nMax;			// no space: split inside the word
+		}
+		memcpy (Line1, pName, nCut);
+		Line1[nCut] = '\0';
+		const char *pRest = pName + nCut;
+		while (*pRest == ' ')
+		{
+			pRest++;
+		}
+		strncpy (Line2, pRest, nMax);
+		Line2[nMax] = '\0';
+	}
+
+	int dy = Line2[0] ? 6 : 0;			// the box grows by 6 lines up and down
+	Panel (32, 84 - dy, UI_W - 33, 150 + dy);
+	CText (98 - dy, "LOADING", UI_TITLE);
+	CText (112 - dy, Line1, UI_WHITE);
+	if (Line2[0])
+	{
+		CText (124 - dy, Line2, UI_WHITE);
+	}
 	int nBarW = UI_W - 96;
-	Fill (48, 130, nBarW, 8, UI_FRAME2);
-	Fill (49, 131, nBarW - 2, 6, UI_PANEL);
-	Fill (49, 131, (nBarW - 2) * (int) (nPercent > 100 ? 100 : nPercent) / 100, 6, UI_TITLE);
+	int yBar = 130 + dy;
+	Fill (48, yBar, nBarW, 8, UI_FRAME2);
+	Fill (49, yBar + 1, nBarW - 2, 6, UI_PANEL);
+	Fill (49, yBar + 1, (nBarW - 2) * (int) (nPercent > 100 ? 100 : nPercent) / 100, 6, UI_TITLE);
 }
 
 void CUI::DrawMessage (const char *pTitle, const char *pLine1, const char *pLine2)

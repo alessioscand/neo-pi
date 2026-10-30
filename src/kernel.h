@@ -65,7 +65,7 @@ private:
 	void Benchmark (void);
 	unsigned RunList (unsigned nSel);
 	void RunGame (void);
-	void ShowUIFrame (boolean bWait = TRUE);
+	void ShowUIFrame (boolean bWait = TRUE, const char *pTopMessage = 0);
 	void WriteTextFile (const char *pPath, const char *pText);
 	const char *SaveScreenshot (void);
 	void RunCredits (void);
