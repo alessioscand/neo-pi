@@ -1,42 +1,32 @@
-# neo-pi - bare metal Neo Geo emulator (Raspberry Pi 4 / 400 and Raspberry Pi 3)
+# neo-pi - Raspberry Pi 4 / 400 and Raspberry Pi 3
 arm_64bit=1
 kernel_address=0x80000
 initial_turbo=0
 
-# Picture even if the TV is switched on after the Pi; no extra black border
+# HDMI always on (even if the TV is switched on later), no border, audio
 hdmi_force_hotplug=1
 disable_overscan=1
-# HDMI with audio; pixels always opaque
 hdmi_drive=2
 framebuffer_ignore_alpha=1
 
-# Fixed output, 1920x1080 at 60 Hz (also on 4K TVs: the TV scales it up).
-# If your screen does not accept it, put a # in front of the next two lines:
-# the screen's preferred mode will be used.
+# 1080p 60 Hz. No picture? Put a # in front of both lines.
+# For 720p, change hdmi_mode=16 to hdmi_mode=4.
 hdmi_group=1
 hdmi_mode=16
-# 1280x720 at 60 Hz instead: put a # in front of hdmi_mode=16 and remove it here.
-# At 720p the 3x enlargement is done by the CPU alone.
-#hdmi_mode=4
 
-# Hardware scaler (HVS): sharp pixels, no smoothing
+# Sharp pixels from the hardware scaler; name in the TV's source list
 scaling_kernel=8
-
-# HDMI CEC: name shown in the TV's source list. At start-up the firmware also
-# asks the TV to switch to this input (if CEC is enabled on the TV).
 cec_osd_name=NEO-PI
 
-# Faster, cleaner start-up: no rainbow screen, no 1 second wait before the
-# kernel, no HAT EEPROM probing
+# Fast start-up, fixed GPU clock
 disable_splash=1
 boot_delay=0
 force_eeprom_read=0
-# Fixed GPU core clock: no clock changes while playing
 core_freq_fixed=1
 
+# Overclock: remove the # in front of arm_freq (heatsink needed)
 [pi3]
 kernel=kernel8.img
-# Mild overclock: remove the # to try it
 #arm_freq=1300
 
 [pi3+]
@@ -47,8 +37,6 @@ kernel=kernel8.img
 armstub=armstub8-rpi4.bin
 kernel=kernel8-rpi4.img
 max_framebuffers=2
-# Overclock (needs a good heatsink and the official power supply):
-# remove the # to try it. A Pi 400 can take arm_freq=2100.
 #arm_freq=1900
 
 [all]
