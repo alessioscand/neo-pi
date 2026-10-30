@@ -63,7 +63,8 @@ Planned:
 1. Download the SD card package from the
    [Releases](../../releases) page.
 2. Copy everything in it to the root of the card.
-3. Put `neogeo.zip` and your `.neo` games in the `neopi` folder.
+3. Put `neogeo.zip` (MAME/FBNeo BIOS set) and your games in `.neo` format
+   (made with TerraOnion's NeoBuilder) in the `neopi` folder.
 4. Connect a pad and the TV (HDMI 0 on RPi4, next to the power socket) and switch on.
 
 
@@ -82,12 +83,9 @@ stick always work. The second pad connected is Player 2.
 | Select + C | Status line on/off |
 | Select + D | Credits |
 
-| Game list | |
-|---|---|
-| Up / Down | Choose a game |
-| Left / Right | Jump by 8 |
-| A or Start | Play |
-| D | Options: system (MVS/AES), BIOS region, scanlines, controls, power off |
+In the game list and in the menus, the buttons are shown on screen.
+Always switch off with POWER OFF (in-game menu or options) before
+unplugging: it saves memory cards and settings.
 
 
 ## Under the hood
@@ -127,6 +125,29 @@ A few choices behind neo-pi's low-latency design and performance optimizations:
   is forced to 1080p (or 720p), and the whole game is loaded into RAM before
   it starts: nothing is streamed from the SD card while you play.
 
+
+## Files and troubleshooting
+
+Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states,
+MVS memory, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
+`pads.cfg` (controls for each pad model), `LOG.TXT` (diagnostics).
+
+For testing and performance comparisons, these lines can be added to
+`neopi/neopi.cfg`:
+
+| | |
+|---|---|
+| `filters=on` | allow scanlines on a Pi 3 too (experimental) |
+| `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
+| `resampler=speex` | previous, heavier audio resampler |
+| `scaler=cpu` | scale with the CPU instead of the hardware scaler |
+
+If something goes wrong, the green LED blinks a number of times, repeatedly:
+2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game, 7 = memory. With no
+picture at all, put a `#` in front of `hdmi_group` and `hdmi_mode` in
+`config.txt`. To report a problem, `neopi/LOG.TXT` is all that is needed;
+for performance, add an empty `neopi/BENCH` file and send `BENCH.TXT` and
+`PROFILE.TXT` too.
 
 ## Building from source
 
