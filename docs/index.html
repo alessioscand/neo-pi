@@ -77,23 +77,26 @@ html{scroll-behavior:smooth;overflow-x:clip}
     </nav>
   </header>
 
-  <section style="max-width: 1040px; margin: 0 auto; padding: 96px 24px 64px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">
+  <section style="max-width: 1040px; margin: 0 auto; padding: 96px 24px 48px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">
     <div class="glow" style="position: relative; width: 240px; height: 120px"><img class="px" src="img/logo.svg" alt="neo-pi logo" width="240" height="120" style="width: 240px; height: 120px; display: block"><div class="fx" aria-hidden="true"></div></div>
     <h1 style="margin: 0; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-weight: 600; font-size: clamp(28px, 7vw, 38px); line-height: 1.25; letter-spacing: -0.01em; color: #F8F8F8">A <span style="border: 2px solid #78C8FF; padding: 0 10px; border-radius: 6px; color: #F8F8F8; white-space: nowrap">bare-metal</span> Neo&nbsp;Geo emulator<br class="dbr"> for Raspberry&nbsp;Pi.</h1>
     <p class="nw" style="margin: 0; color: #AAB3C2">No operating system. No setup hassle. Just power on and insert&nbsp;coin.</p>
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 16px">
+  </section>
+
+  <section aria-label="Screenshots" style="max-width: 1040px; margin: 0 auto; padding: 0 24px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px">
+    <figure style="margin: 0"><img src="img/game-list.png" width="912" height="672" loading="lazy" alt="The game list" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Game list</figcaption></figure>
+    <figure style="margin: 0"><img src="img/in-game-menu.png" width="912" height="672" loading="lazy" alt="Metal Slug 3 paused, with the in-game menu open" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">In-game menu</figcaption></figure>
+    <figure style="margin: 0"><img src="img/options.png" width="912" height="672" loading="lazy" alt="The options menu" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Options</figcaption></figure>
+  </section>
+
+  <section aria-label="Download" style="max-width: 1040px; margin: 0 auto; padding: 56px 24px 64px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 28px">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center">
       <a class="dl" href="https://github.com/alessioscand/neo-pi/releases/download/v0.6.1/neo-pi-0.6.1-sd.zip" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 28px; background: #F0C81E; color: #141414; text-decoration: none; font-family: 'Silkscreen', monospace; font-size: 16px; border-radius: 4px">Download 0.6.1</a>
     </div>
     <div style="display: flex; flex-direction: column; align-items: center; gap: 2px">
       <p style="margin: 0; font-size: 14px; color: #7C8696">For RPi 3 &amp; 4 · Free · GPLv3</p>
       <a href="#support" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: #F8F8F8; font-size: 15px; text-decoration: none"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" style="flex: none"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"></path></svg><span>Enjoying it? <span style="color: #FF4FA8; text-decoration: underline">Buy me a <em lang="it">crema caffè</em></span></span></a>
     </div>
-  </section>
-
-  <section aria-label="Screenshots" style="max-width: 1040px; margin: 0 auto; padding: 0 24px 96px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px">
-    <figure style="margin: 0"><img src="img/game-list.png" width="912" height="672" loading="lazy" alt="The game list" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Game list</figcaption></figure>
-    <figure style="margin: 0"><img src="img/in-game-menu.png" width="912" height="672" loading="lazy" alt="Metal Slug 3 paused, with the in-game menu open" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">In-game menu</figcaption></figure>
-    <figure style="margin: 0"><img src="img/options.png" width="912" height="672" loading="lazy" alt="The options menu" style="width: 100%; height: auto; display: block; border-radius: 4px"><figcaption style="margin-top: 10px; font-size: 14px; color: #7C8696">Options</figcaption></figure>
   </section>
 
   <section id="features" style="border-top: 1px solid #1C2A44">
