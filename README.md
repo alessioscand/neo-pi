@@ -151,6 +151,10 @@ picture at all, put a `#` in front of `hdmi_group` and `hdmi_mode` in
 for performance, add an empty `neopi/BENCH` file and send `BENCH.TXT` and
 `PROFILE.TXT` too.
 
+If games start to slow down after a while, it is usually heat: a heatsink is
+recommended. The status line (Select + C) shows the temperature; the
+Pi 3 B+ lowers its CPU clock above 60 °C, the Pi 4 from about 80 °C.
+
 ## Building from source
 
 See [BUILD.md](BUILD.md). neo-pi is built with the xPack AArch64 GCC
