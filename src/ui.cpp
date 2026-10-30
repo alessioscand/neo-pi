@@ -302,9 +302,26 @@ void CUI::Buttons (int y, const TButtonHint *pHints, unsigned nHints)
 	}
 }
 
-void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel, const char *pMessage)
+// The paused game (darkened snapshot) or, with no game loaded, the pattern
+void CUI::Backdrop (boolean bOverGame)
 {
-	Background ();
+	if (bOverGame)
+	{
+		for (int y = 0; y < UI_H; y++)
+		{
+			memcpy (&m_Buf[(y + OY) * GAME_SRC_PITCH + OX], &m_Snapshot[y * UI_W], UI_W * 4);
+		}
+	}
+	else
+	{
+		Background ();
+	}
+}
+
+void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel, const char *pMessage,
+		    boolean bOverGame)
+{
+	Backdrop (bOverGame);
 	Logo ();					// the big logo: only on the game list
 	// y 0..40 reserved for the logo (empty for now)
 	Panel (12, 44, UI_W - 13, 190);

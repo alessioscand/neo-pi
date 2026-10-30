@@ -1,4 +1,6 @@
-neo-pi 0.6.1 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.6.2 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+(Raspberry Pi 3: most games run at full speed; the heaviest, such as
+Metal Slug 3, can still slow down for a moment in the busiest scenes)
 ===========================================================================
 
 SET-UP
@@ -16,8 +18,10 @@ START-UP
   cartridge in. GAME LIST in the in-game menu still shows the list.
 - Game list: up/down to choose, left/right to jump by 8, A or Start to play,
   D for the OPTIONS menu.
-- An empty file called neopi/BENCH runs a 10 second benchmark on the selected
-  game first (results in neopi/BENCH.TXT). Delete it to start normally.
+- An empty file called neopi/BENCH (no extension) runs a benchmark on the
+  selected game first: 30 seconds of the game's demo, then 60 seconds measured
+  (about a minute and a half, do not touch anything). Results in
+  neopi/BENCH.TXT and neopi/PROFILE.TXT. Delete BENCH to start normally.
 
 SETTING UP THE CONTROLS
   The first time a pad model is connected, the CONTROLS screen opens by itself:
@@ -76,11 +80,13 @@ PICTURE
     colors=invert   swap red and blue, if colours look wrong
     usbpoll=native  poll pads at the rate they ask for (usually every 8-10 ms)
                     instead of every 1 ms
+    resampler=speex the previous, heavier audio resampler (for comparison)
 
 FILES ON THE CARD (neopi folder)
   LOG.TXT     diagnostics: model, HDMI, pads, audio, per-minute timings. Updated
               when the menu opens, when the game changes and every 5 minutes.
   BENCH.TXT   benchmark results
+  PROFILE.TXT benchmark: where the time goes (for the developer)
   shots/      screenshots (Select + A)
   saves/      save states (.st1 MVS, .sa1 AES), MVS memory (.nv), memory cards
   LAST.TXT    last game played (the list starts there)

@@ -9,7 +9,7 @@ GEO_OBJS = m68kcpu.o m68kops.o z80.o ymfm_adpcm.o ymfm_opn.o ymfm_ssg.o \
 	   geo_mixer.o geo_neo.o geo_rtc.o geo_serial.o geo_vfs.o geo_ymfm.o \
 	   geo_z80.o miniz.o resample.o
 
-OBJS	= main.o kernel.o video.o fontdata.o input.o audio.o ui.o vfs.o ziphelp.o shim.o geo_disc_stub.o $(GEO_OBJS) libc_a-setjmp.o
+OBJS	= main.o kernel.o profile.o video.o fontdata.o input.o audio.o ui.o vfs.o ziphelp.o shim.o geo_disc_stub.o $(GEO_OBJS) libc_a-setjmp.o
 
 LIBS	= $(CIRCLEHOME)/addon/fatfs/libfatfs.a \
 	  $(CIRCLEHOME)/addon/SDCard/libsdcard.a \
@@ -31,5 +31,10 @@ DEFINE += -DNDEBUG -DMINIZ_NO_STDIO -DMINIZ_NO_TIME \
 CFLAGS += -fno-math-errno -Wno-unused-parameter -Wno-sign-compare
 
 include $(CIRCLEHOME)/Rules.mk
+
+# the emulator core is where the time goes: optimise it harder
+# (GEO_OPTIMIZE=-O2 in the environment builds the previous way, for comparison)
+GEO_OPTIMIZE ?= -O3
+$(GEO_OBJS): OPTIMIZE = $(GEO_OPTIMIZE)
 
 -include $(DEPS)

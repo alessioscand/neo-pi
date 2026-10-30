@@ -7,7 +7,9 @@ and a steady 60 frames per second. No operating system, no desktop, no
 setup wizard, nothing to configure. Switch on and you are in the game list,
 with a handful of clean menus, all driven from the gamepad.
 
-Tested on the Raspberry Pi 4. Making it run on the Raspberry Pi 3 is a goal.
+Tested on the Raspberry Pi 4 and the Raspberry Pi 3 B+. On the Pi 3 most
+games run at full speed; the heaviest, such as Metal Slug 3, can still slow
+down for a moment in the busiest scenes.
 
 ## Features
 
@@ -33,10 +35,11 @@ Planned:
 
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
 - UniBIOS support
+- Further Raspberry Pi 3 optimizations
 
 ## Requirements
 
-- Raspberry Pi 4 (the Pi 400 should work too; Pi 3 support is in progress)
+- Raspberry Pi 4 (the Pi 400 should work too) or Raspberry Pi 3 B+
 - A micro SD card formatted FAT32
 - A USB gamepad and an HDMI TV or monitor
 - Your own Neo Geo BIOS (`neogeo.zip`) and games in `.neo` format.
@@ -68,7 +71,7 @@ neo-pi is written by **Alessio Scanderebech**, standing on the shoulders of:
 | 68000 CPU | Musashi by Karl Stenerud |
 | Z80 CPU | by Nicola Allemand and Rupert Carmichael |
 | Sound | ymfm by Aaron Giles |
-| Resampler | speexdsp by Jean-Marc Valin |
+| Resampler (optional) | speexdsp by Jean-Marc Valin |
 | Zip and PNG | miniz by Rich Geldreich |
 | Bare-metal system | [Circle](https://github.com/rsta2/circle) by Rene Stange |
 | Menu font | "Matinee" from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |

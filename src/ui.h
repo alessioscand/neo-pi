@@ -58,7 +58,9 @@ public:
 
 	u32 *GetBuffer (void)	{ return m_Buf; }
 
-	void DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel, const char *pMessage);
+	// bOverGame: a game is loaded, show it paused behind the list (SnapshotGame)
+	void DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel, const char *pMessage,
+		       boolean bOverGame);
 	// Menu over a darkened copy of the game frame (call SnapshotGame when it opens)
 	void SnapshotGame (const u32 *pGameBuf);
 	// Generic panel menu: bOverGame = draw over the snapshot, else over the pattern
@@ -83,6 +85,7 @@ private:
 	void Pixel (int x, int y, u32 c);
 	void Fill (int x, int y, int w, int h, u32 c);
 	void Background (void);
+	void Backdrop (boolean bOverGame);
 	void Logo (void);
 	void Panel (int x0, int y0, int x1, int y1);
 	void Text (int x, int y, const char *s, u32 c, unsigned nTall = 1, boolean bListFont = FALSE);

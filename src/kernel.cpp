@@ -5,6 +5,7 @@
 #include "kernel.h"
 #include "fontdata.h"
 #include "neopi.h"
+#include "profile.h"
 #include <circle/machineinfo.h>
 #include <circle/memory.h>
 #include <circle/new.h>
@@ -19,6 +20,7 @@ extern "C" {
 #include "geo_lspc.h"
 #include "geo_mixer.h"
 #include "geo_neo.h"
+#include "geo_ymfm.h"
 
 int snprintf (char *pBuffer, size_t nSize, const char *pFormat, ...);
 int vsnprintf (char *pBuffer, size_t nSize, const char *pFormat, va_list Args);
@@ -34,6 +36,7 @@ void NeopiInstallVFS (void);
 #define LOG_PATH	NEOPI_DIR "/LOG.TXT"
 #define BENCH_PATH	NEOPI_DIR "/BENCH.TXT"
 #define BENCH_FLAG	NEOPI_DIR "/BENCH"
+#define PROFILE_PATH	NEOPI_DIR "/PROFILE.TXT"
 #define LAST_PATH	NEOPI_DIR "/LAST.TXT"
 #define CFG_PATH	NEOPI_DIR "/neopi.cfg"
 #define PADS_PATH	NEOPI_DIR "/pads.cfg"
@@ -41,7 +44,10 @@ void NeopiInstallVFS (void);
 #define SHOT_DIR	NEOPI_DIR "/shots"
 
 #define SAMPLE_RATE	48000
-#define BENCH_FRAMES	600
+#define BENCH_WARMUP	1800		// 30 s of play before measuring
+#define BENCH_FRAMES	3600		// then 60 s measured
+#define BENCH_PROFILE_US 200		// profiler: one sample every 200 us
+#define BENCH_SLOW_US	16000		// frames from 16 ms on count as slow
 #define REPORT_FRAMES	3600		// one statistics line per minute of play
 #define FLUSH_REPORTS	5		// write LOG.TXT every 5 minutes of play
 
@@ -64,6 +70,56 @@ static volatile unsigned s_nAudioSamples;	// stereo frames produced in the last 
 static void AudioCallback (size_t nSamples)
 {
 	s_nAudioSamples = nSamples / 2;		// callback counts int16 values (L+R)
+}
+
+// Light resampler (default since 0.6.2-rc1): the core hands over the raw
+// YM2610 output (about 56.3 kHz) and it is brought to 48 kHz by linear
+// interpolation, carrying the position and the last sample across frames.
+// Same rate ratio as Geolith's Speex path, a fraction of its cost (Speex at
+// quality 7 took about 15% of the frame time on a Pi 3).
+// resampler=speex in neopi.cfg goes back to Speex.
+#define YM_RATE		56319		// as in geo_mixer.c
+static boolean s_bSpeex = FALSE;
+static u64 s_nResPos;			// 32.32 position, 0 = last sample of the previous frame
+static int16_t s_ResPrev[2];
+static const u64 s_nResStep = ((u64) YM_RATE << 32) / SAMPLE_RATE;
+
+static void AudioCallbackLinear (size_t nValues)
+{
+	const int16_t *pIn = geo_ymfm_get_buffer ();
+	unsigned nIn = (unsigned) (nValues / 2);	// stereo input samples
+	unsigned nOut = 0;
+	u64 nPos = s_nResPos;
+	const unsigned nMaxOut = sizeof s_AudioBuf / sizeof s_AudioBuf[0] / 2;
+
+	// extended input: index 0 = previous frame's last sample, k = pIn[k-1]
+	while ((unsigned) (nPos >> 32) < nIn && nOut < nMaxOut)
+	{
+		unsigned i = (unsigned) (nPos >> 32);
+		int f = (int) ((nPos >> 17) & 0x7FFF);		// 15 bits: (diff * f) fits in 32 bits
+		int l0, r0;
+		if (i == 0)
+		{
+			l0 = s_ResPrev[0]; r0 = s_ResPrev[1];
+		}
+		else
+		{
+			l0 = pIn[2*(i-1)]; r0 = pIn[2*(i-1)+1];
+		}
+		int l1 = pIn[2*i], r1 = pIn[2*i+1];
+		s_AudioBuf[2*nOut]   = (int16_t) (l0 + (((l1 - l0) * f) >> 15));
+		s_AudioBuf[2*nOut+1] = (int16_t) (r0 + (((r1 - r0) * f) >> 15));
+		nOut++;
+		nPos += s_nResStep;
+	}
+	if (nIn > 0)
+	{
+		s_ResPrev[0] = pIn[2*(nIn-1)];
+		s_ResPrev[1] = pIn[2*(nIn-1)+1];
+		nPos -= (u64) nIn << 32;
+	}
+	s_nResPos = nPos;
+	s_nAudioSamples = nOut;
 }
 
 static void CoreLog (int nLevel, const char *pFormat, ...)
@@ -697,6 +753,10 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	geo_set_region ((int) m_nRegion);
 	geo_mixer_set_rate (SAMPLE_RATE);
 	geo_mixer_init ();
+	geo_mixer_set_raw (s_bSpeex ? 0 : 1);
+	geo_mixer_set_callback (s_bSpeex ? AudioCallback : AudioCallbackLinear);
+	s_nResPos = 0;
+	s_ResPrev[0] = s_ResPrev[1] = 0;
 	geo_init ();
 	geo_set_region ((int) m_nRegion);
 	ClearVideoMemory ();
@@ -819,29 +879,74 @@ const char *CKernel::SaveScreenshot (void)
 	return bOK ? Name : 0;
 }
 
-// ---- benchmark (M0) -------------------------------------------------------
+// ---- benchmark -------------------------------------------------------------
 
 void CKernel::Benchmark (void)
 {
 	static unsigned Emu[BENCH_FRAMES], Draw[BENCH_FRAMES], Total[BENCH_FRAMES];
 	u64 nSamples = 0;
 
-	Log ("Benchmark: 600 frames at full speed (about 10 seconds)...", COLOR_TITLE);
 	boolean bQuiet = m_bQuiet;
-	m_bQuiet = TRUE;
 	ApplyVideoMode ();		// measure the real drawing path (filter, HVS)
+	m_bQuiet = TRUE;
+
+	// 1. warm-up: let the BIOS logo and the game's start-up pass
+	for (unsigned i = 0; i < BENCH_WARMUP; i++)
+	{
+		geo_exec ();
+		m_Video.DrawGame (s_VideoBuf);
+	}
+
+	// 2. measurement, with the sampling profiler running
+	CProfiler *pProfiler = new CProfiler (&m_Interrupt);
+	boolean bProfile = pProfiler && pProfiler->Start (BENCH_PROFILE_US);
+
+	enum { Worst = 10 };
+	unsigned WorstIdx[Worst];
+	unsigned nWorst = 0;
+	unsigned nSlow = 0, nOver = 0;
+
 	for (unsigned i = 0; i < BENCH_FRAMES; i++)
 	{
+		if (bProfile) pProfiler->BeginFrame ();
 		unsigned t0 = CTimer::GetClockTicks ();
 		geo_exec ();
 		unsigned t1 = CTimer::GetClockTicks ();
 		m_Video.DrawGame (s_VideoBuf);
 		unsigned t2 = CTimer::GetClockTicks ();
+		boolean bSlow = t2 - t0 >= BENCH_SLOW_US;
+		if (bProfile) pProfiler->EndFrame (bSlow);
+
 		Emu[i] = t1 - t0;
 		Draw[i] = t2 - t1;
 		Total[i] = t2 - t0;
 		nSamples += s_nAudioSamples;
+		if (bSlow) nSlow++;
+		if (Total[i] > 16896) nOver++;
+
+		// keep the indices of the slowest frames, slowest first
+		unsigned k;
+		if (nWorst < Worst)
+		{
+			k = nWorst++;
+		}
+		else if (Total[i] > Total[WorstIdx[Worst - 1]])
+		{
+			k = Worst - 1;
+		}
+		else
+		{
+			continue;
+		}
+		while (k > 0 && Total[WorstIdx[k-1]] < Total[i])
+		{
+			WorstIdx[k] = WorstIdx[k-1];
+			k--;
+		}
+		WorstIdx[k] = i;
 	}
+	if (bProfile) pProfiler->Stop ();
+
 	m_bQuiet = bQuiet;
 	m_Video.SetConsoleMode ();
 	RedrawConsole ();
@@ -852,7 +957,7 @@ void CKernel::Benchmark (void)
 	ComputeStats (Total, BENCH_FRAMES, &T);
 
 	char a[16], b[16], c[16], d[16];
-	char Report[2048];
+	char Report[4096];
 	size_t nPos = 0;
 	char Line[160];
 
@@ -867,7 +972,8 @@ void CKernel::Benchmark (void)
 		  NEOPI_VERSION, pInfo->GetMachineName (), pInfo->GetRAMSize (),
 		  m_CPUThrottle.GetClockRate () / 1000000, m_CPUThrottle.GetTemperature ());
 	REPORT (COLOR_TEXT);
-	snprintf (Line, sizeof Line, "Game: %s", m_pGames[m_nLoaded].File);
+	snprintf (Line, sizeof Line, "Game: %s (measured after %u s of play, for %u s)",
+		  m_pGames[m_nLoaded].File, BENCH_WARMUP / 60, BENCH_FRAMES / 60);
 	REPORT (COLOR_TEXT);
 	char Tag[8];
 	VideoModeTag (Tag, sizeof Tag);
@@ -880,28 +986,74 @@ void CKernel::Benchmark (void)
 	REPORT (COLOR_TITLE);
 	FormatMs (a, sizeof a, E.nAvg); FormatMs (b, sizeof b, E.nP99);
 	FormatMs (c, sizeof c, E.nMax); FormatMs (d, sizeof d, E.nMin);
-	snprintf (Line, sizeof Line, "  emulazione + audio      %7s %7s %7s %7s", a, b, c, d);
+	snprintf (Line, sizeof Line, "  emulation + audio       %7s %7s %7s %7s", a, b, c, d);
 	REPORT (COLOR_TEXT);
 	FormatMs (a, sizeof a, D.nAvg); FormatMs (b, sizeof b, D.nP99);
 	FormatMs (c, sizeof c, D.nMax); FormatMs (d, sizeof d, D.nMin);
-	snprintf (Line, sizeof Line, "  disegno su HDMI         %7s %7s %7s %7s", a, b, c, d);
+	snprintf (Line, sizeof Line, "  drawing to HDMI         %7s %7s %7s %7s", a, b, c, d);
 	REPORT (COLOR_TEXT);
 	FormatMs (a, sizeof a, T.nAvg); FormatMs (b, sizeof b, T.nP99);
 	FormatMs (c, sizeof c, T.nMax); FormatMs (d, sizeof d, T.nMin);
-	snprintf (Line, sizeof Line, "  totale                  %7s %7s %7s %7s", a, b, c, d);
+	snprintf (Line, sizeof Line, "  total                   %7s %7s %7s %7s", a, b, c, d);
 	REPORT (COLOR_TEXT);
 	snprintf (Line, sizeof Line, "Top speed: %u%% of a real Neo Geo (100%% = 59.19 fps)", nSpeed);
 	REPORT (nSpeed >= 150 ? COLOR_OK : COLOR_ERR);
-	unsigned nMargin = T.nP99 < 16667 ? 16667 - T.nP99 : 0;
-	FormatMs (a, sizeof a, nMargin);
-	snprintf (Line, sizeof Line, "Spare time at 60 Hz (p99 case): %s ms per frame", a);
-	REPORT (COLOR_TEXT);
-	snprintf (Line, sizeof Line, "Audio: %u stereo samples per frame at %u Hz",
-		  (unsigned) (nSamples / BENCH_FRAMES), SAMPLE_RATE);
+	snprintf (Line, sizeof Line, "Frames over 16.9 ms (too slow for full speed): %u of %u (%u.%u%%)",
+		  nOver, BENCH_FRAMES, nOver * 100 / BENCH_FRAMES, (nOver * 1000 / BENCH_FRAMES) % 10);
+	REPORT (nOver ? COLOR_ERR : COLOR_OK);
+	snprintf (Line, sizeof Line, "Slowest frames (second.frame: emulation + drawing ms):");
+	REPORT (COLOR_TITLE);
+	for (unsigned w = 0; w < nWorst; w += 2)
+	{
+		size_t n = 0;
+		Line[0] = 0;
+		for (unsigned j = w; j < w + 2 && j < nWorst; j++)
+		{
+			unsigned f = WorstIdx[j];
+			FormatMs (a, sizeof a, Emu[f]); FormatMs (b, sizeof b, Draw[f]);
+			n += snprintf (Line + n, sizeof Line - n, "  %3u.%02u: %s + %s",
+				       f / 60, f % 60, a, b);
+		}
+		REPORT (COLOR_TEXT);
+	}
+	snprintf (Line, sizeof Line, "Audio: %u stereo samples per frame at %u Hz, resampler %s",
+		  (unsigned) (nSamples / BENCH_FRAMES), SAMPLE_RATE, s_bSpeex ? "speex" : "linear");
+	REPORT (COLOR_DIM);
+	// same game + same build options must give the same picture after the
+	// same number of frames: used to check compiler optimisations
+	u32 nHash = 2166136261U;
+	for (unsigned i = 0; i < GAME_SRC_PITCH * GAME_SRC_LINES; i++)
+	{
+		nHash = (nHash ^ s_VideoBuf[i]) * 16777619U;
+	}
+	snprintf (Line, sizeof Line, "Check: picture after %u frames = %08X",
+		  BENCH_WARMUP + BENCH_FRAMES, nHash);
+	REPORT (COLOR_DIM);
+	if (bProfile)
+	{
+		snprintf (Line, sizeof Line, "Profile: %u samples (%u in frames over %u ms) -> PROFILE.TXT",
+			  pProfiler->GetTotal (), pProfiler->GetSlow (), BENCH_SLOW_US / 1000);
+	}
+	else
+	{
+		snprintf (Line, sizeof Line, "Profile: not available");
+	}
 	REPORT (COLOR_DIM);
 
 	WriteTextFile (BENCH_PATH, Report);
-	Log ("Results saved to neopi/BENCH.TXT", COLOR_OK);
+	if (bProfile)
+	{
+		const size_t nSize = 1024 * 1024;
+		char *pText = new char[nSize];
+		if (pText)
+		{
+			pProfiler->Format (pText, nSize);
+			WriteTextFile (PROFILE_PATH, pText);
+			delete [] pText;
+		}
+	}
+	delete pProfiler;
+	Log ("Results saved to neopi/BENCH.TXT and neopi/PROFILE.TXT", COLOR_OK);
 	SaveLog ();
 
 	geo_reset (1);		// play from a clean boot
@@ -1056,11 +1208,13 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
 	// colors=invert: swap red and blue if the detected byte order is wrong
 	if (strstr (Text, "colors=invert"))	m_Video.SetInvertColors (TRUE), m_bInvertColors = TRUE;
+	// resampler=speex: Geolith's own high quality resampler (heavier)
+	if (strstr (Text, "resampler=speex"))	s_bSpeex = TRUE;
 
-	char Line[120];
-	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s",
+	char Line[140];
+	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s, resampler %s",
 		  m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion), FilterName (m_nFilter),
-		  g_nUSBInterruptPollMs ? "1 ms" : "native");
+		  g_nUSBInterruptPollMs ? "1 ms" : "native", s_bSpeex ? "speex" : "linear");
 	Log (Line, COLOR_TEXT);
 }
 
@@ -1081,6 +1235,10 @@ void CKernel::SaveConfig (void)
 	if (m_bInvertColors)
 	{
 		strcat (Text, "colors=invert\r\n");
+	}
+	if (s_bSpeex)
+	{
+		strcat (Text, "resampler=speex\r\n");
 	}
 	WriteTextFile (CFG_PATH, Text);
 }
@@ -1154,7 +1312,7 @@ void CKernel::RunSystemMenu (void)
 					int nPad = ChoosePad ();
 					if (nPad >= 0)
 					{
-						RunMapping ((unsigned) nPad, FALSE);
+						RunMapping ((unsigned) nPad, m_nLoaded >= 0);
 					}
 					else if (m_pInput->GetPadCount () == 0)
 					{
@@ -1199,7 +1357,7 @@ void CKernel::RunSystemMenu (void)
 			pShow = "APPLIES TO NEXT GAME";
 		}
 		static const TButtonHint Hints[2] = {{'A', "CHANGE"}, {'B', "BACK"}};
-		m_pUI->DrawPanelMenu (FALSE, "OPTIONS", Items, SmCount, nSel, pShow, UI_VALUE,
+		m_pUI->DrawPanelMenu (m_nLoaded >= 0, "OPTIONS", Items, SmCount, nSel, pShow, UI_VALUE,
 				      Hints, 2, Footer);
 		ShowUIFrame ();
 	}
@@ -1456,7 +1614,7 @@ unsigned CKernel::RunList (unsigned nSel)
 			int nPad = m_pInput->GetUnmappedPad ();
 			if (nPad >= 0)
 			{
-				RunMapping ((unsigned) nPad, FALSE);
+				RunMapping ((unsigned) nPad, m_nLoaded >= 0);
 				nPrev = ~0u;
 				continue;
 			}
@@ -1495,7 +1653,7 @@ unsigned CKernel::RunList (unsigned nSel)
 		nPrev = n;
 
 		const char *pMsg = m_pInput->GetPadCount () == 0 ? "CONNECT A USB GAMEPAD" : "";
-		m_pUI->DrawList (m_pGames, m_nGames, nSel, pMsg);
+		m_pUI->DrawList (m_pGames, m_nGames, nSel, pMsg, m_nLoaded >= 0);
 		ShowUIFrame ();
 	}
 }
