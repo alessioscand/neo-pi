@@ -36,8 +36,7 @@ CVideoOut::CVideoOut (void)
 	m_pDark (0),
 
 	m_nPixelOrder (1),
-	m_bRLow (TRUE),
-	m_bInvertColors (FALSE)
+	m_bRLow (TRUE)
 {
 }
 
@@ -85,7 +84,7 @@ boolean CVideoOut::Allocate (unsigned nWidth, unsigned nHeight)
 	{
 		m_nPixelOrder = Order.nValue;
 	}
-	m_bRLow = (m_nPixelOrder != 0) != m_bInvertColors;
+	m_bRLow = m_nPixelOrder != 0;
 
 	Clear (0, RGB (0, 0, 0));
 	Clear (1, RGB (0, 0, 0));

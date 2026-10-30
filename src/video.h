@@ -72,7 +72,6 @@ public:
 	void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans);
 
 	// Colors: RGB() values are converted to the framebuffer byte order
-	void SetInvertColors (boolean bInvert)	{ m_bInvertColors = bInvert; }
 	unsigned GetPixelOrder (void) const	{ return m_nPixelOrder; }
 	boolean IsRedLow (void) const		{ return m_bRLow; }
 
@@ -120,7 +119,6 @@ private:
 	u32	*m_pDark;			// the same line darkened (scanlines)
 	unsigned m_nPixelOrder;			// reported by the firmware
 	boolean	 m_bRLow;			// red in the low byte of a pixel
-	boolean	 m_bInvertColors;		// colors=invert in neopi.cfg
 };
 
 #endif

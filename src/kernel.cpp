@@ -1,5 +1,5 @@
 /*
- * neo-pi - kernel (milestone M1): game list, play with USB pads and HDMI
+ * neo-pi - kernel: game list, play with USB pads and HDMI
  * audio, in-game menu with save states, automatic diagnostics in LOG.TXT.
  */
 #include "kernel.h"
@@ -49,7 +49,6 @@ void NeopiInstallVFS (void);
 #define BENCH_PROFILE_US 200		// profiler: one sample every 200 us
 #define BENCH_SLOW_US	16000		// frames from 16 ms on count as slow
 #define REPORT_FRAMES	3600		// one statistics line per minute of play
-#define FLUSH_REPORTS	5		// write LOG.TXT every 5 minutes of play
 
 #define COLOR_TEXT	RGB (220, 220, 220)
 #define COLOR_TITLE	RGB (255, 200, 0)
@@ -333,8 +332,7 @@ CKernel::CKernel (void)
 	m_nFilter (0),
 	m_bHVS (TRUE),
 	m_bFilterAllowed (TRUE),
-	m_bForceFilters (FALSE),
-	m_bInvertColors (FALSE)
+	m_bForceFilters (FALSE)
 {
 	s_pThis = this;
 	m_LastRaw[0] = '\0';
@@ -1156,7 +1154,7 @@ void CKernel::ApplyVideoMode (void)
 	Log (Line, COLOR_TEXT);
 	snprintf (Line, sizeof Line, "Video: pixel order %s (%u), red in the %s byte%s",
 		  m_Video.GetPixelOrder () ? "RGB" : "BGR", m_Video.GetPixelOrder (),
-		  m_Video.IsRedLow () ? "low" : "high", m_bInvertColors ? ", colors=invert" : "");
+		  m_Video.IsRedLow () ? "low" : "high", "");
 	Log (Line, COLOR_TEXT);
 }
 
@@ -1206,8 +1204,6 @@ void CKernel::LoadConfig (void)
 	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
 	// usbpoll=native keeps the interval requested by the device
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
-	// colors=invert: swap red and blue if the detected byte order is wrong
-	if (strstr (Text, "colors=invert"))	m_Video.SetInvertColors (TRUE), m_bInvertColors = TRUE;
 	// resampler=speex: Geolith's own high quality resampler (heavier)
 	if (strstr (Text, "resampler=speex"))	s_bSpeex = TRUE;
 
@@ -1231,10 +1227,6 @@ void CKernel::SaveConfig (void)
 	if (g_nUSBInterruptPollMs == 0)
 	{
 		strcat (Text, "usbpoll=native\r\n");
-	}
-	if (m_bInvertColors)
-	{
-		strcat (Text, "colors=invert\r\n");
 	}
 	if (s_bSpeex)
 	{
@@ -1726,7 +1718,7 @@ void CKernel::RunGame (void)
 	u32 nMenuPrev = ~0u;
 	m_pInput->RestartDiagnostics ();		// log the pad reports of this game too
 
-	unsigned nFrames = 0, nReports = 0;
+	unsigned nFrames = 0;
 	unsigned nWinStart = CTimer::GetClockTicks ();
 	unsigned nWorkMax = 0;
 	unsigned nLastVSync = CTimer::GetClockTicks ();
@@ -2125,10 +2117,6 @@ void CKernel::RunGame (void)
 			{
 				ReportWindow (FALSE);
 				m_pInput->FlushDiagnostics ();
-				if (++nReports % FLUSH_REPORTS == 0)
-				{
-					SaveLog ();		// may cost one frame, once every 5 minutes
-				}
 			}
 		}
 

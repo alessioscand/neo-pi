@@ -77,14 +77,13 @@ PICTURE
   Expert options in neopi/neopi.cfg (one per line):
     scaler=cpu      do not use the hardware scaler (comparison only)
     filters=on      allow scanlines on a Pi 3 too (experimental)
-    colors=invert   swap red and blue, if colours look wrong
     usbpoll=native  poll pads at the rate they ask for (usually every 8-10 ms)
                     instead of every 1 ms
     resampler=speex the previous, heavier audio resampler (for comparison)
 
 FILES ON THE CARD (neopi folder)
   LOG.TXT     diagnostics: model, HDMI, pads, audio, per-minute timings. Updated
-              when the menu opens, when the game changes and every 5 minutes.
+              when the menu opens, when the game changes and at power off.
   BENCH.TXT   benchmark results
   PROFILE.TXT benchmark: where the time goes (for the developer)
   shots/      screenshots (Select + A)
