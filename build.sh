@@ -1,5 +1,9 @@
 #!/bin/bash
 # neo-pi build: ./build.sh [4|3|all]
+# Multicore (default): Circle in circle-rpi4mc / circle-rpi3mc, built with
+# ARM_ALLOW_MULTI_CORE; the video chip lines are drawn on core 1
+# (patches/geolith-mc.py). NEOPI_SINGLE=1 ./build.sh builds the single core
+# kernels of 0.6.3 and earlier (Circle in circle-rpi4 / circle-rpi3).
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 GEO="$ROOT/third_party/geolith"
@@ -22,8 +26,14 @@ for P in $TARGETS; do
 	# setjmp/longjmp from newlib
 	(cd "$B" && "$ROOT"/toolchain/xpack-aarch64-none-elf-gcc-14.2.1-1.1/bin/aarch64-none-elf-ar x \
 		"$ROOT"/toolchain/xpack-aarch64-none-elf-gcc-14.2.1-1.1/aarch64-none-elf/lib/libc.a libc_a-setjmp.o)
-	sed "s|@CIRCLEHOME@|$ROOT/circle-rpi$P|; s|@GEO@|$GEO|; s|@SRC@|$ROOT/src|" \
+	CIRCLE="$ROOT/circle-rpi${P}mc"
+	[ -n "$NEOPI_SINGLE" ] && CIRCLE="$ROOT/circle-rpi$P"
+	sed "s|@CIRCLEHOME@|$CIRCLE|; s|@GEO@|$GEO|; s|@SRC@|$ROOT/src|" \
 		"$ROOT/src/Makefile.in" > "$B/Makefile"
+	if [ -z "$NEOPI_SINGLE" ]; then
+		python3 "$ROOT/patches/geolith-mc.py" "$B/geo_lspc.c"
+		echo "DEFINE += -DNEOPI_MC" >> "$B/Makefile"
+	fi
 	make -C "$B" -j16
 done
 

@@ -271,79 +271,82 @@ void CVideoOut::DrawText (unsigned nBuffer, unsigned nCol, unsigned nRow, const 
 
 void CVideoOut::DrawGame (const u32 *pSource)
 {
+	for (unsigned y = 0; y < GAME_H; y++)
+	{
+		DrawGameLine (pSource, y, m_pLine, m_pDark);
+	}
+}
 
+void CVideoOut::DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
+{
 	const unsigned M = m_nM;
 	const unsigned nGameW = GAME_W * M;
-	const u32 *pSrcBase = pSource + GAME_SRC_Y * GAME_SRC_PITCH + GAME_SRC_X;
 
 	// scanlines: bottom rows of each group darker (2 of 4 at 4x, 1 of 2 or 3)
 	const unsigned nDarkRows = m_nFilter != FILTER_NONE ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
 
-	for (unsigned y = 0; y < GAME_H; y++)
+	// expand one source line horizontally into cached memory, converting
+	// Geolith's XRGB8888 (R high) to the framebuffer order if needed
+	const u32 *pSrc = pSource + (GAME_SRC_Y + y) * GAME_SRC_PITCH + GAME_SRC_X;
+	u32 *pDst = pLine;
+	if (m_bRLow)
 	{
-		// expand one source line horizontally into cached memory, converting
-		// Geolith's XRGB8888 (R high) to the framebuffer order if needed
-		const u32 *pSrc = pSrcBase + y * GAME_SRC_PITCH;
-		u32 *pDst = m_pLine;
-		if (m_bRLow)
+		for (unsigned x = 0; x < GAME_W; x++)
 		{
-			for (unsigned x = 0; x < GAME_W; x++)
+			u32 p = pSrc[x];
+			u32 c = 0xFF000000u | (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16);
+			for (unsigned s = 0; s < M; s++)
 			{
-				u32 p = pSrc[x];
-				u32 c = 0xFF000000u | (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16);
-				for (unsigned s = 0; s < M; s++)
-				{
-					*pDst++ = c;
-				}
+				*pDst++ = c;
 			}
 		}
-		else
+	}
+	else
+	{
+		for (unsigned x = 0; x < GAME_W; x++)
 		{
-			for (unsigned x = 0; x < GAME_W; x++)
+			u32 c = 0xFF000000u | pSrc[x];
+			for (unsigned s = 0; s < M; s++)
 			{
-				u32 c = 0xFF000000u | pSrc[x];
-				for (unsigned s = 0; s < M; s++)
-				{
-					*pDst++ = c;
-				}
+				*pDst++ = c;
 			}
 		}
+	}
 
-		unsigned nDstY = m_nGameY + y * M;
+	unsigned nDstY = m_nGameY + y * M;
 
-		if (nDarkRows)
+	if (nDarkRows)
+	{
+		// shifts and masks only (75% = 50% + 25%)
+		const u32 *pL = pLine;
+		u32 *pD = pDark;
+		switch (m_nFilter)
 		{
-			// shifts and masks only (75% = 50% + 25%)
-			const u32 *pL = m_pLine;
-			u32 *pD = m_pDark;
-			switch (m_nFilter)
+		case FILTER_SCAN_LIGHT:
+			for (unsigned x = 0; x < nGameW; x++)
 			{
-			case FILTER_SCAN_LIGHT:
-				for (unsigned x = 0; x < nGameW; x++)
-				{
-					u32 c = pL[x];
-					pD[x] = 0xFF000000u | (((c >> 1) & 0x007F7F7Fu) + ((c >> 2) & 0x003F3F3Fu));
-				}
-				break;
-			case FILTER_SCAN_STRONG:
-				for (unsigned x = 0; x < nGameW; x++)
-				{
-					pD[x] = 0xFF000000u | ((pL[x] >> 2) & 0x003F3F3Fu);
-				}
-				break;
-			default:
-				for (unsigned x = 0; x < nGameW; x++)
-				{
-					pD[x] = 0xFF000000u | ((pL[x] >> 1) & 0x007F7F7Fu);
-				}
-				break;
+				u32 c = pL[x];
+				pD[x] = 0xFF000000u | (((c >> 1) & 0x007F7F7Fu) + ((c >> 2) & 0x003F3F3Fu));
 			}
+			break;
+		case FILTER_SCAN_STRONG:
+			for (unsigned x = 0; x < nGameW; x++)
+			{
+				pD[x] = 0xFF000000u | ((pL[x] >> 2) & 0x003F3F3Fu);
+			}
+			break;
+		default:
+			for (unsigned x = 0; x < nGameW; x++)
+			{
+				pD[x] = 0xFF000000u | ((pL[x] >> 1) & 0x007F7F7Fu);
+			}
+			break;
 		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			const u32 *pSrcLine = s >= M - nDarkRows ? m_pDark : m_pLine;
-			memcpy (Row (m_nBack, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
-		}
+	}
+	for (unsigned s = 0; s < M; s++)
+	{
+		const u32 *pSrcLine = s >= M - nDarkRows ? pDark : pLine;
+		memcpy (Row (m_nBack, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
 	}
 }
 

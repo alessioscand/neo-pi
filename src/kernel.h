@@ -63,6 +63,8 @@ private:
 	void UnloadGame (void);
 	void SaveGameData (void);
 	void Benchmark (void);
+	void DrawGameFrame (void);
+	void McTest (unsigned nSel);
 	unsigned RunList (unsigned nSel);
 	void RunGame (void);
 	void ShowUIFrame (boolean bWait = TRUE, const char *pTopMessage = 0);

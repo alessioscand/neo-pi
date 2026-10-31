@@ -1,11 +1,11 @@
-# neo-pi - how to build (version 0.6.2)
+# neo-pi - how to build (version 0.6.4)
 
 Build host: Linux x86_64.
 
 1. **Toolchain**: xPack aarch64-none-elf-gcc 14.2.1-1.1 (newlib) in `toolchain/`
    (https://github.com/xpack-dev-tools/aarch64-none-elf-gcc-xpack/releases).
-2. **Circle** (rsta2/circle) commit 7a81e1b, copied into `circle-rpi4/` and `circle-rpi3/`
-   with this `Config.mk` (RASPPI = 4 or 3):
+2. **Circle** (rsta2/circle) commit 7a81e1b, copied into `circle-rpi4mc/` and `circle-rpi3mc/`
+   with this `Config.mk` (RASPPI = 4 or 3; the circle-rpiN directory names inside it adjusted):
 
    ```
    AARCH = 64
@@ -13,22 +13,33 @@ Build host: Linux x86_64.
    PREFIX64 = <path>/toolchain/xpack-aarch64-none-elf-gcc-14.2.1-1.1/bin/aarch64-none-elf-
    STDLIB_SUPPORT = 1
    DEFINE += -DKERNEL_MAX_SIZE=0x1000000
+   DEFINE += -DARM_ALLOW_MULTI_CORE
    ```
+
+   ARM_ALLOW_MULTI_CORE: since 0.6.4 the video chip's lines are drawn on core 1
+   (see step 4). Copies without it in `circle-rpi4/` and `circle-rpi3/` build the
+   single core kernels of 0.6.3 and earlier with `NEOPI_SINGLE=1 ./build.sh all`.
 
    KERNEL_MAX_SIZE is 16 MB because the core's Neo Geo CD buffers do not fit in the default 2 MB.
 3. **Circle patches**: USB pads polled every 1 ms instead of the interval the device asks for,
    like `usbhid.jspoll=1` on Linux (hubs excluded); third-party wired Xbox 360 (XInput)
    pads handled by Circle's Xbox 360 driver, like Linux xpad:
 
-       python3 patches/circle-usb-poll.py circle-rpi4
-       python3 patches/circle-usb-poll.py circle-rpi3
-       python3 patches/circle-xinput.py circle-rpi4
-       python3 patches/circle-xinput.py circle-rpi3
+       python3 patches/circle-usb-poll.py circle-rpi4mc
+       python3 patches/circle-usb-poll.py circle-rpi3mc
+       python3 patches/circle-xinput.py circle-rpi4mc
+       python3 patches/circle-xinput.py circle-rpi3mc
 
    then `./makeall` in each copy, and `make` in `addon/SDCard` and `addon/fatfs`.
    `usbpoll=native` in `neopi/neopi.cfg` turns the faster polling off at run time.
 4. **Geolith** in `third_party/geolith` (from the mirror github.com/alessioscand/geolith-mirror),
-   unmodified; CD support is left out with `src/geo_disc_stub.c`.
+   unmodified; CD support is left out with `src/geo_disc_stub.c`. `build.sh` applies
+   `patches/geolith-mc.py` to the copy of `geo_lspc.c` in the build directory: core 0
+   queues the lines, core 1 draws them (and copies each finished line to the screen);
+   before anything the drawing reads is changed, core 0 waits for core 1, so the
+   picture is identical to single core. `multicore=off` in `neopi/neopi.cfg` keeps
+   everything on core 0; an empty `neopi/MCTEST` file compares single core and
+   multicore line by line (results in `neopi/MCTEST.TXT`).
 5. `./build.sh all` builds `build/rpi4/kernel8-rpi4.img` and `build/rpi3/kernel8.img`.
    The Geolith core is compiled with `-O3` (the rest of neo-pi and Circle with `-O2`):
    on a Pi 3 it halves the frames that miss 60 Hz in heavy scenes, with identical

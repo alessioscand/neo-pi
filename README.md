@@ -21,8 +21,9 @@ It is also meant to give older boards a new lease on life: neo-pi makes the
 most of the Raspberry Pi 3 and 4, so you don't need the latest hardware to
 play.
 
-Tested on the Raspberry Pi 4 and the Raspberry Pi 3 B+. On the Pi 3 most
-games run at full speed with no overclocking. Scanlines are available on the Pi 4.
+Tested on the Raspberry Pi 4 and the Raspberry Pi 3 B+. On the Pi 3 even
+the heaviest games run at full speed with no overclocking, scanlines
+included.
 
 
 ## Features
@@ -36,8 +37,8 @@ games run at full speed with no overclocking. Scanlines are available on the Pi 
 - MVS (arcade) and AES (home console) systems, all four BIOS regions
 - Integer scaling with square pixels at 1080p or 720p, using the Pi's
   hardware scaler
-- Optional scanlines (light, medium, strong) on the Pi 4, drawn within
-  the same frame: no added lag
+- Optional scanlines (light, medium, strong), drawn within the same
+  frame: no added lag
 - Lazy finger (turbo): Select + B switches it on and off; while it is on,
   holding A, B, C or D fires repeatedly
 - Save states (one slot per game), screenshots (PNG) and an optional
@@ -48,7 +49,6 @@ Planned:
 
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
 - UniBIOS support
-- Further Raspberry Pi 3 optimizations
 
 
 ## Requirements
@@ -94,10 +94,20 @@ unplugging: it saves memory cards and settings.
 
 A few choices behind neo-pi's low-latency design and performance optimizations:
 
-- **One frame, start to finish, on one core.** Each frame reads the pads,
+- **One frame, start to finish, no pipeline.** Each frame reads the pads,
   emulates, queues the audio and draws, then the double-buffered
-  framebuffer flips at the vertical sync. No pipeline: no frame is emulated
-  ahead and shown later by another stage, so nothing adds a frame of delay.
+  framebuffer flips at the vertical sync. No frame is emulated ahead and
+  shown later by another stage, so nothing adds a frame of delay.
+
+- **Two cores on the same frame.** While the first CPU core runs the 68000,
+  the Z80 and the sound chip, the second draws the video chip's lines (the
+  most expensive part) and copies each finished line to the screen. Before
+  the game changes anything the drawing reads (video memory, palette), the
+  first core waits for the second, so the picture is identical, pixel for
+  pixel, to a single core; at the end of the frame it waits for the last
+  line, so the frame is shown at the same vertical sync as before. The lag,
+  measured from the USB report to the start of scan-out, does not change;
+  the frame is simply ready earlier.
 
 - **1 ms USB polling.** The USB stack is patched so that pads are polled
   every 1 ms instead of the 8-10 ms most of them ask for, and they are read
@@ -105,9 +115,8 @@ A few choices behind neo-pi's low-latency design and performance optimizations:
 
 - **The hardware scaler does the enlarging.** The 304x224 picture is copied
   once into a small framebuffer (480x270 at 1080p) and the Pi's HVS scales
-  it 4x to the screen, integer and with square pixels: drawing costs about
-  0.6 ms per frame even on a Pi 3. Scanlines are drawn while copying (CPU
-  2x, HVS 2x), in the same frame.
+  it 4x to the screen, integer and with square pixels. Scanlines are drawn
+  while copying (CPU 2x, HVS 2x), in the same frame.
 
 - **Own audio resampler.** The YM2610 output (about 56 kHz) is brought to
   48 kHz by a small fixed-point resampler written for neo-pi; the
@@ -120,7 +129,8 @@ A few choices behind neo-pi's low-latency design and performance optimizations:
   benchmark with a sampling profiler (the interrupted address is recorded
   every 200 us, `tools/resolve_profile.py` maps it to functions) and a check
   value of the final picture: an optimisation must give the same picture
-  after the same 5,400 frames, so the emulation is unchanged. The
+  after the same 5,400 frames, so the emulation is unchanged. An empty
+  `neopi/MCTEST` file compares one core and two cores line by line. The
   emulation core is compiled with `-O3`, the rest with `-O2`.
 
 - **Fixed clocks, no surprises.** The GPU core clock is fixed, the HDMI mode
@@ -139,7 +149,7 @@ For testing and performance comparisons, these lines can be added to
 
 | | |
 |---|---|
-| `filters=on` | allow scanlines on a Pi 3 too (experimental) |
+| `multicore=off` | everything on one core, as up to 0.6.3 |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
 | `resampler=speex` | previous, heavier audio resampler |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler |

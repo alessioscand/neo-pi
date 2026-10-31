@@ -1,4 +1,4 @@
-neo-pi 0.6.3 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.6.4 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
 
 SET-UP
@@ -60,7 +60,7 @@ OPTIONS MENU (D in the list; A or left/right changes, B goes back)
   SYSTEM         MVS (arcade) or AES (home console), from the next game
   REGION         EUROPE / USA / JAPAN / ASIA (BIOS region: language,
                  censorship), from the next game
-  SCANLINES      OFF / LIGHT / MEDIUM / STRONG (Pi 4 only)
+  SCANLINES      OFF / LIGHT / MEDIUM / STRONG
   CONTROLS       sets up a pad (with several pads: press a button on the
                  one to set up)
   POWER OFF      as above
@@ -78,7 +78,7 @@ PICTURE
   borders. 1080p: 1216x896 picture. 720p: 912x672 picture.
   Testing options in neopi/neopi.cfg (one per line):
     scaler=cpu       do not use the hardware scaler (comparison only)
-    filters=on       allow scanlines on a Pi 3 too (experimental)
+    multicore=off    everything on one CPU core, as up to 0.6.3
     usbpoll=native   poll pads at the rate they ask for (usually every
                      8-10 ms) instead of every 1 ms
     resampler=speex  the previous, heavier audio resampler (comparison)

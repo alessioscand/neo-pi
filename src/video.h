@@ -67,6 +67,9 @@ public:
 
 	// Game: draws the visible 304x224 area into the back buffer
 	void DrawGame (const u32 *pSource);
+	// one line of the game picture into the back buffer, with the caller's
+	// scratch lines (GAME_W * 8 pixels each): used by core 1 in the multicore build
+	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark);
 	// One centred line of text in the top or bottom black band (no spans = clear)
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
 	void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans);

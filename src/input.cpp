@@ -6,6 +6,7 @@
 #include <circle/usb/usbhid.h>
 #include <circle/usb/usbdevice.h>
 #include <circle/util.h>
+#include <circle/timer.h>
 #include <stdio.h>
 
 CInput *CInput::s_pThis = 0;
@@ -20,6 +21,8 @@ unsigned CInput::s_nMaps = 0;
 volatile int CInput::s_SlotMap[MAX_PADS];
 TGamePadState CInput::s_Last[MAX_PADS];
 volatile boolean CInput::s_bGotReport[MAX_PADS];
+volatile boolean CInput::s_bChange = FALSE;
+volatile unsigned CInput::s_nChangeTicks = 0;
 
 static const char *MapKeys[MAP_COUNT] =
 	{"UP", "DOWN", "LEFT", "RIGHT", "A", "B", "C", "D", "START", "SELECT"};
@@ -139,6 +142,17 @@ void CInput::UpdateDevices (void)
 			m_pKeyboard->RegisterKeyStatusHandlerRaw (KeyboardRawHandler);
 		}
 	}
+}
+
+boolean CInput::TakeChange (unsigned *pTicks)
+{
+	if (!s_bChange)
+	{
+		return FALSE;
+	}
+	*pTicks = s_nChangeTicks;
+	s_bChange = FALSE;
+	return TRUE;
 }
 
 unsigned CInput::GetPadCount (void) const
@@ -274,6 +288,11 @@ void CInput::GamePadStatusHandler (unsigned nIndex, const TGamePadState *pState)
 		return;
 	}
 	u32 nMapped = MapPad (nIndex, pState);
+	if (nMapped != s_PadState[nIndex] && !s_bChange)
+	{
+		s_nChangeTicks = CTimer::GetClockTicks ();	// lag measurement
+		s_bChange = TRUE;
+	}
 	s_PadState[nIndex] = nMapped;
 	s_bGotReport[nIndex] = TRUE;
 

@@ -37,6 +37,11 @@ void NeopiInstallVFS (void);
 #define BENCH_PATH	NEOPI_DIR "/BENCH.TXT"
 #define BENCH_FLAG	NEOPI_DIR "/BENCH"
 #define PROFILE_PATH	NEOPI_DIR "/PROFILE.TXT"
+#define MCTEST_FLAG	NEOPI_DIR "/MCTEST"		// multicore build: picture check
+#define MCTEST_PATH	NEOPI_DIR "/MCTEST.TXT"
+#ifndef MCTEST_FRAMES
+#define MCTEST_FRAMES	3600
+#endif
 #define LAST_PATH	NEOPI_DIR "/LAST.TXT"
 #define CFG_PATH	NEOPI_DIR "/neopi.cfg"
 #define PADS_PATH	NEOPI_DIR "/pads.cfg"
@@ -44,8 +49,12 @@ void NeopiInstallVFS (void);
 #define SHOT_DIR	NEOPI_DIR "/shots"
 
 #define SAMPLE_RATE	48000
+#ifndef BENCH_WARMUP
 #define BENCH_WARMUP	1800		// 30 s of play before measuring
+#endif
+#ifndef BENCH_FRAMES
 #define BENCH_FRAMES	3600		// then 60 s measured
+#endif
 #define BENCH_PROFILE_US 200		// profiler: one sample every 200 us
 #define BENCH_SLOW_US	16000		// frames from 16 ms on count as slow
 #define REPORT_FRAMES	3600		// one statistics line per minute of play
@@ -79,6 +88,71 @@ static void AudioCallback (size_t nSamples)
 // resampler=speex in neopi.cfg goes back to Speex.
 #define YM_RATE		56319		// as in geo_mixer.c
 static boolean s_bSpeex = FALSE;
+
+#ifdef NEOPI_MC
+// Experimental (Pi 3): the video chip's lines are drawn by core 1 while core 0
+// runs the CPUs and sound (patches/geolith-mc.py). multicore=off in neopi.cfg
+// keeps everything on core 0.
+#include <circle/multicore.h>
+#include <circle/memory.h>
+extern "C" {
+	extern unsigned geo_lspc_mc_enabled;
+	extern volatile unsigned geo_lspc_mc_alive;
+	extern unsigned geo_lspc_mc_failed;
+	extern unsigned geo_lspc_mc_fail_head, geo_lspc_mc_fail_tail, geo_lspc_mc_fail_stage;
+	extern unsigned geo_lspc_mc_fail_line, geo_lspc_mc_fail_lines, geo_lspc_mc_fail_beatmoved;
+	extern unsigned long long geo_lspc_mc_freq;
+	extern void (*geo_lspc_mc_linecb) (unsigned nScanline);
+	void geo_lspc_mc_worker (volatile unsigned *pStop);
+	void geo_lspc_mc_sync (void);
+}
+class CVideoCore : public CMultiCoreSupport
+{
+public:
+	CVideoCore (void) : CMultiCoreSupport (CMemorySystem::Get ()), m_nStop (0) {}
+	void Run (unsigned nCore)
+	{
+		if (nCore == 1)
+		{
+			geo_lspc_mc_worker (&m_nStop);	// cores 2 and 3 stay idle
+		}
+	}
+	volatile unsigned m_nStop;
+};
+static boolean s_bMultiCore = TRUE;
+static unsigned s_nGeoFrames = 0, s_nMcFailFrame = 0;
+static inline void GEO_SYNC (void)		// wait until core 1 has finished the frame
+{
+	geo_lspc_mc_sync ();
+	s_nGeoFrames++;
+	if (geo_lspc_mc_failed && s_nMcFailFrame == 0)
+	{
+		s_nMcFailFrame = s_nGeoFrames;
+	}
+}
+// core 1: each finished line goes straight to the screen (with the scanlines)
+static CVideoOut *s_pMcVideo = 0;
+static u32 s_McLine[GAME_W * 8], s_McDark[GAME_W * 8];
+static void McLineDone (unsigned nScanline)
+{
+	if (nScanline >= GAME_SRC_Y && nScanline < GAME_SRC_Y + GAME_H)
+	{
+		s_pMcVideo->DrawGameLine (s_VideoBuf, nScanline - GAME_SRC_Y, s_McLine, s_McDark);
+	}
+}
+
+static void McFailText (char *pOut, size_t nSize)
+{
+	snprintf (pOut, nSize, "  core 1 stuck at frame %u: queue %u/%u, %s line %u, "
+		  "%u lines, beat %s, %llu Hz",
+		  s_nMcFailFrame, geo_lspc_mc_fail_tail, geo_lspc_mc_fail_head,
+		  geo_lspc_mc_fail_stage ? "drawing" : "waiting after", geo_lspc_mc_fail_line,
+		  geo_lspc_mc_fail_lines, geo_lspc_mc_fail_beatmoved ? "moving" : "stopped",
+		  geo_lspc_mc_freq);
+}
+#else
+#define GEO_SYNC()
+#endif
 static u64 s_nResPos;			// 32.32 position, 0 = last sample of the previous frame
 static int16_t s_ResPrev[2];
 static const u64 s_nResStep = ((u64) YM_RATE << 32) / SAMPLE_RATE;
@@ -226,9 +300,11 @@ struct THisto
 	unsigned nCount, nMax;
 	u64 nSum;
 
-	void Reset (void) { memset (Bin, 0, sizeof Bin); nCount = nMax = 0; nSum = 0; }
+	unsigned nMin;
+	void Reset (void) { memset (Bin, 0, sizeof Bin); nCount = nMax = 0; nMin = ~0u; nSum = 0; }
 	void Add (unsigned us)
 	{
+		if (us < nMin) nMin = us;
 		unsigned b = us / 100;
 		Bin[b < Bins ? b : Bins - 1]++;
 		nCount++;
@@ -249,6 +325,8 @@ struct THisto
 };
 
 static THisto s_HistEmu, s_HistWork, s_HistPeriod;
+static THisto s_HistLag;		// pad report -> start of scan-out of the frame that uses it
+static THisto s_HistSlack;		// frame ready (flip) -> vsync
 static unsigned s_nOverBudget, s_nMissedVSync, s_nWindowFrames;
 static unsigned s_nWindowStart;
 
@@ -888,6 +966,151 @@ const char *CKernel::SaveScreenshot (void)
 
 // ---- benchmark -------------------------------------------------------------
 
+#ifdef NEOPI_MC
+// Multicore picture check (neopi/MCTEST): 60 s of the game's demo, always from
+// the same starting state (a save state taken after loading), run 4 times:
+// 1 single core (only to start from the same leftovers), 2 single core
+// (reference), 3 and 4 with core 1 drawing the lines. Every line of every
+// frame of passes 3 and 4 must be identical to pass 2. Results in MCTEST.TXT.
+void CKernel::McTest (unsigned nSel)
+{
+	u32 *pRef = new u32[MCTEST_FRAMES * GAME_H];
+	if (pRef == 0)
+	{
+		Log ("MC test: not enough memory", COLOR_ERR);
+		return;
+	}
+	char Report[2000] = "";
+	char Line[160];
+	boolean bWasEnabled = geo_lspc_mc_enabled;
+
+	auto LineHash = [] (unsigned y) -> u32
+	{
+		u32 h = 2166136261U;
+		const u32 *p = &s_VideoBuf[(y + GAME_SRC_Y) * GAME_SRC_PITCH + GAME_SRC_X];
+		for (unsigned x = 0; x < GAME_W; x++)
+		{
+			h = (h ^ p[x]) * 16777619U;
+		}
+		return h;
+	};
+
+	geo_lspc_mc_sync ();
+	geo_lspc_mc_enabled = 0;
+	if (!LoadGame (nSel))
+	{
+		Log ("MC test: cannot load the game", COLOR_ERR);
+		delete [] pRef;
+		return;
+	}
+	size_t nStateSize = geo_state_size ();
+	u8 *pState = new u8[nStateSize];
+	memcpy (pState, geo_state_save_raw (), nStateSize);
+	ApplyVideoMode ();
+
+	for (unsigned nPass = 0; nPass < 4; nPass++)
+	{
+		geo_lspc_mc_sync ();
+		geo_lspc_mc_enabled = nPass < 2 ? 0 : (bWasEnabled && !geo_lspc_mc_failed);
+		geo_state_load_raw (pState);
+		snprintf (Line, sizeof Line, "MC test pass %u: %s", nPass + 1,
+			  geo_lspc_mc_enabled ? "multicore" : "single core");
+		Log (Line, COLOR_TEXT);
+		SaveLog ();
+
+		unsigned nBadFrames = 0, nFirstBad = 0, nBadLines = 0;
+		unsigned nFirstLines = 0, nFirstLo = 0, nFirstHi = 0;
+		unsigned t0 = CTimer::GetClockTicks ();
+		for (unsigned f = 0; f < MCTEST_FRAMES; f++)
+		{
+			geo_exec ();
+			GEO_SYNC ();
+			unsigned nBadHere = 0, nLo = 0, nHi = 0;
+			for (unsigned y = 0; y < GAME_H; y++)
+			{
+				u32 h = LineHash (y);
+				if (nPass == 0)
+				{
+				}
+				else if (nPass == 1)
+				{
+					pRef[f * GAME_H + y] = h;
+				}
+				else if (h != pRef[f * GAME_H + y])
+				{
+					if (nBadHere == 0) nLo = y;
+					nHi = y;
+					nBadHere++;
+				}
+			}
+			if (nBadHere)
+			{
+				if (nBadFrames == 0)
+				{
+					nFirstBad = f;
+					nFirstLines = nBadHere;
+					nFirstLo = nLo;
+					nFirstHi = nHi;
+				}
+				nBadFrames++;
+				nBadLines += nBadHere;
+			}
+			if (f % 60 == 0)
+			{
+				m_Video.DrawGame (s_VideoBuf);
+				char Text[64];
+				snprintf (Text, sizeof Text, "MC TEST %u/4  %u/%u S", nPass + 1, f / 60,
+					  MCTEST_FRAMES / 60);
+				const CVideoOut::TTextSpan Span = {Text, nBadFrames ? UI_ERR : UI_WHITE};
+				m_Video.DrawBandText (TRUE, &Span, 1);
+				m_Video.Flip ();
+			}
+		}
+		unsigned nMs = (CTimer::GetClockTicks () - t0) / 1000;
+
+		if (nPass < 2)
+		{
+			snprintf (Line, sizeof Line, "pass %u, single core: %u frames in %u ms%s\r\n",
+				  nPass + 1, MCTEST_FRAMES, nMs, nPass == 1 ? " (reference)" : "");
+		}
+		else if (nBadFrames == 0)
+		{
+			snprintf (Line, sizeof Line, "pass %u, multicore: %u frames in %u ms, all lines identical%s\r\n",
+				  nPass + 1, MCTEST_FRAMES, nMs, geo_lspc_mc_failed ? " (core 1 FAILED)" : "");
+		}
+		else
+		{
+			snprintf (Line, sizeof Line, "pass %u, multicore: %u frames in %u ms, DIFFERENT: %u frames, "
+				  "%u lines; first frame %u, %u lines (%u-%u)%s\r\n",
+				  nPass + 1, MCTEST_FRAMES, nMs, nBadFrames, nBadLines, nFirstBad,
+				  nFirstLines, nFirstLo, nFirstHi, geo_lspc_mc_failed ? " (core 1 FAILED)" : "");
+		}
+		strncat (Report, Line, sizeof Report - strlen (Report) - 1);
+		Log (Line, nBadFrames ? COLOR_ERR : COLOR_OK);
+	}
+
+	geo_lspc_mc_sync ();
+	geo_lspc_mc_enabled = bWasEnabled && !geo_lspc_mc_failed;
+	WriteTextFile (MCTEST_PATH, Report);
+	Log ("MC test: results in neopi/MCTEST.TXT", COLOR_OK);
+	SaveLog ();
+	delete [] pState;
+	delete [] pRef;
+}
+#endif
+
+// the emulated frame to the back buffer (already there if core 1 drew it line by line)
+void CKernel::DrawGameFrame (void)
+{
+#ifdef NEOPI_MC
+	if (geo_lspc_mc_enabled && geo_lspc_mc_linecb)
+	{
+		return;
+	}
+#endif
+	m_Video.DrawGame (s_VideoBuf);
+}
+
 void CKernel::Benchmark (void)
 {
 	static unsigned Emu[BENCH_FRAMES], Draw[BENCH_FRAMES], Total[BENCH_FRAMES];
@@ -897,12 +1120,35 @@ void CKernel::Benchmark (void)
 	ApplyVideoMode ();		// measure the real drawing path (filter, HVS)
 	m_bQuiet = TRUE;
 
+	// on screen once per second (outside the timings): the game and, above it,
+	// what the benchmark is doing, so it is clear that it is not stuck
+	auto Progress = [this] (const char *pPhase, unsigned nFrame, unsigned nFrames)
+	{
+		char Text[64];
+		snprintf (Text, sizeof Text, "BENCHMARK  %s %u/%u S", pPhase,
+			  nFrame / 60, nFrames / 60);
+		const CVideoOut::TTextSpan Span = {Text, UI_WHITE};
+		m_Video.DrawBandText (TRUE, &Span, 1);
+		m_Video.Flip ();
+	};
+
+	Log ("Benchmark: warm-up", COLOR_TEXT);
+	SaveLog ();
+
 	// 1. warm-up: let the BIOS logo and the game's start-up pass
 	for (unsigned i = 0; i < BENCH_WARMUP; i++)
 	{
 		geo_exec ();
-		m_Video.DrawGame (s_VideoBuf);
+		GEO_SYNC ();
+		DrawGameFrame ();
+		if (i % 60 == 0)
+		{
+			Progress ("WARM-UP", i, BENCH_WARMUP);
+		}
 	}
+
+	Log ("Benchmark: measuring", COLOR_TEXT);
+	SaveLog ();
 
 	// 2. measurement, with the sampling profiler running
 	CProfiler *pProfiler = new CProfiler (&m_Interrupt);
@@ -912,17 +1158,34 @@ void CKernel::Benchmark (void)
 	unsigned WorstIdx[Worst];
 	unsigned nWorst = 0;
 	unsigned nSlow = 0, nOver = 0;
+	u32 nAllHash = 2166136261U;
 
 	for (unsigned i = 0; i < BENCH_FRAMES; i++)
 	{
 		if (bProfile) pProfiler->BeginFrame ();
 		unsigned t0 = CTimer::GetClockTicks ();
 		geo_exec ();
+		GEO_SYNC ();
 		unsigned t1 = CTimer::GetClockTicks ();
-		m_Video.DrawGame (s_VideoBuf);
+		DrawGameFrame ();
 		unsigned t2 = CTimer::GetClockTicks ();
 		boolean bSlow = t2 - t0 >= BENCH_SLOW_US;
 		if (bProfile) pProfiler->EndFrame (bSlow);
+
+		// hash of every measured frame (outside the timings): the same game must
+		// give the same value with and without multicore
+		for (unsigned y = 0; y < GAME_H; y++)
+		{
+			const u32 *p = &s_VideoBuf[(y + GAME_SRC_Y) * GAME_SRC_PITCH + GAME_SRC_X];
+			for (unsigned x = 0; x < GAME_W; x++)
+			{
+				nAllHash = (nAllHash ^ p[x]) * 16777619U;
+			}
+		}
+		if (i % 60 == 0)
+		{
+			Progress ("MEASURING", i, BENCH_FRAMES);
+		}
 
 		Emu[i] = t1 - t0;
 		Draw[i] = t2 - t1;
@@ -1036,6 +1299,18 @@ void CKernel::Benchmark (void)
 	snprintf (Line, sizeof Line, "Check: picture after %u frames = %08X",
 		  BENCH_WARMUP + BENCH_FRAMES, nHash);
 	REPORT (COLOR_DIM);
+	snprintf (Line, sizeof Line, "Check: all %u measured frames = %08X", BENCH_FRAMES, nAllHash);
+	REPORT (COLOR_DIM);
+#ifdef NEOPI_MC
+	snprintf (Line, sizeof Line, "Multicore: %s", geo_lspc_mc_failed ? "FAILED, core 1 stopped answering"
+		  : (geo_lspc_mc_enabled ? "on, video chip lines on core 1" : "off"));
+	REPORT (geo_lspc_mc_failed ? COLOR_ERR : COLOR_DIM);
+	if (geo_lspc_mc_failed)
+	{
+		McFailText (Line, sizeof Line);
+		REPORT (COLOR_ERR);
+	}
+#endif
 	if (bProfile)
 	{
 		snprintf (Line, sizeof Line, "Profile: %u samples (%u in frames over %u ms) -> PROFILE.TXT",
@@ -1102,9 +1377,37 @@ void CKernel::ReportWindow (boolean bFinal)
 		  m_CPUThrottle.GetClockRate () / 1000000, m_CPUThrottle.GetTemperature ());
 	Log (Line, COLOR_TEXT);
 
+#ifdef NEOPI_MC
+	static boolean s_bFailLogged = FALSE;
+	if (geo_lspc_mc_failed && !s_bFailLogged)
+	{
+		Log ("Multicore: core 1 stopped answering, single core from now on", COLOR_ERR);
+		char Fail[160];
+		McFailText (Fail, sizeof Fail);
+		Log (Fail, COLOR_ERR);
+		s_bFailLogged = TRUE;
+	}
+#endif
+	if (s_HistLag.nCount > 0)
+	{
+		char la[16], lm[16], lx[16], sa[16], sm[16];
+		FormatMs (la, sizeof la, s_HistLag.Avg ());
+		FormatMs (lm, sizeof lm, s_HistLag.nMin);
+		FormatMs (lx, sizeof lx, s_HistLag.nMax);
+		FormatMs (sa, sizeof sa, s_HistSlack.Avg ());
+		FormatMs (sm, sizeof sm, s_HistSlack.nMin);
+		snprintf (Line, sizeof Line,
+			  "   lag: %u inputs, report->scan-out %s/%s/%s ms avg/min/max | "
+			  "ready before vsync %s/%s ms avg/min",
+			  s_HistLag.nCount, la, lm, lx, sa, sm);
+		Log (Line, COLOR_TEXT);
+	}
+
 	s_HistEmu.Reset ();
 	s_HistWork.Reset ();
 	s_HistPeriod.Reset ();
+	s_HistLag.Reset ();
+	s_HistSlack.Reset ();
 	s_nOverBudget = s_nMissedVSync = s_nWindowFrames = 0;
 	s_nWindowStart = CTimer::GetClockTicks ();
 }
@@ -1209,12 +1512,19 @@ void CKernel::LoadConfig (void)
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
 	if (strstr (Text, "filters=on"))	m_bFilterAllowed = m_bForceFilters = TRUE;	// e.g. to try them on a Pi 3
+#ifdef NEOPI_MC
+	// multicore on a Pi 3: core 0 has the margin for the scanlines
+	if (!strstr (Text, "multicore=off"))	m_bFilterAllowed = TRUE;
+#endif
 	if (!m_bFilterAllowed)			m_nFilter = FILTER_NONE;
 	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
 	// usbpoll=native keeps the interval requested by the device
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
 	// resampler=speex: Geolith's own high quality resampler (heavier)
 	if (strstr (Text, "resampler=speex"))	s_bSpeex = TRUE;
+#ifdef NEOPI_MC
+	if (strstr (Text, "multicore=off"))	s_bMultiCore = FALSE;
+#endif
 
 	char Line[140];
 	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s, resampler %s",
@@ -1241,6 +1551,12 @@ void CKernel::SaveConfig (void)
 	{
 		strcat (Text, "resampler=speex\r\n");
 	}
+#ifdef NEOPI_MC
+	if (!s_bMultiCore)
+	{
+		strcat (Text, "multicore=off\r\n");
+	}
+#endif
 	WriteTextFile (CFG_PATH, Text);
 }
 
@@ -1666,6 +1982,7 @@ void CKernel::ResetGameStats (void)
 {
 	s_nWindowStart = CTimer::GetClockTicks ();
 	s_HistEmu.Reset (); s_HistWork.Reset (); s_HistPeriod.Reset ();
+	s_HistLag.Reset (); s_HistSlack.Reset ();
 	s_nOverBudget = s_nMissedVSync = s_nWindowFrames = 0;
 }
 
@@ -1735,8 +2052,13 @@ void CKernel::RunGame (void)
 	unsigned nTotalFrames = 0;
 
 	s_HistEmu.Reset (); s_HistWork.Reset (); s_HistPeriod.Reset ();
+	s_HistLag.Reset (); s_HistSlack.Reset ();
 	s_nOverBudget = s_nMissedVSync = s_nWindowFrames = 0;
 	s_nWindowStart = nLastVSync;
+	{
+		unsigned nOld;
+		m_pInput->TakeChange (&nOld);	// a press from the list does not count
+	}
 	{
 		unsigned a, b, c;
 		int d;
@@ -1759,10 +2081,14 @@ void CKernel::RunGame (void)
 				m_pUI->SnapshotGame (s_VideoBuf);
 				RunMapping ((unsigned) nPad, TRUE);
 				nPrev[0] = nPrev[1] = ~0u;
+				unsigned nOld;
+				m_pInput->TakeChange (&nOld);	// presses during the set-up do not count
 			}
 		}
 
 		// read controls as late as possible, right before emulating the frame
+		unsigned nChangeTicks;
+		boolean bChange = m_pInput->TakeChange (&nChangeTicks);
 		u32 Pad[2] = {m_pInput->Get (0), m_pInput->Get (1)};
 
 		if (!bMenu)
@@ -1929,9 +2255,10 @@ void CKernel::RunGame (void)
 					nToast = 60;
 				}
 				geo_exec ();
+				GEO_SYNC ();
 				t1 = CTimer::GetClockTicks ();
 				m_Audio.WriteFrame (s_AudioBuf, s_nAudioSamples);
-				m_Video.DrawGame (s_VideoBuf);
+				DrawGameFrame ();
 			}
 		}
 
@@ -2119,6 +2446,11 @@ void CKernel::RunGame (void)
 			s_HistEmu.Add (t1 - t0);
 			s_HistWork.Add (t2 - t0);
 			s_HistPeriod.Add (nPeriod);
+			s_HistSlack.Add (t4 - t3);
+			if (bChange)
+			{
+				s_HistLag.Add (t4 - nChangeTicks);
+			}
 			if (t3 - t0 > 16000) s_nOverBudget++;
 			if (nPeriod > 25000) s_nMissedVSync++;
 			s_nWindowFrames++;
@@ -2215,6 +2547,34 @@ TShutdownMode CKernel::Run (void)
 	f_mkdir (SHOT_DIR);
 	m_bFilterAllowed = CMachineInfo::Get ()->GetModelMajor () >= 4;
 	LoadConfig ();
+#ifdef NEOPI_MC
+	if (s_bMultiCore)
+	{
+		CVideoCore *pVideoCore = new CVideoCore;
+		boolean bStarted = pVideoCore && pVideoCore->Initialize ();
+		unsigned nWait = CTimer::GetClockTicks ();
+		while (bStarted && !geo_lspc_mc_alive && CTimer::GetClockTicks () - nWait < 200000)
+		{
+		}
+		if (bStarted && geo_lspc_mc_alive)
+		{
+			s_pMcVideo = &m_Video;
+			geo_lspc_mc_linecb = McLineDone;
+			geo_lspc_mc_enabled = 1;
+			Log ("Multicore: video chip lines drawn on core 1", COLOR_TEXT);
+		}
+		else
+		{
+			Log (bStarted ? "Multicore: core 1 started but is not running, single core"
+				      : "Multicore: core 1 did not start, single core", COLOR_ERR);
+		}
+		SaveLog ();
+	}
+	else
+	{
+		Log ("Multicore: off (multicore=off), single core", COLOR_TEXT);
+	}
+#endif
 
 	// BIOS + console font
 	m_pBIOS = LoadFile (BIOS_PATH, &m_nBIOSSize, HEAP_LOW, 0);
@@ -2287,6 +2647,13 @@ TShutdownMode CKernel::Run (void)
 	}
 
 	FILINFO Info;
+#ifdef NEOPI_MC
+	if (f_stat (MCTEST_FLAG, &Info) == FR_OK)
+	{
+		McTest (nSel);
+		CTimer::SimpleMsDelay (8000);
+	}
+#endif
 	boolean bBench = f_stat (BENCH_FLAG, &Info) == FR_OK;
 	if (bBench)
 	{

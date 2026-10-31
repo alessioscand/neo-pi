@@ -56,6 +56,10 @@ public:
 
 	// Latest state of player 0 or 1 (pads in connection order; keyboard = player 1)
 	u32 Get (unsigned nPlayer) const;
+
+	// lag measurement: time (CTimer ticks, us) of the oldest pad report that
+	// changed the controls and has not been taken yet; FALSE if none
+	boolean TakeChange (unsigned *pTicks);
 	// Any player: used by the menus
 	u32 GetAny (void) const	{ return Get (0) | Get (1); }
 
@@ -119,6 +123,8 @@ private:
 	static TGamePadState	 s_Last[MAX_PADS];	// latest raw report
 	TGamePadState		 m_Rest[MAX_PADS];	// state at rest (reference for the capture)
 	static volatile boolean	 s_bGotReport[MAX_PADS];
+	static volatile boolean	 s_bChange;		// a report changed the controls
+	static volatile unsigned s_nChangeTicks;	// when (the oldest not taken)
 	boolean			 m_bAsked[MAX_PADS];
 
 	// diagnostics ring (filled in interrupt context, logged at task level)
