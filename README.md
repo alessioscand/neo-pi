@@ -1,6 +1,6 @@
 # neo-pi
 
-A streamlined bare-metal Neo Geo emulator for Raspberry Pi.
+A streamlined bare-metal Neo Geo emulator for Raspberry Pi 3 & 4.
 
 Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
@@ -92,6 +92,7 @@ can give you.
 
 **Planned:**
 
+- Beam racing
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
 - UniBIOS support
 
