@@ -22,6 +22,7 @@ CVideoOut::CVideoOut (void)
 	m_pBase (0),
 	m_nBack (1),
 	m_bGameMode (FALSE),
+	m_bRacing (FALSE),
 	m_nTextScale (1),
 	m_nScale (1),
 	m_nK (1),
@@ -273,11 +274,11 @@ void CVideoOut::DrawGame (const u32 *pSource)
 {
 	for (unsigned y = 0; y < GAME_H; y++)
 	{
-		DrawGameLine (pSource, y, m_pLine, m_pDark);
+		DrawGameLineTo (m_nBack, pSource, y, m_pLine, m_pDark);
 	}
 }
 
-void CVideoOut::DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
+void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
 {
 	const unsigned M = m_nM;
 	const unsigned nGameW = GAME_W * M;
@@ -346,7 +347,7 @@ void CVideoOut::DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *p
 	for (unsigned s = 0; s < M; s++)
 	{
 		const u32 *pSrcLine = s >= M - nDarkRows ? pDark : pLine;
-		memcpy (Row (m_nBack, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
+		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
 	}
 }
 
@@ -356,10 +357,11 @@ void CVideoOut::DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nS
 	const unsigned S = m_nStatusScale;
 	const unsigned nY = bTop ? m_nTopY : m_nStatusY;
 	const unsigned nH = 9 * S;					// glyph + shadow
+	const unsigned nBuf = m_bRacing ? m_nBack ^ 1 : m_nBack;
 
 	for (unsigned y = nY; y < nY + nH && y < m_nHeight; y++)
 	{
-		u32 *p = Row (m_nBack, y);
+		u32 *p = Row (nBuf, y);
 		if (y >= m_nGameY && y < m_nHeight - m_nGameY)
 		{
 			// never inside the picture: clear only the side bands
@@ -415,7 +417,7 @@ void CVideoOut::DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nS
 						{
 							unsigned yy = nY + r * S + sy + o;
 							if (yy >= m_nHeight) continue;
-							u32 *p = Row (m_nBack, yy) + x + k * S + o;
+							u32 *p = Row (nBuf, yy) + x + k * S + o;
 							for (unsigned sx = 0; sx < S; sx++)
 							{
 								p[sx] = c;

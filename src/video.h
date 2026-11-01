@@ -56,6 +56,13 @@ public:
 	unsigned GetFilter (void) const		{ return m_nFilter; }
 	unsigned GetFBWidth (void) const	{ return m_nWidth; }	// framebuffer before the HVS
 	unsigned GetFBHeight (void) const	{ return m_nHeight; }
+	unsigned GetGameY (void) const		{ return m_nGameY; }	// first game line in the framebuffer
+	unsigned GetCPUScale (void) const	{ return m_nM; }	// m
+
+	// Beam racing: game lines and band text go straight into the buffer being
+	// shown (no flip); the UI (DrawGame) still uses the back buffer
+	void SetRacing (boolean bOn)		{ m_bRacing = bOn; }
+	boolean IsRacing (void) const		{ return m_bRacing; }
 
 	// Text grid (character cells) of the console
 	unsigned GetColumns (void) const;
@@ -69,7 +76,10 @@ public:
 	void DrawGame (const u32 *pSource);
 	// one line of the game picture into the back buffer, with the caller's
 	// scratch lines (GAME_W * 8 pixels each): used by core 1 in the multicore build
-	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark);
+	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
+	{
+		DrawGameLineTo (m_bRacing ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark);
+	}
 	// One centred line of text in the top or bottom black band (no spans = clear)
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
 	void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans);
@@ -85,6 +95,7 @@ public:
 
 private:
 	boolean Allocate (unsigned nWidth, unsigned nHeight);
+	void DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark);
 	u32 *Row (unsigned nBuffer, unsigned nY) const
 	{
 		return m_pBase + (nBuffer * m_nHeight + nY) * m_nPitchPx;
@@ -102,6 +113,7 @@ private:
 	u32	*m_pBase;
 	unsigned m_nBack;
 	boolean	 m_bGameMode;
+	volatile boolean m_bRacing;
 
 	unsigned m_nTextScale;			// console text scale (1 or 2)
 	unsigned m_nScale;			// S

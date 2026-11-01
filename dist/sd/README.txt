@@ -1,4 +1,4 @@
-neo-pi 0.6.4 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.7.0-rc1 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
 
 SET-UP
@@ -67,11 +67,37 @@ OPTIONS MENU (D in the list; A or left/right changes, B goes back)
   Settings are stored in neopi/neopi.cfg.
 
 STATUS LINE (Select + C), below the picture
-  60 FPS   LOAD 62%   39 C   1080P 4X CPU+HVS
+  60 FPS   LOAD 62%   39 C   DLY 6.5   1080P 4X CPU+HVS
   LOAD is how much of each 1/60 s frame is used (green, yellow from 75%,
   red above 95%). 4X HVS = scaled by the Pi's hardware scaler,
   CPU+HVS = the CPU draws the scanlines at 2x and the scaler doubles it,
-  CPU = all by the CPU.
+  CPU = all by the CPU. DLY is the frame delay in ms; with beam racing,
+  RACE is the time in ms from reading the pads to the top of the picture
+  being sent to the TV (see INPUT LAG).
+
+INPUT LAG
+  Each frame starts with the vertical blank, when games read the pads, and
+  then draws the picture: the frame shown at the next vsync already answers
+  the pads (up to 0.6.4 the answer came one frame later).
+  Frame delay: the frame starts a few ms after the vsync, so the pads are
+  read later. It is automatic: it starts at 0 and grows slowly while the
+  game's frames stay light (up to 6 ms), and drops at once if they get
+  heavier. LOG.TXT shows it every minute.
+  Beam racing: the picture is not prepared in advance and shown
+  at the next vsync, it is drawn line by line just ahead of the HDMI
+  output, as a real Neo Geo draws it on a CRT: the pads are read about
+  2-4 ms before the top of the picture is sent to the TV. At start-up
+  neo-pi measures the Pi's video scaler for about one second (LOG.TXT:
+  "raster" and "Beam racing" lines). The margins adapt to each game; if
+  lines arrive late too often, that game goes back to the normal way
+  (double buffer + frame delay) and LOG.TXT says so. The Pi 3 has less
+  time to spare than the Pi 4, so heavier games may go back to the normal
+  way more often there.
+  Testing options in neopi/neopi.cfg (one per line):
+    beamracing=off      normal way (double buffer + frame delay)
+    framedelay=off      no frame delay
+    framedelay=5        fixed delay in ms (1-12; too much = stutter)
+    framephase=classic  the frame starts as up to 0.6.4 (one frame more)
 
 PICTURE
   Always integer scaling (square pixels, never stretched) with black

@@ -6,6 +6,8 @@
 #include "fontdata.h"
 #include "neopi.h"
 #include "profile.h"
+#include "raster.h"
+#include "race.h"
 #include <circle/machineinfo.h>
 #include <circle/memory.h>
 #include <circle/new.h>
@@ -75,6 +77,11 @@ static u32 s_VideoBuf[GAME_SRC_PITCH * GAME_SRC_LINES] __attribute__ ((aligned (
 static int16_t s_AudioBuf[8192] __attribute__ ((aligned (64)));
 static volatile unsigned s_nAudioSamples;	// stereo frames produced in the last frame
 
+// beam racing (declared early: core 1's line callback uses them)
+static void RaceRowDone (unsigned nRow);
+static volatile boolean s_bRaceFrame = FALSE;	// this frame is raced (read by core 1)
+extern "C" void (*geo_lspc_line_hook) (unsigned nScanline);
+
 static void AudioCallback (size_t nSamples)
 {
 	s_nAudioSamples = nSamples / 2;		// callback counts int16 values (L+R)
@@ -138,6 +145,10 @@ static void McLineDone (unsigned nScanline)
 	if (nScanline >= GAME_SRC_Y && nScanline < GAME_SRC_Y + GAME_H)
 	{
 		s_pMcVideo->DrawGameLine (s_VideoBuf, nScanline - GAME_SRC_Y, s_McLine, s_McDark);
+		if (s_bRaceFrame)
+		{
+			RaceRowDone (nScanline - GAME_SRC_Y);
+		}
 	}
 }
 
@@ -153,6 +164,162 @@ static void McFailText (char *pOut, size_t nSize)
 #else
 #define GEO_SYNC()
 #endif
+// ---- input lag: frame phase and frame delay ---------------------------------
+//
+// Frame phase (patches/geolith-phase.py): each geo_exec() starts at line 248,
+// so it runs the vertical blank first (the game reads the pads there) and
+// then every visible line; the frame shown at the next vsync already answers
+// the pads read just before it. framephase=classic in neopi.cfg = line 0, as
+// up to 0.6.4 (one frame more of lag).
+//
+// Frame delay: the frame starts a few ms after the vsync instead of right
+// after it, so the pads are read later and the finished frame waits less
+// before the next vsync. framedelay=auto (default) measures how long each
+// frame takes and only waits what this game has proved it can afford:
+// - the delay starts at 0 and grows slowly (about 17 s time constant) while
+//   the frames stay light, never above DELAY_MAX_US;
+// - it keeps at least half of the slowest recent frame, and DELAY_GUARD_US,
+//   free before the vsync;
+// - one heavier frame lowers it at once; a missed vsync with a delay active
+//   sets it back to 0 and it starts growing again.
+// framedelay=off = no delay; framedelay=N (1-12) = fixed N ms, for testing.
+extern "C" void geo_exec_rephase (unsigned nLine);
+#define PHASE_LINE		248		// first line after the picture
+#define FRAME_US		16667
+#define DELAY_GUARD_US		3000
+#define DELAY_MAX_US		6000
+static unsigned s_nPhaseLine = PHASE_LINE;
+static int s_nDelayCfg = -1;		// -1 auto, 0 off, N ms fixed
+static unsigned s_nDelayUs;		// delay before the next frame
+static unsigned s_nDelayPeak = FRAME_US;	// slowest recent frame (decays)
+static unsigned s_nDelayMisses;		// vsyncs missed with a delay active (auto)
+static u64 s_nDelaySum;
+static unsigned s_nDelayMin, s_nDelayMax, s_nDelayCount;
+
+static void DelayRestart (void)
+{
+	s_nDelayPeak = FRAME_US;
+	s_nDelayUs = s_nDelayCfg > 0 ? (unsigned) s_nDelayCfg * 1000 : 0;
+}
+
+static void DelayStatsReset (void)
+{
+	s_nDelaySum = 0;
+	s_nDelayMin = ~0u;
+	s_nDelayMax = s_nDelayCount = s_nDelayMisses = 0;
+}
+
+// after each game frame: nWork = time the frame needed (pads to flip done)
+static void DelayUpdate (unsigned nWork, boolean bMissed)
+{
+	s_nDelaySum += s_nDelayUs;
+	s_nDelayCount++;
+	if (s_nDelayUs < s_nDelayMin) s_nDelayMin = s_nDelayUs;
+	if (s_nDelayUs > s_nDelayMax) s_nDelayMax = s_nDelayUs;
+
+	if (s_nDelayCfg >= 0)
+	{
+		return;				// off or fixed
+	}
+	if (bMissed && s_nDelayUs > 0)
+	{
+		s_nDelayMisses++;
+		DelayRestart ();
+		return;
+	}
+	s_nDelayPeak -= s_nDelayPeak >> 10;
+	if (nWork > s_nDelayPeak)
+	{
+		s_nDelayPeak = nWork;
+	}
+	unsigned nFree = s_nDelayPeak / 2 > DELAY_GUARD_US ? s_nDelayPeak / 2 : DELAY_GUARD_US;
+	unsigned nNeed = s_nDelayPeak + nFree;
+	unsigned nDelay = nNeed < FRAME_US ? FRAME_US - nNeed : 0;
+	s_nDelayUs = nDelay < DELAY_MAX_US ? nDelay : DELAY_MAX_US;
+}
+
+// ---- beam racing (Pi 4, multicore; see race.h and raster.h) -----------------
+static inline u64 ReadTicks (void)
+{
+	u64 v;
+	__asm__ volatile ("isb; mrs %0, cntpct_el0" : "=r" (v));
+	return v;
+}
+static u64 TicksFreq (void)
+{
+	u64 v;
+	__asm__ volatile ("mrs %0, cntfrq_el0" : "=r" (v));
+	return v;
+}
+// HVS registers at bus address 0x7E400000
+#if RASPPI == 4
+#define HVS_BASE	0xFE400000UL
+#define HVS_GEN		5
+#else
+#define HVS_BASE	0x3F400000UL
+#define HVS_GEN		4
+#endif
+static u32 HvsRead (unsigned nOffset)
+{
+	return *(volatile u32 *) (uintptr) (HVS_BASE + nOffset);
+}
+// beamracing= in neopi.cfg: -1 default (on), 0 off, 1 on
+static int s_nRaceCfg = -1;
+static boolean s_bRaceReady = FALSE;	// calibrated at start-up
+static boolean s_bRaceGame = FALSE;	// racing in this game (until it gives up)
+static CRaster *s_pRaster = 0;
+static CBeamRacer *s_pRacer = 0;
+
+// core 0, every time the video chip's line counter changes during a raced frame
+static void RaceLineHook (unsigned nScanline)
+{
+	if (nScanline < GAME_SRC_Y || nScanline >= GAME_SRC_Y + GAME_H)
+	{
+		return;
+	}
+	unsigned nRow = nScanline - GAME_SRC_Y;
+	u64 nNow = ReadTicks ();
+	s_pRacer->RowArrived (nRow, nNow);
+	u64 nRelease = s_pRacer->RowRelease (nRow);
+	if ((s64) (nNow - nRelease) < 0)
+	{
+		do
+		{
+			s_pRaster->Sample ();
+		}
+		while ((s64) (ReadTicks () - nRelease) < 0);
+	}
+	else if ((nRow & 15) == 0)
+	{
+		s_pRaster->Sample ();
+	}
+}
+
+// core 1: the row is in the framebuffer being shown
+static void RaceRowDone (unsigned nRow)
+{
+	__asm__ volatile ("dsb st" ::: "memory");	// the pixels have left the CPU
+	s_pRacer->RowDone (nRow, ReadTicks ());
+}
+
+// after a reset or a loaded state: the frame starts at s_nPhaseLine again
+// (lines drawn meanwhile are not copied to the screen)
+static void Rephase (void)
+{
+#ifdef NEOPI_MC
+	geo_lspc_mc_sync ();
+	void (*pLineCB) (unsigned) = geo_lspc_mc_linecb;
+	geo_lspc_mc_linecb = 0;
+	__asm__ volatile ("dsb ish" ::: "memory");
+	geo_exec_rephase (s_nPhaseLine);
+	GEO_SYNC ();
+	geo_lspc_mc_linecb = pLineCB;
+	__asm__ volatile ("dsb ish" ::: "memory");
+#else
+	geo_exec_rephase (s_nPhaseLine);
+#endif
+}
+
 static u64 s_nResPos;			// 32.32 position, 0 = last sample of the previous frame
 static int16_t s_ResPrev[2];
 static const u64 s_nResStep = ((u64) YM_RATE << 32) / SAMPLE_RATE;
@@ -864,6 +1031,7 @@ boolean CKernel::LoadGame (unsigned nIndex)
 
 	geo_lspc_set_palette (0);		// resistor network palette (as on hardware)
 	geo_reset (1);
+	Rephase ();
 
 	WriteTextFile (LAST_PATH, G.File);
 	return TRUE;
@@ -1339,6 +1507,7 @@ void CKernel::Benchmark (void)
 	SaveLog ();
 
 	geo_reset (1);		// play from a clean boot
+	Rephase ();
 }
 
 // ---- statistics -------------------------------------------------------------
@@ -1403,6 +1572,44 @@ void CKernel::ReportWindow (boolean bFinal)
 		Log (Line, COLOR_TEXT);
 	}
 
+	if (s_pRacer && s_pRacer->GetStats ().nFrames > 0)
+	{
+		const CBeamRacer::TStats &S = s_pRacer->GetStats ();
+		const CRaster *R = s_pRaster;
+		char la[16], lm[16], lx[16], va[16], pa[16], px[16];
+		FormatMs (la, sizeof la, (unsigned) R->TicksToUs ((s64) (S.nLeadSum / S.nFrames)));
+		FormatMs (lm, sizeof lm, (unsigned) R->TicksToUs ((s64) S.nLeadMin));
+		FormatMs (lx, sizeof lx, (unsigned) R->TicksToUs ((s64) S.nLeadMax));
+		FormatMs (va, sizeof va, (unsigned) R->TicksToUs ((s64) (S.nVBSum / S.nFrames)));
+		FormatMs (pa, sizeof pa, (unsigned) R->TicksToUs ((s64) (S.nPadSum / S.nFrames)));
+		FormatMs (px, sizeof px, (unsigned) R->TicksToUs ((s64) S.nPadMax));
+		snprintf (Line, sizeof Line,
+			  "   race: %u frames | pads->picture %s/%s ms avg/max | lead %s/%s/%s | vblank %s ms",
+			  S.nFrames, pa, px, la, lm, lx, va);
+		Log (Line, COLOR_TEXT);
+		snprintf (Line, sizeof Line,
+			  "   race: late rows %u in %u frames, skipped %u, min slack %d us | raster resyncs %u, last fix %d ns",
+			  S.nLateRows, S.nLateFrames, S.nSkips, (int) R->TicksToUs (S.nSlackMin),
+			  R->GetResyncs (), (int) R->TicksToNs (R->GetLastCorrection ()));
+		Log (Line, S.nLateFrames || S.nSkips ? COLOR_ERR : COLOR_TEXT);
+		s_pRacer->ResetStats ();
+	}
+	if (s_nDelayCount > 0)
+	{
+		char da[16], dm[16], dx[16];
+		FormatMs (da, sizeof da, (unsigned) (s_nDelaySum / s_nDelayCount));
+		FormatMs (dm, sizeof dm, s_nDelayMin);
+		FormatMs (dx, sizeof dx, s_nDelayMax);
+		char Mode[16];
+		if (s_nDelayCfg < 0)		snprintf (Mode, sizeof Mode, "auto");
+		else if (s_nDelayCfg == 0)	snprintf (Mode, sizeof Mode, "off");
+		else				snprintf (Mode, sizeof Mode, "fixed %d ms", s_nDelayCfg);
+		snprintf (Line, sizeof Line,
+			  "   frame delay %s: %s/%s/%s ms avg/min/max, vsyncs missed with delay %u | frame starts at line %u",
+			  Mode, da, dm, dx, s_nDelayMisses, s_nPhaseLine);
+		Log (Line, s_nDelayMisses ? COLOR_ERR : COLOR_TEXT);
+	}
+
 	s_HistEmu.Reset ();
 	s_HistWork.Reset ();
 	s_HistPeriod.Reset ();
@@ -1410,6 +1617,7 @@ void CKernel::ReportWindow (boolean bFinal)
 	s_HistSlack.Reset ();
 	s_nOverBudget = s_nMissedVSync = s_nWindowFrames = 0;
 	s_nWindowStart = CTimer::GetClockTicks ();
+	DelayStatsReset ();
 }
 
 // ---- configuration, system menu, power off ---------------------------------
@@ -1525,11 +1733,41 @@ void CKernel::LoadConfig (void)
 #ifdef NEOPI_MC
 	if (strstr (Text, "multicore=off"))	s_bMultiCore = FALSE;
 #endif
+	// input lag (see "input lag" at the top of this file)
+	if (strstr (Text, "framephase=classic"))	s_nPhaseLine = 0;
+	if (strstr (Text, "beamracing=off"))		s_nRaceCfg = 0;
+	if (strstr (Text, "beamracing=on"))		s_nRaceCfg = 1;
+	const char *pDelay = strstr (Text, "framedelay=");
+	if (pDelay)
+	{
+		pDelay += 11;
+		if (strncmp (pDelay, "off", 3) == 0)
+		{
+			s_nDelayCfg = 0;
+		}
+		else if (*pDelay >= '0' && *pDelay <= '9')
+		{
+			int n = 0;
+			while (*pDelay >= '0' && *pDelay <= '9' && n < 100)
+			{
+				n = n * 10 + (*pDelay++ - '0');
+			}
+			s_nDelayCfg = n > 12 ? 12 : n;
+		}
+	}
 
 	char Line[140];
 	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s, resampler %s",
 		  m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion), FilterName (m_nFilter),
 		  g_nUSBInterruptPollMs ? "1 ms" : "native", s_bSpeex ? "speex" : "linear");
+	Log (Line, COLOR_TEXT);
+	char Delay[16];
+	if (s_nDelayCfg < 0)		snprintf (Delay, sizeof Delay, "auto");
+	else if (s_nDelayCfg == 0)	snprintf (Delay, sizeof Delay, "off");
+	else				snprintf (Delay, sizeof Delay, "%d ms", s_nDelayCfg);
+	snprintf (Line, sizeof Line, "Settings: frame starts at line %u%s, frame delay %s, beam racing %s",
+		  s_nPhaseLine, s_nPhaseLine ? "" : " (framephase=classic)", Delay,
+		  s_nRaceCfg ? "on" : "off");
 	Log (Line, COLOR_TEXT);
 }
 
@@ -1557,6 +1795,25 @@ void CKernel::SaveConfig (void)
 		strcat (Text, "multicore=off\r\n");
 	}
 #endif
+	if (s_nPhaseLine == 0)
+	{
+		strcat (Text, "framephase=classic\r\n");
+	}
+	if (s_nRaceCfg == 0)
+	{
+		strcat (Text, "beamracing=off\r\n");
+	}
+	else if (s_nRaceCfg == 1)
+	{
+		strcat (Text, "beamracing=on\r\n");
+	}
+	if (s_nDelayCfg >= 0)
+	{
+		char Line[24];
+		if (s_nDelayCfg == 0)	snprintf (Line, sizeof Line, "framedelay=off\r\n");
+		else			snprintf (Line, sizeof Line, "framedelay=%d\r\n", s_nDelayCfg);
+		strcat (Text, Line);
+	}
 	WriteTextFile (CFG_PATH, Text);
 }
 
@@ -1984,6 +2241,13 @@ void CKernel::ResetGameStats (void)
 	s_HistEmu.Reset (); s_HistWork.Reset (); s_HistPeriod.Reset ();
 	s_HistLag.Reset (); s_HistSlack.Reset ();
 	s_nOverBudget = s_nMissedVSync = s_nWindowFrames = 0;
+	DelayStatsReset ();
+	DelayRestart ();
+	if (s_pRacer)
+	{
+		s_pRacer->Restart ();
+		s_pRacer->ResetStats ();
+	}
 }
 
 // Credits over the paused game; B (or Esc) goes back to the game
@@ -2016,12 +2280,60 @@ void CKernel::RunCredits (void)
 	}
 }
 
+// Pi 4 with multicore: find the HVS channel and measure it (about 0.7 s)
+void CKernel::SetupBeamRacing (void)
+{
+	s_bRaceReady = FALSE;
+	if (s_pRaster == 0)
+	{
+		s_pRaster = new CRaster (HvsRead, ReadTicks, TicksFreq (), HVS_GEN);
+		s_pRacer = new CBeamRacer (s_pRaster);
+	}
+	if (s_nRaceCfg == 0)
+	{
+		Log ("Beam racing: off (beamracing=off)", COLOR_TEXT);
+		return;
+	}
+#if (RASPPI == 3 || RASPPI == 4) && defined (NEOPI_MC)
+	if (!geo_lspc_mc_enabled || geo_lspc_mc_failed)
+	{
+		Log ("Beam racing: needs multicore, off", COLOR_TEXT);
+		return;
+	}
+	static char Report[600];
+	boolean bOK = s_pRaster->Probe (m_Video.GetWidth (), m_Video.GetHeight (), Report, sizeof Report);
+	// the report can be long: log it in pieces
+	for (const char *p = Report; *p; )
+	{
+		char Line[MaxLineLen];
+		size_t n = strlen (p);
+		if (n > MaxLineLen - 3) n = MaxLineLen - 3;
+		Line[0] = Line[1] = ' ';
+		memcpy (Line + 2, p, n);
+		Line[n + 2] = '\0';
+		Log (Line, COLOR_DIM);
+		p += n;
+	}
+	if (bOK)
+	{
+		bOK = s_pRaster->Calibrate (40, Report, sizeof Report);
+		Log (Report, bOK ? COLOR_TEXT : COLOR_ERR);
+	}
+	s_bRaceReady = bOK;
+	Log (bOK ? "Beam racing: ready" : "Beam racing: not available, double buffer + frame delay",
+	     bOK ? COLOR_OK : COLOR_ERR);
+#else
+	Log ("Beam racing: not available in this build", COLOR_TEXT);
+#endif
+}
+
 void CKernel::RunGame (void)
 {
 	const char *pName = m_pGames[m_nLoaded].Name;
 
 	// status line (Select+C), refreshed once per second
 	char StFps[16] = "", StLoad[8] = "", StTemp[8] = "", StRes[8] = "", StScale[16] = "";
+	char StDelay[8] = "";
 	u32 nFpsColor = UI_WHITE, nLoadColor = UI_OK, nTempColor = UI_WHITE;
 	boolean bStatusReady = FALSE;
 
@@ -2055,6 +2367,18 @@ void CKernel::RunGame (void)
 	s_HistLag.Reset (); s_HistSlack.Reset ();
 	s_nOverBudget = s_nMissedVSync = s_nWindowFrames = 0;
 	s_nWindowStart = nLastVSync;
+	DelayStatsReset ();
+	DelayRestart ();
+	s_bRaceGame = s_bRaceReady;
+#ifdef NEOPI_MC
+	if (!geo_lspc_mc_enabled) s_bRaceGame = FALSE;
+#endif
+	if (s_bRaceGame)
+	{
+		s_pRacer->SetGeometry (m_Video.GetGameY (), m_Video.GetCPUScale (), m_Video.GetHVSFactor ());
+		s_pRacer->Restart ();
+		s_pRacer->ResetStats ();
+	}
 	{
 		unsigned nOld;
 		m_pInput->TakeChange (&nOld);	// a press from the list does not count
@@ -2079,12 +2403,46 @@ void CKernel::RunGame (void)
 			{
 				// new pad during the game: pause and set it up
 				m_pUI->SnapshotGame (s_VideoBuf);
+				m_Video.SetRacing (FALSE);
 				RunMapping ((unsigned) nPad, TRUE);
+				ResetGameStats ();
 				nPrev[0] = nPrev[1] = ~0u;
 				unsigned nOld;
 				m_pInput->TakeChange (&nOld);	// presses during the set-up do not count
 			}
 		}
+
+		// beam racing: start the frame (and read the pads) when the plan says,
+		// against the HDMI scan-out; the time spent waiting does not count as work
+		const boolean bRace = s_bRaceGame && !bMenu;
+		m_Video.SetRacing (bRace);
+		unsigned nGoUs = 0;
+		if (bRace)
+		{
+			u64 nStart = s_pRacer->PlanFrame (ReadTicks ());
+			unsigned tWait = CTimer::GetClockTicks ();
+			while ((s64) (ReadTicks () - nStart) < 0)
+			{
+				s_pRaster->Sample ();
+			}
+			s_pRacer->FrameGo (ReadTicks ());
+			nGoUs = CTimer::GetClockTicks ();
+			t0 += nGoUs - tWait;
+			t1 = t0;
+		}
+		// frame delay: start the frame (and read the pads) s_nDelayUs after the
+		// vsync; the time spent waiting does not count as work
+		else if (!bMenu && s_nDelayUs > 0)
+		{
+			unsigned tGo = nLastVSync + s_nDelayUs;
+			unsigned tWait = CTimer::GetClockTicks ();
+			while ((int) (CTimer::GetClockTicks () - tGo) < 0)
+			{
+			}
+			t0 += CTimer::GetClockTicks () - tWait;
+			t1 = t0;
+		}
+		boolean bOddFrame = FALSE;	// slow for its own reasons: not a measure of the game
 
 		// read controls as late as possible, right before emulating the frame
 		unsigned nChangeTicks;
@@ -2213,6 +2571,7 @@ void CKernel::RunGame (void)
 				s_StatA = 0x07 | 0x18;
 				s_StatB = 0x0F | 0x30;
 				m_pUI->SnapshotGame (s_VideoBuf);
+				m_Video.SetRacing (FALSE);
 				RunCredits ();
 				nPrev[0] = nPrev[1] = ~0u;
 				bSelectCombo[0] = bSelectCombo[1] = FALSE;
@@ -2239,6 +2598,7 @@ void CKernel::RunGame (void)
 					bSaved = f_stat (Path, &Info) == FR_OK;
 				}
 				m_pUI->SnapshotGame (s_VideoBuf);
+				m_Video.SetRacing (FALSE);
 				SaveGameData ();
 				m_pInput->FlushDiagnostics ();
 				ReportWindow (TRUE);
@@ -2248,14 +2608,51 @@ void CKernel::RunGame (void)
 			{
 				if (bScreenshot)
 				{
+					bOddFrame = TRUE;
 					// the frame on screen, before emulating the next one
 					const char *pFile = SaveScreenshot ();
 					snprintf (Toast, sizeof Toast, pFile ? "SCREENSHOT SAVED  %s" : "SCREENSHOT FAILED",
 						  pFile);
 					nToast = 60;
 				}
+				if (bRace)
+				{
+					s_bRaceFrame = TRUE;
+					geo_lspc_line_hook = RaceLineHook;
+				}
 				geo_exec ();
 				GEO_SYNC ();
+				if (bRace)
+				{
+					geo_lspc_line_hook = 0;
+					s_bRaceFrame = FALSE;
+					if (bOddFrame)
+					{
+						s_pRacer->Restart ();	// the screenshot took the time
+					}
+					else
+					{
+						s_pRacer->FrameEnd ();
+					}
+					s_pRaster->EndFrame ();
+					if (s_pRacer->Failed ())
+					{
+						s_bRaceGame = FALSE;
+						Log ("Beam racing: rows late in too many frames, double buffer for this game",
+						     COLOR_ERR);
+					}
+#ifdef NEOPI_MC
+					if (!geo_lspc_mc_enabled)
+					{
+						// core 1 stopped: the lines are no longer drawn as they come
+						s_bRaceGame = FALSE;
+						m_Video.SetRacing (FALSE);
+						m_Video.DrawGame (s_VideoBuf);
+						m_Video.Flip ();
+						Log ("Beam racing: off, single core from now on", COLOR_ERR);
+					}
+#endif
+				}
 				t1 = CTimer::GetClockTicks ();
 				m_Audio.WriteFrame (s_AudioBuf, s_nAudioSamples);
 				DrawGameFrame ();
@@ -2316,6 +2713,7 @@ void CKernel::RunGame (void)
 					}
 					if (geo_state_load (Path))
 					{
+						Rephase ();		// states from 0.6.4 or framephase=classic too
 						Log ("  save state: loaded", COLOR_TEXT);
 						bMenu = FALSE;
 					}
@@ -2328,6 +2726,7 @@ void CKernel::RunGame (void)
 
 				case GmReset:
 					geo_reset (1);
+					Rephase ();
 					Log ("  reset", COLOR_TEXT);
 					bMenu = FALSE;
 					break;
@@ -2341,6 +2740,7 @@ void CKernel::RunGame (void)
 				case GmList:
 					SaveGameData ();
 					SaveLog ();
+					m_Video.SetRacing (FALSE);
 					return;
 
 				case GmPower:
@@ -2399,6 +2799,7 @@ void CKernel::RunGame (void)
 			{
 				{StFps, nFpsColor}, {"   LOAD ", UI_GREY}, {StLoad, nLoadColor},
 				{"   ", UI_GREY}, {StTemp, nTempColor},
+				{s_bRaceGame ? "   RACE " : "   DLY ", UI_GREY}, {StDelay, UI_WHITE},
 				{"   ", UI_GREY}, {StRes, UI_WHITE}, {StScale, UI_GREY}
 			};
 			m_Video.DrawBandText (FALSE, Spans, sizeof Spans / sizeof Spans[0]);
@@ -2422,10 +2823,18 @@ void CKernel::RunGame (void)
 			nClearToast--;
 		}
 		unsigned t2 = CTimer::GetClockTicks ();
-		m_Video.Flip ();
+		const boolean bRaced = bRace && !bMenu;	// already on screen: no flip, no vsync
+		if (!bRaced)
+		{
+			m_Video.Flip ();
+		}
 		unsigned t3 = CTimer::GetClockTicks ();
 
-		if (m_bVSync)
+		if (bRaced)
+		{
+			nNextDeadline = t3 + 16667;	// the next frame start paces the loop
+		}
+		else if (m_bVSync)
 		{
 			m_Video.WaitForVSync ();
 		}
@@ -2446,10 +2855,26 @@ void CKernel::RunGame (void)
 			s_HistEmu.Add (t1 - t0);
 			s_HistWork.Add (t2 - t0);
 			s_HistPeriod.Add (nPeriod);
-			s_HistSlack.Add (t4 - t3);
-			if (bChange)
+			if (bRaced)
 			{
-				s_HistLag.Add (t4 - nChangeTicks);
+				// pad report -> the HVS starts composing the top of the picture
+				if (bChange)
+				{
+					s_HistLag.Add (nGoUs - nChangeTicks
+						       + (unsigned) s_pRaster->TicksToUs ((s64) s_pRacer->GetPadToPicture ()));
+				}
+			}
+			else
+			{
+				s_HistSlack.Add (t4 - t3);
+				if (!bOddFrame)
+				{
+					DelayUpdate (t3 - t0, nPeriod > 25000);
+				}
+				if (bChange)
+				{
+					s_HistLag.Add (t4 - nChangeTicks);
+				}
 			}
 			if (t3 - t0 > 16000) s_nOverBudget++;
 			if (nPeriod > 25000) s_nMissedVSync++;
@@ -2491,6 +2916,15 @@ void CKernel::RunGame (void)
 			snprintf (StTemp, sizeof StTemp, "%u" FONT_DEGREE "C", nTemp);
 			nTempColor = nTemp > 75 ? UI_ERR : (nTemp > 65 ? UI_WARN : UI_WHITE);
 			snprintf (StRes, sizeof StRes, "%uP", m_Video.GetHeight ());
+			if (s_bRaceGame)
+			{
+				unsigned us = (unsigned) s_pRaster->TicksToUs ((s64) s_pRacer->GetPadToPicture ());
+				snprintf (StDelay, sizeof StDelay, "%u.%u", us / 1000, (us % 1000) / 100);
+			}
+			else
+			{
+				snprintf (StDelay, sizeof StDelay, "%u.%u", s_nDelayUs / 1000, (s_nDelayUs % 1000) / 100);
+			}
 			unsigned k = m_Video.GetHVSFactor (), S = m_Video.GetScale ();
 			snprintf (StScale, sizeof StScale, " %uX %s", S,
 				  k == S ? "HVS" : (k == 1 ? "CPU" : "CPU+HVS"));
@@ -2667,6 +3101,7 @@ TShutdownMode CKernel::Run (void)
 
 	// from here on the screen belongs to the UI
 	ApplyVideoMode ();
+	SetupBeamRacing ();
 	SaveLog ();
 	m_bQuiet = TRUE;
 

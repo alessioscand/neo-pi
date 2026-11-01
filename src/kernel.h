@@ -67,6 +67,7 @@ private:
 	void McTest (unsigned nSel);
 	unsigned RunList (unsigned nSel);
 	void RunGame (void);
+	void SetupBeamRacing (void);
 	void ShowUIFrame (boolean bWait = TRUE, const char *pTopMessage = 0);
 	void WriteTextFile (const char *pPath, const char *pText);
 	const char *SaveScreenshot (void);
