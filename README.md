@@ -4,48 +4,93 @@ A streamlined bare-metal Neo Geo emulator for Raspberry Pi.
 
 Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
+## Why neo-pi
 
-## Design goals
+I've been fascinated by the Neo Geo for as long as I can remember. I started
+collecting Neo Geo CD games in the early 2000s, briefly moved to AES, and
+eventually settled on MVS. I still own an MV1-FZ board and several
+cartridges, but rarely get to enjoy them due to the space and setup they
+require.
 
-neo-pi is built around a simple idea: nothing between you and the game.
-No operating system, no desktop, nothing to configure: switch on and you
-are in the game list, with a handful of clean menus, all driven from the
-gamepad.
+Ever since the days of the Raspberry Pi 2 and AdvanceMAME with VGA666, I've
+dreamed of creating a focused, compact Neo Geo experience on the Raspberry
+Pi, as close to the original hardware as possible, but with all the
+conveniences of modern emulation: LCD displays with visual filters, save
+states, turbo buttons, but prioritizing the responsiveness of the controls.
+I've tried countless times to strip existing retro-gaming distros down to
+their bare essentials, but thanks to today's vibe-coding tools, I've finally
+been able to bring my original vision to life. Still, neo-pi isn't just
+code: it's design, choices and compromises, and those still take time and
+care. So let's look at how it's made, the old-fashioned way.
 
-It respects the arcade spirit while keeping the conveniences that matter.
-One save-state slot per game, for example: useful, without turning the game
-into something else. Picture and controls get the same care: integer
-scaling with square pixels, and pads read right before every frame.
+## The choices behind it
 
-It is also meant to give older boards a new lease on life: neo-pi makes the
-most of the Raspberry Pi 3 and 4, so you don't need the latest hardware to
-play.
+**Bare metal.** Nothing sits between the game and the screen: no operating
+system on the Pi's CPU and no graphics stack adding latency. neo-pi is the
+kernel itself: it runs directly on the Pi's hardware, boots in seconds and
+talks to the hardware directly, down to the video scaler's registers.
+Circle provides the essential drivers (USB, SD, HDMI, audio), so bare metal
+doesn't mean starting from scratch.
 
-Tested on the Raspberry Pi 4 and the Raspberry Pi 3 B+. On the Pi 3 even
-the heaviest games run at full speed with no overclocking, scanlines
-included.
+**Geolith.** This accurate Neo Geo emulator is a real gem, written in plain,
+portable C that doesn't assume an OS: it renders into a buffer it is given,
+talks to the outside world through a few callbacks, and loads the BIOS and
+games straight from memory. That made it a natural fit for Circle.
 
+**Scanline-based rendering.** Above all, Geolith draws the picture the way
+the real Neo Geo does: one line at a time, as the emulated video chip
+reaches it. Each line is drawn always at the same moment and never touched
+again, so it can be handed over as soon as it's done. This opened up a
+whole range of possibilities. The lines can be drawn on a second CPU core
+while the first runs the game. And since each line is ready while the frame
+is still being emulated, it can be sent to the screen just before the HDMI
+output reaches it: beam racing! So the pads are read only a couple of
+milliseconds before the picture appears, as they would be on the original
+hardware with a CRT. *(Beam racing is coming in an upcoming release.)*
+
+**Custom audio resampler.** The Neo Geo's sound chip runs at about 56 kHz,
+while HDMI wants 48 kHz. Instead of a heavy general-purpose converter,
+neo-pi uses a small one written just for it: same clean sound, a fraction
+of the work (on a Pi 3, Geolith's standard Speex resampler took about 15%
+of every frame).
+
+**User experience.** The rest was a matter of choices. Display options are
+cut to the bone: integer scaling is always on, and scanlines are the only
+filter, so you just play, with nothing to tweak and nothing to distract
+you. Save states are limited to one slot per game: enough to soften the
+gameplay (think of the notoriously brutal bosses of some King of Fighters
+games) while keeping that edge-of-your-seat tension that only arcade games
+can give you.
 
 ## Features
 
+**Gameplay**
+
 - Accurate emulation, built on the [Geolith](https://gitlab.com/jgemu/geolith)
-  core
-- Responsive controls: USB pads polled every 1 ms (1000 Hz), with no
-  operating system in between
-- Single-slot mode: with only one game on the card, neo-pi skips the list
-  and boots straight into it, like an arcade board with one cartridge in
-- MVS (arcade) and AES (home console) systems, all four BIOS regions
-- Integer scaling with square pixels at 1080p or 720p, using the Pi's
+  core: MVS (arcade) and AES (home console), all four BIOS regions
+- Responsive controls: pads are read every millisecond, and what you press
+  shows up on screen almost as quickly as on the original hardware with a
+  CRT *(on Pi 4, coming in an upcoming release)*
+- Lazy finger (turbo buttons): Select + B toggles it; while on, holding A, B, C or D
+  fires repeatedly
+- Save states: one slot per game
+
+**Picture**
+
+- Integer scaling with square pixels at 1080p or 720p, done by the Pi's
   hardware scaler
-- Optional scanlines (light, medium, strong), drawn within the same
-  frame: no added lag
-- Lazy finger (turbo): Select + B switches it on and off; while it is on,
-  holding A, B, C or D fires repeatedly
-- Save states (one slot per game), screenshots (PNG) and an optional
-  status line (FPS, load, temperature, video mode)
+- Optional scanlines (light, medium, strong), drawn within the same frame:
+  no added lag
+
+**Convenience**
+
+- Single-cartridge mode: with only one game on the card, neo-pi skips the
+  list and boots straight into it, like an arcade board
+- Screenshots (PNG) and an optional status line (FPS, load, temperature,
+  video mode)
 - Safe power off that saves memory cards, MVS settings and the log
 
-Planned:
+**Planned:**
 
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
 - UniBIOS support
@@ -85,86 +130,47 @@ stick always work. The second pad connected is Player 2.
 | Select + C | Status line on/off |
 | Select + D | Credits |
 
-In the game list and in the menus, the buttons are shown on screen.
+In the menus the buttons are shown on screen.
 Always switch off with POWER OFF (in-game menu or options) before
 unplugging: it saves memory cards and settings.
 
 
-## Under the hood
-
-A few choices behind neo-pi's low-latency design and performance optimizations:
-
-- **One frame, start to finish, no pipeline.** Each frame reads the pads,
-  emulates, queues the audio and draws, then the double-buffered
-  framebuffer flips at the vertical sync. No frame is emulated ahead and
-  shown later by another stage, so nothing adds a frame of delay.
-
-- **Two cores on the same frame.** While the first CPU core runs the 68000,
-  the Z80 and the sound chip, the second draws the video chip's lines (the
-  most expensive part) and copies each finished line to the screen. Before
-  the game changes anything the drawing reads (video memory, palette), the
-  first core waits for the second, so the picture is identical, pixel for
-  pixel, to a single core; at the end of the frame it waits for the last
-  line, so the frame is shown at the same vertical sync as before. The lag,
-  measured from the USB report to the start of scan-out, does not change;
-  the frame is simply ready earlier.
-
-- **1 ms USB polling.** The USB stack is patched so that pads are polled
-  every 1 ms instead of the 8-10 ms most of them ask for, and they are read
-  right before the frame is emulated.
-
-- **The hardware scaler does the enlarging.** The 304x224 picture is copied
-  once into a small framebuffer (480x270 at 1080p) and the Pi's HVS scales
-  it 4x to the screen, integer and with square pixels. Scanlines are drawn
-  while copying (CPU 2x, HVS 2x), in the same frame.
-
-- **Own audio resampler.** The YM2610 output (about 56 kHz) is brought to
-  48 kHz by a small fixed-point resampler written for neo-pi; the
-  general-purpose one used before took about 15% of the frame time on a
-  Pi 3. The HDMI audio clock is not locked to the display, so the queue is
-  kept at about two frames by stretching or shrinking blocks by a few
-  samples: no drops, no clicks.
-
-- **Measured, not guessed.** An empty `neopi/BENCH` file runs a built-in
-  benchmark with a sampling profiler (the interrupted address is recorded
-  every 200 us, `tools/resolve_profile.py` maps it to functions) and a check
-  value of the final picture: an optimisation must give the same picture
-  after the same 5,400 frames, so the emulation is unchanged. An empty
-  `neopi/MCTEST` file compares one core and two cores line by line. The
-  emulation core is compiled with `-O3`, the rest with `-O2`.
-
-- **Fixed clocks, no surprises.** The GPU core clock is fixed, the HDMI mode
-  is forced to 1080p (or 720p), and the whole game is loaded into RAM before
-  it starts: nothing is streamed from the SD card while you play.
-
-
-## Files and troubleshooting
+## Tinkerer's corner
 
 Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states,
 MVS memory, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
 `pads.cfg` (controls for each pad model), `LOG.TXT` (diagnostics).
 
-For testing and performance comparisons, these lines can be added to
-`neopi/neopi.cfg`:
+**Testing options.** The defaults are what neo-pi is designed and tuned
+for: the lines below are only meant for testing and comparisons, not for
+everyday play. Add them to `neopi/neopi.cfg`, one per line:
 
-| | |
+| Option | |
 |---|---|
+| `beamracing=off` | double buffer instead of beam racing (Pi 4) |
+| `framedelay=off` | no automatic frame delay |
+| `framedelay=5` | fixed frame delay in ms (1-12; too much = stutter) |
+| `framephase=classic` | frames start as up to 0.6.4 (one frame more lag) |
 | `multicore=off` | everything on one core, as up to 0.6.3 |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
-| `resampler=speex` | previous, heavier audio resampler |
+| `resampler=speex` | Geolith's standard Speex resampler (heavier) |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler |
 
-If something goes wrong, the green LED blinks a number of times, repeatedly:
-2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game, 7 = memory. With no
-picture at all, put a `#` in front of `hdmi_group` and `hdmi_mode` in
-`config.txt`. To report a problem, `neopi/LOG.TXT` is all that is needed;
-for performance, add an empty `neopi/BENCH` file and send `BENCH.TXT` and
-`PROFILE.TXT` too.
+An empty `neopi/BENCH` file runs a built-in benchmark on the selected game
+(results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file
+checks that one core and two cores give the same picture, line by line.
 
-If games start to slow down after a while, it is usually heat: a heatsink is
-recommended. The status line (Select + C) shows the temperature; the
-Pi 3 B+ lowers its CPU clock above 60 °C, the Pi 4 from about 80 °C.
+**If something goes wrong.** The green LED blinks a number of times,
+repeatedly: 2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game,
+7 = memory. With no picture at all, put a `#` in front of `hdmi_group` and
+`hdmi_mode` in `config.txt`. To report a problem, `neopi/LOG.TXT` is all
+that is needed; for performance, add an empty `neopi/BENCH` file and send
+`BENCH.TXT` and `PROFILE.TXT` too.
 
+**Heat.** If games start to slow down after a while, it is usually heat: a
+heatsink is recommended. The status line (Select + C) shows the
+temperature; the Pi 3 B+ lowers its CPU clock above 60 °C, the Pi 4 from
+about 80 °C.
 ## Building from source
 
 See [BUILD.md](BUILD.md). neo-pi is built with the xPack AArch64 GCC
@@ -173,17 +179,18 @@ toolchain on top of the Circle bare-metal library and the Geolith core.
 
 ## Credits
 
-neo-pi is written by Alessio Scanderebech, alongside his coding buddy Claude, standing on the shoulders of:
+neo-pi is written by Alessio Scanderebech, alongside his coding buddy
+Claude, standing on the shoulders of:
 
-| | |
+| Component | Thanks to |
 |---|---|
+| Bare-metal system | [Circle](https://github.com/rsta2/circle) by Rene Stange |
 | Neo Geo core | [Geolith](https://gitlab.com/jgemu/geolith) by Rupert Carmichael |
 | 68000 CPU | Musashi by Karl Stenerud |
-| Z80 CPU | by Nicola Allemand and Rupert Carmichael |
-| Sound | ymfm by Aaron Giles |
+| Z80 CPU | by Nicolas Allemand and Rupert Carmichael |
+| Sound | ymfm by Aaron Giles (C port by Rupert Carmichael) |
 | Resampler (optional) | speexdsp by Jean-Marc Valin |
 | Zip and PNG | miniz by Rich Geldreich |
-| Bare-metal system | [Circle](https://github.com/rsta2/circle) by Rene Stange |
 | Menu font | "Matinee" from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
 
 
