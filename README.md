@@ -12,13 +12,13 @@ eventually settled on MVS. I still own an MV1-FZ board and several
 cartridges, but rarely get to enjoy them due to the space and setup they
 require.
 
-Ever since the days of the Raspberry Pi 2 and AdvanceMAME with VGA666, I've
+Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've
 dreamed of creating a focused, compact Neo Geo experience on the Raspberry
 Pi, as close to the original hardware as possible, but with all the
-conveniences of modern emulation: LCD displays with visual filters, save
-states, turbo buttons, but prioritizing the responsiveness of the controls.
+conveniences of modern emulation (LCD displays with visual filters, save
+states, turbo buttons) but prioritizing the responsiveness of the controls.
 I've tried countless times to strip existing retro-gaming distros down to
-their bare essentials, but thanks to today's vibe-coding tools, I've finally
+their bare essentials, and thanks to today's vibe-coding tools, I've finally
 been able to bring my original vision to life. Still, neo-pi isn't just
 code: it's design, choices and compromises, and those still take time and
 care. So let's look at how it's made, the old-fashioned way.
@@ -26,10 +26,10 @@ care. So let's look at how it's made, the old-fashioned way.
 ## The choices behind it
 
 **Bare metal.** Nothing sits between the game and the screen: no operating
-system on the Pi's CPU and no graphics stack adding latency. neo-pi is the
+system on the Pi's CPU and no graphics stack adding latency. neo-pi IS the
 kernel itself: it runs directly on the Pi's hardware, boots in seconds and
 talks to the hardware directly, down to the video scaler's registers.
-Circle provides the essential drivers (USB, SD, HDMI, audio), so bare metal
+**Circle** provides the essential drivers (USB, SD, HDMI, audio), so bare metal
 doesn't mean starting from scratch.
 
 **Geolith.** This accurate Neo Geo emulator is a real gem, written in plain,
@@ -44,7 +44,7 @@ again, so it can be handed over as soon as it's done. This opened up a
 whole range of possibilities. The lines can be drawn on a second CPU core
 while the first runs the game. And since each line is ready while the frame
 is still being emulated, it can be sent to the screen just before the HDMI
-output reaches it: beam racing! So the pads are read only a couple of
+output reaches it: *beam racing!* So the pads are read only a couple of
 milliseconds before the picture appears, as they would be on the original
 hardware with a CRT. *(Beam racing is coming in an upcoming release.)*
 
@@ -84,7 +84,7 @@ can give you.
 
 **Convenience**
 
-- Single-cartridge mode: with only one game on the card, neo-pi skips the
+- MV-1 mode: with only one game on the SD card, neo-pi skips the
   list and boots straight into it, like an arcade board
 - Screenshots (PNG) and an optional status line (FPS, load, temperature,
   video mode)
@@ -92,7 +92,7 @@ can give you.
 
 **Planned:**
 
-- Beam racing
+- Beam racing *(already available in the 0.7.0-rc1 pre-release)*
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
 - UniBIOS support
 
@@ -118,16 +118,17 @@ can give you.
 
 ## Controls
 
-The first time a pad model is connected, neo-pi asks you to press the
-buttons you want as A, B, C, D, Start and Select. The d-pad, hat and left
-stick always work. The second pad connected is Player 2.
+Although wireless gamepads are supported, wired ones are preferable for maximum
+responsiveness. The first time a pad model is connected, neo-pi asks you to press
+the buttons you want as A, B, C, D, Start and Select. The d-pad, hat and left
+stick always work. Second pad connected is Player 2.
 
 | In game | |
 |---|---|
 | Select (short press) | Insert a coin (AES: Select) |
 | Select, held 1 s | In-game menu: save / load state, reset, BIOS settings, game list, power off |
 | Select + A | Screenshot (PNG) |
-| Select + B | Lazy finger (turbo buttons) on/off |
+| Select + B | *Lazy finger* (turbo buttons) on/off |
 | Select + C | Status line on/off |
 | Select + D | Credits |
 
@@ -148,14 +149,13 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 
 | Option | |
 |---|---|
-| `beamracing=off` | double buffer instead of beam racing (Pi 4) |
+| `beamracing=off` | double buffer instead of beam racing (more lag) |
 | `framedelay=off` | no automatic frame delay |
 | `framedelay=5` | fixed frame delay in ms (1-12; too much = stutter) |
-| `framephase=classic` | frames start as up to 0.6.4 (one frame more lag) |
-| `multicore=off` | everything on one core, as up to 0.6.3 |
+| `multicore=off` | everything on one core, as up to 0.6.3 (heavier) |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
 | `resampler=speex` | Geolith's standard Speex resampler (heavier) |
-| `scaler=cpu` | scale with the CPU instead of the hardware scaler |
+| `scaler=cpu` | scale with the CPU instead of the hardware scaler (slower) |
 
 An empty `neopi/BENCH` file runs a built-in benchmark on the selected game
 (results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file
@@ -180,8 +180,8 @@ toolchain on top of the Circle bare-metal library and the Geolith core.
 
 ## Credits
 
-neo-pi is written by Alessio Scanderebech, alongside his coding buddy
-Claude, standing on the shoulders of:
+neo-pi is written by Alessio Scanderebech and his much-maligned programming
+partner Claude, standing on the shoulders of giants:
 
 | Component | Thanks to |
 |---|---|
@@ -195,7 +195,7 @@ Claude, standing on the shoulders of:
 | Menu font | "Matinee" from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
 
 
-## Licence
+## License
 
 neo-pi is free software, released under the
 [GNU General Public License v3](LICENSE) or any later version, as required
