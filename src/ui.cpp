@@ -98,58 +98,35 @@ static const char *const s_Logo[] =
 #define LOGO_YELLOW	0xF0C81Eu	// = button B
 #define LOGO_BLUE	0x4678FFu	// a little brighter than button D, to stand out
 
-// Background: the logo in grey, tiled every 48x24 (odd rows shifted by 24),
-// faint, scrolling diagonally; the pattern repeats every 48 pixels
-#define TILE_CELL_W	48
-#define TILE_CELL_H	24
-#define TILE_GREY	0x96A0AFu	// = UI_DIM
-#define TILE_DIM	24		// % of the full colour over the background
-#define TILE_US_PER_PX	33333		// 30 pixels per second
+// Background: a checkerboard turned 45 degrees (diamonds) in two dark blues,
+// scrolling diagonally (down-right) with the same motion as the tiled logo of
+// 0.7.0-rc1 and earlier; the pattern repeats every 16 pixels
+#define BG_CELL		16
+#define BG_DARK		0x060E1Eu	// = UI_BG1
+#define BG_LIGHT	0x16294Eu
+#define BG_US_PER_PX	33333		// 30 pixels per second, as before
 
-static u32 Mix (u32 nBack, u32 nFore, int nPercent)
+// Screens without a game behind them. bFreeze: keep the last position (the
+// loading screen is redrawn at irregular times, moving it would look jerky)
+void CUI::Background (boolean bFreeze)
 {
-	u32 nResult = 0;
-	for (int s = 0; s < 24; s += 8)
+	static unsigned s_nOff;
+	if (!bFreeze)
 	{
-		int b = (int) ((nBack >> s) & 0xFF), f = (int) ((nFore >> s) & 0xFF);
-		nResult |= (u32) (b + (f - b) * nPercent / 100) << s;
+		// time based, so it moves at the same speed whatever draws the frames
+		s_nOff = (unsigned) (CTimer::GetClockTicks64 () / BG_US_PER_PX) % BG_CELL;
 	}
-	return nResult;
-}
-
-// Screens without a game behind them
-void CUI::Background (void)
-{
-	const u32 nGrey = Mix (UI_BG1, TILE_GREY, TILE_DIM);
-	const u32 nPlate = Mix (UI_BG1, 0x000000, TILE_DIM);
-	// time based, so it moves at the same speed whatever draws the frames
-	const unsigned nOff = (unsigned) (CTimer::GetClockTicks64 () / TILE_US_PER_PX) % TILE_CELL_W;
+	const u32 Color[2] = {ARGB (BG_DARK), ARGB (BG_LIGHT)};
 	for (int y = 0; y < UI_H; y++)
 	{
 		u32 *p = &m_Buf[(y + OY) * GAME_SRC_PITCH + OX];
-		unsigned yy = ((unsigned) y + 2 * TILE_CELL_H - nOff) % (2 * TILE_CELL_H);
-		unsigned nRow = yy / TILE_CELL_H, ly = yy % TILE_CELL_H;
+		const unsigned yy = (unsigned) y + BG_CELL - s_nOff;
 		for (int x = 0; x < UI_W; x++)
 		{
-			u32 c = UI_BG1;
-			if (ly < LOGO_H)
-			{
-				unsigned lx = ((unsigned) x + 2 * TILE_CELL_W - nOff
-					       - nRow * (TILE_CELL_W / 2)) % TILE_CELL_W;
-				if (lx < LOGO_W)
-				{
-					char ch = s_Logo[ly][lx];
-					if (ch == '.')
-					{
-						c = nPlate;
-					}
-					else if (ch != ' ')
-					{
-						c = nGrey;
-					}
-				}
-			}
-			p[x] = ARGB (c);
+			const unsigned xx = (unsigned) x + BG_CELL - s_nOff;
+			// diamond = cell of the grid along both diagonals
+			unsigned u = (xx + yy) / BG_CELL, v = (xx - yy + 1024) / BG_CELL;
+			p[x] = Color[(u + v) & 1];
 		}
 	}
 }
@@ -454,6 +431,10 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 			}
 		}
 		u32 nColor = pItems[n].bDisabled ? Dim (UI_DIM, 55) : (bSel ? UI_WHITE : UI_DIM);
+		if (!pItems[n].bDisabled && strcmp (pItems[n].pLabel, "POWER OFF") == 0)
+		{
+			nColor = UI_CURSOR;		// same red as the cursor, selected or not
+		}
 		Text (x0 + 22, y, pItems[n].pLabel, nColor);
 		if (pItems[n].pValue)
 		{
@@ -509,7 +490,7 @@ void CUI::DrawBlack (void)
 
 void CUI::DrawLoading (const char *pName, unsigned nPercent)
 {
-	Background ();
+	Background (TRUE);
 
 	// long titles go on two lines of up to 26 characters, split at a space
 	const unsigned nMax = 26;

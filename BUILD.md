@@ -31,7 +31,8 @@ Build host: Linux x86_64.
        python3 patches/circle-xinput.py circle-rpi3mc
 
    then `./makeall` in each copy, and `make` in `addon/SDCard` and `addon/fatfs`.
-   `usbpoll=native` in `neopi/neopi.cfg` turns the faster polling off at run time.
+   `usbpoll=500` / `usbpoll=250` in `neopi/neopi.cfg` poll every 2 / 4 ms instead, `usbpoll=native`
+   turns the faster polling off at run time.
 4. **Geolith** in `third_party/geolith` (from the mirror github.com/alessioscand/geolith-mirror),
    unmodified; CD support is left out with `src/geo_disc_stub.c`. `build.sh` applies
    `patches/geolith-mc.py` to the copy of `geo_lspc.c` in the build directory: core 0

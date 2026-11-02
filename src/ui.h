@@ -84,7 +84,7 @@ public:
 private:
 	void Pixel (int x, int y, u32 c);
 	void Fill (int x, int y, int w, int h, u32 c);
-	void Background (void);
+	void Background (boolean bFreeze = FALSE);
 	void Backdrop (boolean bOverGame);
 	void Logo (void);
 	void Panel (int x0, int y0, int x1, int y1);

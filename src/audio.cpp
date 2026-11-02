@@ -9,7 +9,7 @@
 #include "audio.h"
 
 #define SAMPLE_RATE	48000
-#define CHUNK_SIZE	(384 * 4)		// words per DMA chunk (must be multiple of 384)
+#define CHUNK_SIZE	(384 * 2)		// words per DMA chunk (multiple of 384): 384 stereo frames = 8 ms
 #define QUEUE_FRAMES	4800			// 100 ms queue capacity
 #define TARGET_FRAMES	1600			// keep ~2 video frames queued (~33 ms)
 #define BAND_FRAMES	400

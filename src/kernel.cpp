@@ -169,8 +169,8 @@ static void McFailText (char *pOut, size_t nSize)
 // Frame phase (patches/geolith-phase.py): each geo_exec() starts at line 248,
 // so it runs the vertical blank first (the game reads the pads there) and
 // then every visible line; the frame shown at the next vsync already answers
-// the pads read just before it. framephase=classic in neopi.cfg = line 0, as
-// up to 0.6.4 (one frame more of lag).
+// the pads read just before it (up to 0.6.4 the frame started at line 0:
+// one frame more of lag).
 //
 // Frame delay: the frame starts a few ms after the vsync instead of right
 // after it, so the pads are read later and the finished frame waits less
@@ -188,7 +188,7 @@ extern "C" void geo_exec_rephase (unsigned nLine);
 #define FRAME_US		16667
 #define DELAY_GUARD_US		3000
 #define DELAY_MAX_US		6000
-static unsigned s_nPhaseLine = PHASE_LINE;
+static const unsigned s_nPhaseLine = PHASE_LINE;
 static int s_nDelayCfg = -1;		// -1 auto, 0 off, N ms fixed
 static unsigned s_nDelayUs;		// delay before the next frame
 static unsigned s_nDelayPeak = FRAME_US;	// slowest recent frame (decays)
@@ -1678,6 +1678,18 @@ void CKernel::ApplyVideoMode (void)
 	Log (Line, COLOR_TEXT);
 }
 
+// usbpoll= value for the log and neopi.cfg
+static const char *UsbPollName (void)
+{
+	switch (g_nUSBInterruptPollMs)
+	{
+	case 0:		return "native";
+	case 2:		return "500";
+	case 4:		return "250";
+	default:	return "1000";
+	}
+}
+
 const char *CKernel::RegionName (unsigned nRegion)
 {
 	switch (nRegion)
@@ -1726,15 +1738,17 @@ void CKernel::LoadConfig (void)
 #endif
 	if (!m_bFilterAllowed)			m_nFilter = FILTER_NONE;
 	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
+	// usbpoll=500 / 250 = every 2 / 4 ms, for pads that misbehave at 1000 Hz;
 	// usbpoll=native keeps the interval requested by the device
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
+	else if (strstr (Text, "usbpoll=500"))	g_nUSBInterruptPollMs = 2;
+	else if (strstr (Text, "usbpoll=250"))	g_nUSBInterruptPollMs = 4;
 	// resampler=speex: Geolith's own high quality resampler (heavier)
 	if (strstr (Text, "resampler=speex"))	s_bSpeex = TRUE;
 #ifdef NEOPI_MC
 	if (strstr (Text, "multicore=off"))	s_bMultiCore = FALSE;
 #endif
 	// input lag (see "input lag" at the top of this file)
-	if (strstr (Text, "framephase=classic"))	s_nPhaseLine = 0;
 	if (strstr (Text, "beamracing=off"))		s_nRaceCfg = 0;
 	if (strstr (Text, "beamracing=on"))		s_nRaceCfg = 1;
 	const char *pDelay = strstr (Text, "framedelay=");
@@ -1757,16 +1771,16 @@ void CKernel::LoadConfig (void)
 	}
 
 	char Line[140];
-	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s, resampler %s",
+	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s%s, resampler %s",
 		  m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion), FilterName (m_nFilter),
-		  g_nUSBInterruptPollMs ? "1 ms" : "native", s_bSpeex ? "speex" : "linear");
+		  UsbPollName (), g_nUSBInterruptPollMs ? " Hz" : "", s_bSpeex ? "speex" : "linear");
 	Log (Line, COLOR_TEXT);
 	char Delay[16];
 	if (s_nDelayCfg < 0)		snprintf (Delay, sizeof Delay, "auto");
 	else if (s_nDelayCfg == 0)	snprintf (Delay, sizeof Delay, "off");
 	else				snprintf (Delay, sizeof Delay, "%d ms", s_nDelayCfg);
-	snprintf (Line, sizeof Line, "Settings: frame starts at line %u%s, frame delay %s, beam racing %s",
-		  s_nPhaseLine, s_nPhaseLine ? "" : " (framephase=classic)", Delay,
+	snprintf (Line, sizeof Line, "Settings: frame starts at line %u, frame delay %s, beam racing %s",
+		  s_nPhaseLine, Delay,
 		  s_nRaceCfg ? "on" : "off");
 	Log (Line, COLOR_TEXT);
 }
@@ -1781,9 +1795,11 @@ void CKernel::SaveConfig (void)
 	{
 		strcat (Text, "filters=on\r\n");
 	}
-	if (g_nUSBInterruptPollMs == 0)
+	if (g_nUSBInterruptPollMs != 1)
 	{
-		strcat (Text, "usbpoll=native\r\n");
+		strcat (Text, "usbpoll=");
+		strcat (Text, UsbPollName ());
+		strcat (Text, "\r\n");
 	}
 	if (s_bSpeex)
 	{
@@ -1795,10 +1811,6 @@ void CKernel::SaveConfig (void)
 		strcat (Text, "multicore=off\r\n");
 	}
 #endif
-	if (s_nPhaseLine == 0)
-	{
-		strcat (Text, "framephase=classic\r\n");
-	}
 	if (s_nRaceCfg == 0)
 	{
 		strcat (Text, "beamracing=off\r\n");
@@ -2357,6 +2369,9 @@ void CKernel::RunGame (void)
 	m_pInput->RestartDiagnostics ();		// log the pad reports of this game too
 
 	unsigned nFrames = 0;
+	unsigned nSeconds = 0;		// temperature: read every 4 s (firmware call)
+	unsigned nTemp = 0;
+	m_ActLED.On ();			// steady while playing (no firmware call every second)
 	unsigned nWinStart = CTimer::GetClockTicks ();
 	unsigned nWorkMax = 0;
 	unsigned nLastVSync = CTimer::GetClockTicks ();
@@ -2713,7 +2728,7 @@ void CKernel::RunGame (void)
 					}
 					if (geo_state_load (Path))
 					{
-						Rephase ();		// states from 0.6.4 or framephase=classic too
+						Rephase ();		// states from 0.6.4 too
 						Log ("  save state: loaded", COLOR_TEXT);
 						bMenu = FALSE;
 					}
@@ -2912,7 +2927,10 @@ void CKernel::RunGame (void)
 			unsigned nLoad = nWorkMax * 100 / 16667;
 			snprintf (StLoad, sizeof StLoad, "%u%%", nLoad);
 			nLoadColor = nLoad > 95 ? UI_ERR : (nLoad >= 75 ? UI_WARN : UI_OK);
-			unsigned nTemp = m_CPUThrottle.GetTemperature ();
+			if (nSeconds++ % 4 == 0)
+			{
+				nTemp = m_CPUThrottle.GetTemperature ();
+			}
 			snprintf (StTemp, sizeof StTemp, "%u" FONT_DEGREE "C", nTemp);
 			nTempColor = nTemp > 75 ? UI_ERR : (nTemp > 65 ? UI_WARN : UI_WHITE);
 			snprintf (StRes, sizeof StRes, "%uP", m_Video.GetHeight ());
@@ -2930,15 +2948,10 @@ void CKernel::RunGame (void)
 				  k == S ? "HVS" : (k == 1 ? "CPU" : "CPU+HVS"));
 			bStatusReady = TRUE;
 
-			m_CPUThrottle.Update ();
-			m_ActLED.On ();
+			m_CPUThrottle.Update ();	// does its firmware calls every 4 s
 			nFrames = 0;
 			nWorkMax = 0;
 			nWinStart = CTimer::GetClockTicks ();
-		}
-		else if (nFrames == 30)
-		{
-			m_ActLED.Off ();
 		}
 	}
 }

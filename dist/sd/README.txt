@@ -1,4 +1,4 @@
-neo-pi 0.7.0-rc1 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.7.0-rc2 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
 
 SET-UP
@@ -97,7 +97,6 @@ INPUT LAG
     beamracing=off      normal way (double buffer + frame delay)
     framedelay=off      no frame delay
     framedelay=5        fixed delay in ms (1-12; too much = stutter)
-    framephase=classic  the frame starts as up to 0.6.4 (one frame more)
 
 PICTURE
   Always integer scaling (square pixels, never stretched) with black
@@ -105,8 +104,11 @@ PICTURE
   Testing options in neopi/neopi.cfg (one per line):
     scaler=cpu       do not use the hardware scaler (comparison only)
     multicore=off    everything on one CPU core, as up to 0.6.3
-    usbpoll=native   poll pads at the rate they ask for (usually every
-                     8-10 ms) instead of every 1 ms
+    usbpoll=500      poll pads every 2 ms instead of every 1 ms (1000 Hz).
+                     If a pad misbehaves (double or missed presses,
+                     disconnects), try 500, then 250
+    usbpoll=250      every 4 ms
+    usbpoll=native   at the rate the pad asks for (usually every 8-10 ms)
     resampler=speex  the previous, heavier audio resampler (comparison)
 
 FILES ON THE CARD (neopi folder)
