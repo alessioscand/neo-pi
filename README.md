@@ -138,6 +138,20 @@ stick always work. Second pad connected is Player 2.
 | Select + C | Status line on/off |
 | Select + D | Credits |
 
+**With the Universe BIOS** (OPTIONS > SYSTEM > UNIBIOS, needs
+`uni-bios_4_0.rom` in `neogeo.zip`), neo-pi's own controls stay the same,
+so a few of its combinations take a different route:
+
+| Universe BIOS | On neo-pi |
+|---|---|
+| Main menu (A+B+C at start-up) | In-game menu > BIOS SETTINGS, or A+B+C while its splash screen is shown |
+| In-game menu (Start+A+B+C) | Works as is |
+| In-game menu (Start+Coin, Start+Select) | Not available: Select belongs to neo-pi (coin, menu, shortcuts); use Start+A+B+C |
+| Memory card manager (A+B+C+D at start-up), test mode (B+C+D) | Press them while its splash screen is shown |
+
+The region is set in the Universe BIOS menu, and its settings are kept
+for each game.
+
 In the menus the buttons are shown on screen.
 Always switch off with POWER OFF (in-game menu or options) before
 unplugging: it saves memory cards and settings.
@@ -164,7 +178,6 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
 | `resampler=speex` | Geolith's standard Speex resampler (heavier) |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler (slower) |
-| `writecombine=off` | write the framebuffer the old way (slower) |
 
 An empty `neopi/BENCH` file runs a built-in benchmark on the selected game
 (results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file
