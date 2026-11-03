@@ -1,9 +1,12 @@
-neo-pi 0.8.0-rc1 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.8.0-rc2 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
 
 WHAT'S NEW IN 0.8.0
   - Universe BIOS: with uni-bios_4_0.rom in neogeo.zip, OPTIONS > SYSTEM
     can be UNIBIOS. BIOS SETTINGS in the in-game menu opens its menu.
+  - OPTIONS in the in-game menu too: change SCANLINES and see it at once
+    on the paused game.
+  - The menus go through the chosen filter as well, COMPOSITE included.
 
 WHAT'S NEW IN 0.7.0
   - Less input lag: each frame reads the pads first and then draws the
@@ -64,17 +67,20 @@ CONTROLS IN GAME
 IN-GAME MENU (hold Select for 1 second; B resumes the game)
   SAVE STATE     saves the game (one save per game)
   LOAD STATE     loads it (available once something has been saved)
-  RESET          restarts the game
   BIOS SETTINGS  (MVS and UNIBIOS) MVS: presses the TEST button, the
                  BIOS's own menu appears (game and cabinet settings); its
                  EXIT item restarts the game with the new settings.
                  UNIBIOS: restarts the game into the Universe BIOS menu
+  OPTIONS        the OPTIONS menu (below), over the paused game; B comes
+                 back here. SYSTEM and REGION apply from the next game
+  RESET          restarts the game
   GAME LIST      back to the game list
   POWER OFF      3 second countdown (B cancels), saves everything and
                  switches picture and sound off: then the power can be
                  unplugged
 
-OPTIONS MENU (D in the list; A or left/right changes, B goes back)
+OPTIONS MENU (D in the list or OPTIONS in the in-game menu; A or
+              left/right changes, B goes back)
   SYSTEM         MVS (arcade) or AES (home console), from the next game.
                  UNIBIOS too, if uni-bios_4_0.rom is in neogeo.zip
   REGION         EUROPE / USA / JAPAN / ASIA (BIOS region: language,

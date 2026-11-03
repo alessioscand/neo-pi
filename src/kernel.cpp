@@ -77,7 +77,7 @@ void NeopiInstallVFS (void);
 
 CKernel *CKernel::s_pThis = 0;
 
-enum { GmSave, GmLoad, GmReset, GmBios, GmList, GmPower, GmCount };
+enum { GmSave, GmLoad, GmBios, GmOptions, GmReset, GmList, GmPower, GmCount };
 
 // ---- emulator buffers and callbacks ---------------------------------------
 
@@ -611,6 +611,8 @@ CKernel::CKernel (void)
 	m_nShots (0),
 	m_nSystem (SYS_MVS),
 	m_bHasUni (FALSE),
+	m_nGameSystem (SYS_MVS),
+	m_bReloadGame (FALSE),
 	m_nRegion (REGION_EU),
 	m_nFilter (0),
 	m_bHVS (TRUE),
@@ -935,7 +937,7 @@ const char *CKernel::SystemName (void) const
 const char *CKernel::SaveExt (unsigned nType) const
 {
 	static const char *Ext[3] = {"nv", "srm", "mcr"};
-	if (nType == 0 && m_nSystem == SYS_UNI)
+	if (nType == 0 && m_nGameSystem == SYS_UNI)
 	{
 		return "unv";
 	}
@@ -1047,6 +1049,8 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	}
 
 	geo_mixer_deinit ();
+	m_nGameSystem = m_nSystem;
+	m_bReloadGame = FALSE;
 	geo_set_system (m_nSystem == SYS_AES ? SYSTEM_AES : (m_nSystem == SYS_UNI ? SYSTEM_UNI : SYSTEM_MVS));
 	geo_set_region ((int) m_nRegion);
 	geo_mixer_set_rate (SAMPLE_RATE);
@@ -1094,9 +1098,26 @@ boolean CKernel::LoadGame (unsigned nIndex)
 
 // ---- video helpers ----------------------------------------------------------
 
+// the menus and screens go through the same filter as the game: scanlines are
+// drawn by m_Video, COMPOSITE by core 2 (with a fixed colour burst phase, so the
+// dots do not crawl on still text)
+void CKernel::DrawPicture (u32 *pBuffer)
+{
+	if (s_bComposite)
+	{
+		for (unsigned y = 0; y < GAME_H; y++)
+		{
+			TvPost (pBuffer + (y + GAME_SRC_Y) * GAME_SRC_PITCH + GAME_SRC_X, y % COMP_PHASES, y, FALSE);
+		}
+		TvSync ();
+		return;
+	}
+	m_Video.DrawGame (pBuffer);
+}
+
 void CKernel::ShowUIFrame (boolean bWait, const char *pTopMessage)
 {
-	m_Video.DrawGame (m_pUI->GetBuffer ());
+	DrawPicture (m_pUI->GetBuffer ());
 	if (pTopMessage && pTopMessage[0])
 	{
 		// in the black band above the picture, like the in-game messages
@@ -1821,7 +1842,7 @@ const char *CKernel::RegionName (unsigned nRegion)
 void CKernel::StateExt (char *pExt, unsigned nSlot) const
 {
 	pExt[0] = 's';
-	pExt[1] = m_nSystem == SYS_AES ? 'a' : (m_nSystem == SYS_UNI ? 'u' : 't');	// separate for each system
+	pExt[1] = m_nGameSystem == SYS_AES ? 'a' : (m_nGameSystem == SYS_UNI ? 'u' : 't');	// separate for each system
 	pExt[2] = (char) ('1' + nSlot);
 	pExt[3] = '\0';
 }
@@ -1945,7 +1966,7 @@ void CKernel::SaveConfig (void)
 	WriteTextFile (CFG_PATH, Text);
 }
 
-void CKernel::RunSystemMenu (void)
+void CKernel::RunSystemMenu (boolean bInGame)
 {
 	enum { SmSystem, SmRegion, SmFilter, SmControls, SmPower, SmCount };
 	static const unsigned Regions[4] = {REGION_EU, REGION_US, REGION_JP, REGION_AS};
@@ -1956,21 +1977,26 @@ void CKernel::RunSystemMenu (void)
 	const char *pMsg = "";
 	unsigned nFrame = 0;
 
-	CMachineInfo *pInfo = CMachineInfo::Get ();
+	// "Raspberry Pi 3 Model B+" -> "PI 3 B+"
+	char Model[32];
+	const char *pName = CMachineInfo::Get ()->GetMachineName ();
+	if (strncmp (pName, "Raspberry ", 10) == 0) pName += 10;
+	unsigned nLen = 0;
+	for (; *pName && nLen < sizeof Model - 1; pName++)
+	{
+		if (strncmp (pName, "Model ", 6) == 0) pName += 6;
+		char c = *pName;
+		Model[nLen++] = c >= 'a' && c <= 'z' ? (char) (c - 32) : c;
+	}
+	Model[nLen] = '\0';
 	char Footer[48];
-	snprintf (Footer, sizeof Footer, "NEO-PI " NEOPI_VERSION "  PI %u  %u C", pInfo->GetModelMajor (),
-		  m_CPUThrottle.GetTemperature ());
+	snprintf (Footer, sizeof Footer, "NEO-PI " NEOPI_VERSION "  %s", Model);
 
 	while (1)
 	{
 		if (nFrame++ % 15 == 0)
 		{
 			m_pInput->UpdateDevices ();
-		}
-		if (nFrame % 120 == 0)
-		{
-			snprintf (Footer, sizeof Footer, "NEO-PI " NEOPI_VERSION "  PI %u  %u C", pInfo->GetModelMajor (),
-				  m_CPUThrottle.GetTemperature ());
 		}
 
 		u32 n = m_pInput->GetAny ();
@@ -2013,7 +2039,7 @@ void CKernel::RunSystemMenu (void)
 				}
 				else if (nNew & BTN_A)
 				{
-					pMsg = "SCANLINES NEED A PI 4";
+					pMsg = "SCANLINES NEED MULTICORE";
 				}
 				break;
 
@@ -2090,7 +2116,14 @@ void CKernel::RunSystemMenu (void)
 	}
 	if ((m_nSystem != nOldSystem || m_nRegion != nOldRegion) && m_nLoaded >= 0)
 	{
-		UnloadGame ();		// the BIOS changes: reload the game next time
+		if (bInGame)
+		{
+			m_bReloadGame = TRUE;	// the game goes on; reloaded from the list
+		}
+		else
+		{
+			UnloadGame ();		// the BIOS changes: reload the game next time
+		}
 	}
 }
 
@@ -2365,7 +2398,7 @@ unsigned CKernel::RunList (unsigned nSel)
 		}
 		if (nNew & BTN_D)
 		{
-			RunSystemMenu ();
+			RunSystemMenu (FALSE);
 			n = ~0u;		// wait for release
 		}
 		nPrev = n;
@@ -2700,7 +2733,7 @@ void CKernel::RunGame (void)
 			}
 			unsigned nStatA = 0x07 | 0x18;
 			unsigned nStatB = 0x0F | 0x30;
-			if (m_nSystem != SYS_AES)		// MVS hardware (MVS BIOS or Universe BIOS)
+			if (m_nGameSystem != SYS_AES)		// MVS hardware (MVS BIOS or Universe BIOS)
 			{
 				if (nCoin[0]) { nStatA &= ~0x01u; nCoin[0]--; }
 				if (nCoin[1]) { nStatA &= ~0x02u; nCoin[1]--; }
@@ -2820,8 +2853,9 @@ void CKernel::RunGame (void)
 			unsigned Ids[GmCount], nIds = 0;
 			Ids[nIds++] = GmSave;		// RESUME is the B button
 			Ids[nIds++] = GmLoad;
+			if (m_nGameSystem != SYS_AES) Ids[nIds++] = GmBios;
+			Ids[nIds++] = GmOptions;
 			Ids[nIds++] = GmReset;
-			if (m_nSystem != SYS_AES) Ids[nIds++] = GmBios;
 			Ids[nIds++] = GmList;
 			Ids[nIds++] = GmPower;
 			if (nMenuSel >= nIds) nMenuSel = 0;
@@ -2887,7 +2921,7 @@ void CKernel::RunGame (void)
 					break;
 
 				case GmBios:
-					if (m_nSystem == SYS_UNI)
+					if (m_nGameSystem == SYS_UNI)
 					{
 						// Universe BIOS: restart with A+B+C held on the splash
 						// screen, which opens its main menu
@@ -2904,8 +2938,18 @@ void CKernel::RunGame (void)
 					bMenu = FALSE;
 					break;
 
+				case GmOptions:
+					// over the paused game; B goes back to this menu
+					RunSystemMenu (TRUE);
+					nMenuPrev = ~0u;
+					break;
+
 				case GmList:
 					SaveGameData ();
+					if (m_bReloadGame)
+					{
+						UnloadGame ();		// SYSTEM or REGION changed while playing
+					}
 					SaveLog ();
 					m_Video.SetRacing (FALSE);
 					return;
@@ -2931,8 +2975,8 @@ void CKernel::RunGame (void)
 			{
 				static const char *Labels[GmCount] =
 				{
-					"SAVE STATE", "LOAD STATE", "RESET",
-					"BIOS SETTINGS", "GAME LIST", "POWER OFF"
+					"SAVE STATE", "LOAD STATE", "BIOS SETTINGS",
+					"OPTIONS", "RESET", "GAME LIST", "POWER OFF"
 				};
 				TMenuItem Items[GmCount];
 				for (unsigned i = 0; i < nIds; i++)
@@ -2951,7 +2995,7 @@ void CKernel::RunGame (void)
 				static const TButtonHint Hints[2] = {{'A', "SELECT"}, {'B', "RESUME"}};
 				m_pUI->DrawPanelMenu (TRUE, pName, Items, nIds, nMenuSel, pMsg, nMsgColor,
 						      Hints, 2, 0);
-				m_Video.DrawGame (m_pUI->GetBuffer ());
+				DrawPicture (m_pUI->GetBuffer ());
 			}
 			else
 			{

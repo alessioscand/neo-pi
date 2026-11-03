@@ -664,8 +664,8 @@ void CUI::DrawCredits (const char *pVersion)
 		{"AUDIO",  "SPEEX - J.M.VALIN"},
 		{"ZIP",    "MINIZ - R.GELDREICH"},
 		{"SYSTEM", "CIRCLE - R.STANGE"},
-		{"FONT",   "MATINEE - D.GUARD"},
-		{"NTSC",   "BLARGG - S.GREEN"}
+		{"NTSC",   "BLARGG - S.GREEN"},
+		{"FONT",   "MATINEE - D.GUARD"}
 	};
 	for (int i = 0; i < 9; i++)
 	{
