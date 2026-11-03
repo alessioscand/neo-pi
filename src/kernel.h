@@ -140,7 +140,10 @@ private:
 	unsigned		 m_nShots;
 
 	// configuration (neopi.cfg)
-	unsigned		 m_nSystem;	// 0 = MVS, 1 = AES
+	unsigned		 m_nSystem;	// SYS_MVS, SYS_AES, SYS_UNI
+	boolean			 m_bHasUni;	// uni-bios_4_0.rom is in neogeo.zip
+	const char *SystemName (void) const;
+	const char *SaveExt (unsigned nType) const;
 	unsigned		 m_nRegion;	// REGION_*
 	unsigned		 m_nFilter;	// FILTER_*
 	boolean			 m_bHVS;		// FALSE: scaler=cpu in neopi.cfg

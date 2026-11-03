@@ -37,6 +37,12 @@ void NeopiInstallVFS (void);
 
 #define NEOPI_DIR	"SD:/neopi"
 #define BIOS_PATH	NEOPI_DIR "/neogeo.zip"
+#define UNIBIOS_ROM	"uni-bios_4_0.rom"	// Universe BIOS, in neogeo.zip (MAME/FBNeo sets)
+
+// OPTIONS > SYSTEM
+#define SYS_MVS		0
+#define SYS_AES		1
+#define SYS_UNI		2		// MVS hardware with the Universe BIOS
 #define LOG_PATH	NEOPI_DIR "/LOG.TXT"
 #define BENCH_PATH	NEOPI_DIR "/BENCH.TXT"
 #define BENCH_FLAG	NEOPI_DIR "/BENCH"
@@ -424,6 +430,8 @@ static unsigned InputJoystick (unsigned nPort)	{ return s_Joy[nPort & 1]; }
 static unsigned InputStatusA (void)		{ return s_StatA; }
 static unsigned InputStatusB (void)		{ return s_StatB; }
 static volatile unsigned s_nTestFrames = 0;		// > 0: TEST button held (MVS service menu)
+#define BOOT_KEYS_FRAMES	240			// 4 s: the Universe BIOS's splash screen
+static unsigned s_nBootKeys = 0;			// > 0: player 1's A+B+C held (Universe BIOS menu)
 static unsigned InputSystemType (void)	{ return s_nTestFrames ? 0x40 : 0xC0; }
 static unsigned InputDIPSwitches (void)	{ return 0xFF; }		// all DIP switches off
 static unsigned InputUnused (void)		{ return 0xFF; }
@@ -601,7 +609,8 @@ CKernel::CKernel (void)
 	m_bStatusOn (FALSE),
 	m_nClearStatus (0),
 	m_nShots (0),
-	m_nSystem (0),
+	m_nSystem (SYS_MVS),
+	m_bHasUni (FALSE),
 	m_nRegion (REGION_EU),
 	m_nFilter (0),
 	m_bHVS (TRUE),
@@ -915,6 +924,24 @@ void CKernel::ScanGames (void)
 	}
 }
 
+const char *CKernel::SystemName (void) const
+{
+	return m_nSystem == SYS_AES ? "AES" : (m_nSystem == SYS_UNI ? "UNIBIOS" : "MVS");
+}
+
+// save data of the loaded game: MVS memory (backup RAM), cartridge RAM, memory
+// card. The Universe BIOS keeps its own settings for each game in the backup
+// RAM, so it has a file of its own (.unv) and never mixes with the MVS BIOS's.
+const char *CKernel::SaveExt (unsigned nType) const
+{
+	static const char *Ext[3] = {"nv", "srm", "mcr"};
+	if (nType == 0 && m_nSystem == SYS_UNI)
+	{
+		return "unv";
+	}
+	return Ext[nType < 3 ? nType : 0];
+}
+
 void CKernel::GamePath (char *pOut, size_t nSize, const char *pExt) const
 {
 	char Base[64];
@@ -950,11 +977,10 @@ void CKernel::SaveGameData (void)
 	{
 		return;
 	}
-	static const char *Ext[3] = {"nv", "srm", "mcr"};
 	for (unsigned i = 0; i < 3; i++)
 	{
 		char Path[160];
-		GamePath (Path, sizeof Path, Ext[i]);
+		GamePath (Path, sizeof Path, SaveExt (i));
 		geo_savedata_save (i, Path);
 	}
 }
@@ -1021,7 +1047,7 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	}
 
 	geo_mixer_deinit ();
-	geo_set_system (m_nSystem == 0 ? SYSTEM_MVS : SYSTEM_AES);
+	geo_set_system (m_nSystem == SYS_AES ? SYSTEM_AES : (m_nSystem == SYS_UNI ? SYSTEM_UNI : SYSTEM_MVS));
 	geo_set_region ((int) m_nRegion);
 	geo_mixer_set_rate (SAMPLE_RATE);
 	geo_mixer_init ();
@@ -1032,7 +1058,7 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	geo_init ();
 	geo_set_region ((int) m_nRegion);
 	ClearVideoMemory ();
-	snprintf (Line, sizeof Line, "  system %s, region %s", m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion));
+	snprintf (Line, sizeof Line, "  system %s, region %s", SystemName (), RegionName (m_nRegion));
 	Log (Line, COLOR_DIM);
 	if (!geo_bios_load_mem (m_pBIOS, m_nBIOSSize))
 	{
@@ -1048,13 +1074,13 @@ boolean CKernel::LoadGame (unsigned nIndex)
 		return FALSE;
 	}
 	m_nLoaded = (int) nIndex;
+	s_nBootKeys = 0;
 	m_nShots = 0;					// screenshot numbers: next free one
 
-	static const char *Ext[3] = {"nv", "srm", "mcr"};
 	for (unsigned i = 0; i < 3; i++)
 	{
 		char SavePath[160];
-		GamePath (SavePath, sizeof SavePath, Ext[i]);
+		GamePath (SavePath, sizeof SavePath, SaveExt (i));
 		geo_savedata_load (i, SavePath);
 	}
 
@@ -1764,7 +1790,7 @@ void CKernel::ApplyVideoMode (void)
 		  m_Video.IsRedLow () ? "low" : "high", "");
 	Log (Line, COLOR_TEXT);
 	snprintf (Line, sizeof Line, "Video: framebuffer write-combining %s (%u pages of 64 KB)",
-		  m_Video.GetWCPages () ? "on" : (g_bFbWriteCombine ? "FAILED" : "off (writecombine=off)"),
+		  m_Video.GetWCPages () ? "on" : "FAILED",
 		  m_Video.GetWCPages ());
 	Log (Line, COLOR_TEXT);
 }
@@ -1795,7 +1821,7 @@ const char *CKernel::RegionName (unsigned nRegion)
 void CKernel::StateExt (char *pExt, unsigned nSlot) const
 {
 	pExt[0] = 's';
-	pExt[1] = m_nSystem == 0 ? 't' : 'a';		// separate states for MVS and AES
+	pExt[1] = m_nSystem == SYS_AES ? 'a' : (m_nSystem == SYS_UNI ? 'u' : 't');	// separate for each system
 	pExt[2] = (char) ('1' + nSlot);
 	pExt[3] = '\0';
 }
@@ -1813,7 +1839,8 @@ void CKernel::LoadConfig (void)
 	f_close (&File);
 	Text[nRead] = '\0';
 
-	if (strstr (Text, "system=AES"))	m_nSystem = 1;
+	if (strstr (Text, "system=AES"))	m_nSystem = SYS_AES;
+	if (strstr (Text, "system=UNIBIOS"))	m_nSystem = SYS_UNI;	// checked against neogeo.zip later
 	if (strstr (Text, "region=USA"))	m_nRegion = REGION_US;
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
@@ -1823,7 +1850,6 @@ void CKernel::LoadConfig (void)
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
-	if (strstr (Text, "writecombine=off"))	g_bFbWriteCombine = FALSE;
 	if (strstr (Text, "filters=on"))	m_bFilterAllowed = m_bForceFilters = TRUE;	// e.g. to try them on a Pi 3
 	// (multicore and the scanlines on a Pi 3: decided after LoadConfig, also
 	// when neopi.cfg does not exist yet)
@@ -1862,7 +1888,7 @@ void CKernel::LoadConfig (void)
 
 	char Line[140];
 	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s%s, resampler %s",
-		  m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion), FilterName (m_nFilter),
+		  SystemName (), RegionName (m_nRegion), FilterName (m_nFilter),
 		  UsbPollName (), g_nUSBInterruptPollMs ? " Hz" : "", s_bSpeex ? "speex" : "linear");
 	Log (Line, COLOR_TEXT);
 	char Delay[16];
@@ -1879,7 +1905,7 @@ void CKernel::SaveConfig (void)
 {
 	char Text[200];
 	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\nfilter=%s\r\n%s",
-		  m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion),
+		  SystemName (), RegionName (m_nRegion),
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
 	if (m_bForceFilters)
 	{
@@ -1960,10 +1986,19 @@ void CKernel::RunSystemMenu (void)
 			switch (nSel)
 			{
 			case SmSystem:
-				m_nSystem ^= 1;
+				// MVS, AES, UNIBIOS (only with uni-bios_4_0.rom in neogeo.zip)
+				do
+				{
+					m_nSystem = (m_nSystem + 3 + (unsigned) nDir) % 3;
+				}
+				while (m_nSystem == SYS_UNI && !m_bHasUni);
 				break;
 
 			case SmRegion: {
+				if (m_nSystem == SYS_UNI)
+				{
+					break;		// set in the Universe BIOS's own menu
+				}
 				unsigned i = 0;
 				while (i < 4 && Regions[i] != m_nRegion) i++;
 				i = (i + 4 + (unsigned) nDir) % 4;
@@ -2021,8 +2056,9 @@ void CKernel::RunSystemMenu (void)
 			Items[i].pValue = 0;
 			Items[i].bDisabled = FALSE;
 		}
-		Items[SmSystem].pValue = m_nSystem == 0 ? "MVS" : "AES";
-		Items[SmRegion].pValue = RegionName (m_nRegion);
+		Items[SmSystem].pValue = SystemName ();
+		Items[SmRegion].pValue = m_nSystem == SYS_UNI ? "SET IN UNIBIOS" : RegionName (m_nRegion);
+		Items[SmRegion].bDisabled = m_nSystem == SYS_UNI;
 		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE"};
 #ifdef NEOPI_MC
 		// not allowed only on a Pi 3 with multicore=off
@@ -2049,7 +2085,7 @@ void CKernel::RunSystemMenu (void)
 		SaveConfig ();
 		char Line[120];
 		snprintf (Line, sizeof Line, "New settings: system %s, region %s, filter %s",
-			  m_nSystem == 0 ? "MVS" : "AES", RegionName (m_nRegion), FilterName (m_nFilter));
+			  SystemName (), RegionName (m_nRegion), FilterName (m_nFilter));
 		Log (Line, COLOR_TEXT);
 	}
 	if ((m_nSystem != nOldSystem || m_nRegion != nOldRegion) && m_nLoaded >= 0)
@@ -2652,6 +2688,11 @@ void CKernel::RunGame (void)
 				u32 nPanel = (n & BTN_SELECT) ? (n & 0x0F) : nGame;
 				s_Joy[p] = ~nPanel & 0xFF;
 			}
+			if (s_nBootKeys)
+			{
+				s_Joy[0] &= ~0x70u;		// A+B+C (active low)
+				s_nBootKeys--;
+			}
 
 			if (bOpenMenu || bOpenCredits)
 			{
@@ -2659,7 +2700,7 @@ void CKernel::RunGame (void)
 			}
 			unsigned nStatA = 0x07 | 0x18;
 			unsigned nStatB = 0x0F | 0x30;
-			if (m_nSystem == 0)
+			if (m_nSystem != SYS_AES)		// MVS hardware (MVS BIOS or Universe BIOS)
 			{
 				if (nCoin[0]) { nStatA &= ~0x01u; nCoin[0]--; }
 				if (nCoin[1]) { nStatA &= ~0x02u; nCoin[1]--; }
@@ -2775,12 +2816,12 @@ void CKernel::RunGame (void)
 
 		if (bMenu)
 		{
-			// item list (BIOS SETTINGS only on MVS)
+			// item list (BIOS SETTINGS only on MVS hardware)
 			unsigned Ids[GmCount], nIds = 0;
 			Ids[nIds++] = GmSave;		// RESUME is the B button
 			Ids[nIds++] = GmLoad;
 			Ids[nIds++] = GmReset;
-			if (m_nSystem == 0) Ids[nIds++] = GmBios;
+			if (m_nSystem != SYS_AES) Ids[nIds++] = GmBios;
 			Ids[nIds++] = GmList;
 			Ids[nIds++] = GmPower;
 			if (nMenuSel >= nIds) nMenuSel = 0;
@@ -2846,8 +2887,20 @@ void CKernel::RunGame (void)
 					break;
 
 				case GmBios:
-					s_nTestFrames = 10;		// press the MVS TEST button
-					Log ("  BIOS SETTINGS: TEST button", COLOR_TEXT);
+					if (m_nSystem == SYS_UNI)
+					{
+						// Universe BIOS: restart with A+B+C held on the splash
+						// screen, which opens its main menu
+						geo_reset (1);
+						Rephase ();
+						s_nBootKeys = BOOT_KEYS_FRAMES;
+						Log ("  BIOS SETTINGS: reset with A+B+C (Universe BIOS menu)", COLOR_TEXT);
+					}
+					else
+					{
+						s_nTestFrames = 10;		// press the MVS TEST button
+						Log ("  BIOS SETTINGS: TEST button", COLOR_TEXT);
+					}
 					bMenu = FALSE;
 					break;
 
@@ -3144,6 +3197,17 @@ TShutdownMode CKernel::Run (void)
 	}
 	m_pUI = new CUI;
 	size_t nFixSize = 0;
+	size_t nUniSize = 0;
+	void *pUni = neopi_zip_extract (m_pBIOS, m_nBIOSSize, UNIBIOS_ROM, &nUniSize);
+	m_bHasUni = pUni != 0;
+	free (pUni);
+	Log (m_bHasUni ? "BIOS: " UNIBIOS_ROM " found, SYSTEM can be UNIBIOS"
+		       : "BIOS: no " UNIBIOS_ROM " in neogeo.zip", COLOR_TEXT);
+	if (m_nSystem == SYS_UNI && !m_bHasUni)
+	{
+		m_nSystem = SYS_MVS;
+		Log ("  system=UNIBIOS in neopi.cfg but no Universe BIOS: MVS", COLOR_ERR);
+	}
 	void *pFix = neopi_zip_extract (m_pBIOS, m_nBIOSSize, "sfix.sfix", &nFixSize);
 	if (pFix)
 	{
