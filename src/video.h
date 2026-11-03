@@ -30,7 +30,8 @@
 #define FILTER_SCAN_LIGHT  1	// dark rows at 75%
 #define FILTER_SCAN_MEDIUM 2	// dark rows at 50%
 #define FILTER_SCAN_STRONG 3	// dark rows at 25%
-#define FILTER_COUNT	4
+#define FILTER_COMPOSITE   4	// blargg's NTSC filter (tvcore.h), no dark rows
+#define FILTER_COUNT	5
 
 // Logical colors (R in the low byte); CVideoOut converts them if the
 // framebuffer stores red in the high byte (Pi 4)
@@ -56,6 +57,13 @@ public:
 	unsigned GetFilter (void) const		{ return m_nFilter; }
 	unsigned GetFBWidth (void) const	{ return m_nWidth; }	// framebuffer before the HVS
 	unsigned GetFBHeight (void) const	{ return m_nHeight; }
+	unsigned GetGameY (void) const		{ return m_nGameY; }	// first game line in the framebuffer
+	unsigned GetCPUScale (void) const	{ return m_nM; }	// m
+
+	// Beam racing: game lines and band text go straight into the buffer being
+	// shown (no flip); the UI (DrawGame) still uses the back buffer
+	void SetRacing (boolean bOn)		{ m_bRacing = bOn; }
+	boolean IsRacing (void) const		{ return m_bRacing; }
 
 	// Text grid (character cells) of the console
 	unsigned GetColumns (void) const;
@@ -69,13 +77,20 @@ public:
 	void DrawGame (const u32 *pSource);
 	// one line of the game picture into the back buffer, with the caller's
 	// scratch lines (GAME_W * 8 pixels each): used by core 1 in the multicore build
-	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark);
+	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
+	{
+		DrawGameLineTo (m_bRacing ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark);
+	}
+	// COMPOSITE: one filtered line (nNtscW pixels 0x00RRGGBB) stretched to the
+	// game width, into the buffer being drawn; pLine = scratch (GAME_W * 8)
+	void DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine);
 	// One centred line of text in the top or bottom black band (no spans = clear)
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
 	void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans);
 
 	// Colors: RGB() values are converted to the framebuffer byte order
 	unsigned GetPixelOrder (void) const	{ return m_nPixelOrder; }
+	unsigned GetWCPages (void) const	{ return m_nWCPages; }	// framebuffer pages write-combining
 	boolean IsRedLow (void) const		{ return m_bRLow; }
 
 	unsigned GetBackBuffer (void) const	{ return m_nBack; }
@@ -85,6 +100,7 @@ public:
 
 private:
 	boolean Allocate (unsigned nWidth, unsigned nHeight);
+	void DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark);
 	u32 *Row (unsigned nBuffer, unsigned nY) const
 	{
 		return m_pBase + (nBuffer * m_nHeight + nY) * m_nPitchPx;
@@ -102,6 +118,7 @@ private:
 	u32	*m_pBase;
 	unsigned m_nBack;
 	boolean	 m_bGameMode;
+	volatile boolean m_bRacing;
 
 	unsigned m_nTextScale;			// console text scale (1 or 2)
 	unsigned m_nScale;			// S
@@ -121,6 +138,7 @@ private:
 	u32	*m_pLine;			// one scaled game line (cached memory)
 	u32	*m_pDark;			// the same line darkened (scanlines)
 	unsigned m_nPixelOrder;			// reported by the firmware
+	unsigned m_nWCPages;
 	boolean	 m_bRLow;			// red in the low byte of a pixel
 };
 

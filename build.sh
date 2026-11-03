@@ -34,6 +34,8 @@ for P in $TARGETS; do
 		python3 "$ROOT/patches/geolith-mc.py" "$B/geo_lspc.c"
 		echo "DEFINE += -DNEOPI_MC" >> "$B/Makefile"
 	fi
+	# where the frame starts (vertical blank first): patches/geolith-phase.py
+	python3 "$ROOT/patches/geolith-phase.py" "$B"
 	make -C "$B" -j16
 done
 

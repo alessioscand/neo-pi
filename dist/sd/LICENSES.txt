@@ -211,6 +211,20 @@ miniz - MIT
  **************************************************************************/
 
 ==============================================================================
+snes_ntsc (COMPOSITE filter) - GNU LGPL version 2.1 or later
+==============================================================================
+snes_ntsc 0.2.2, Copyright (C) 2006-2007 Shay Green (blargg).
+This module is free software; you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version. This module is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser
+General Public License for more details:
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+Its source code (unmodified) is in neo-pi's repository, third_party/snes_ntsc.
+
+==============================================================================
 Raspberry Pi firmware
 ==============================================================================
 See LICENCE.broadcom on this card.

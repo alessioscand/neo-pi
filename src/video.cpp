@@ -3,6 +3,7 @@
  */
 #include "fontdata.h"
 #include "video.h"
+#include "fbmap.h"
 #include <circle/bcmpropertytags.h>
 #include <circle/font.h>
 #include <circle/util.h>
@@ -22,6 +23,7 @@ CVideoOut::CVideoOut (void)
 	m_pBase (0),
 	m_nBack (1),
 	m_bGameMode (FALSE),
+	m_bRacing (FALSE),
 	m_nTextScale (1),
 	m_nScale (1),
 	m_nK (1),
@@ -36,6 +38,7 @@ CVideoOut::CVideoOut (void)
 	m_pDark (0),
 
 	m_nPixelOrder (1),
+	m_nWCPages (0),
 	m_bRLow (TRUE)
 {
 }
@@ -85,6 +88,9 @@ boolean CVideoOut::Allocate (unsigned nWidth, unsigned nHeight)
 		m_nPixelOrder = Order.nValue;
 	}
 	m_bRLow = m_nPixelOrder != 0;
+
+	// write-combining: stores merged into bursts instead of one bus write each
+	m_nWCPages = FbWriteCombine ((uintptr) m_pBase, (size_t) m_nPitchPx * 4 * m_pFrameBuffer->GetVirtHeight ());
 
 	Clear (0, RGB (0, 0, 0));
 	Clear (1, RGB (0, 0, 0));
@@ -273,17 +279,20 @@ void CVideoOut::DrawGame (const u32 *pSource)
 {
 	for (unsigned y = 0; y < GAME_H; y++)
 	{
-		DrawGameLine (pSource, y, m_pLine, m_pDark);
+		DrawGameLineTo (m_nBack, pSource, y, m_pLine, m_pDark);
 	}
 }
 
-void CVideoOut::DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
+void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark)
 {
 	const unsigned M = m_nM;
 	const unsigned nGameW = GAME_W * M;
 
 	// scanlines: bottom rows of each group darker (2 of 4 at 4x, 1 of 2 or 3)
-	const unsigned nDarkRows = m_nFilter != FILTER_NONE ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
+	// (COMPOSITE: none; the game lines come through DrawNtscLine, this draws
+	// the menus over the paused game)
+	const unsigned nDarkRows = m_nFilter != FILTER_NONE && m_nFilter != FILTER_COMPOSITE
+				   ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
 
 	// expand one source line horizontally into cached memory, converting
 	// Geolith's XRGB8888 (R high) to the framebuffer order if needed
@@ -346,8 +355,43 @@ void CVideoOut::DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *p
 	for (unsigned s = 0; s < M; s++)
 	{
 		const u32 *pSrcLine = s >= M - nDarkRows ? pDark : pLine;
-		memcpy (Row (m_nBack, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
+		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
 	}
+	FbFlush ();			// the line is in memory before the HVS reads it
+}
+
+void CVideoOut::DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine)
+{
+	const unsigned M = m_nM;
+	const unsigned nGameW = GAME_W * M;
+	const unsigned nBuffer = m_bRacing ? m_nBack ^ 1 : m_nBack;
+
+	// linear interpolation, 16.16: output pixel x samples the filtered line at
+	// (x + 0.5) * nNtscW / nGameW - 0.5
+	const u32 nStep = (nNtscW << 16) / nGameW;
+	s32 nPos = (s32) (nStep / 2) - 0x8000;
+	for (unsigned x = 0; x < nGameW; x++, nPos += nStep)
+	{
+		unsigned i = nPos < 0 ? 0 : (unsigned) nPos >> 16;
+		u32 f = nPos < 0 ? 0 : ((unsigned) nPos >> 8) & 0xFF;	// weight of the next pixel
+		u32 p = pNtsc[i];
+		if (f && i + 1 < nNtscW)
+		{
+			u32 q = pNtsc[i + 1];
+			u32 rb = (((p & 0xFF00FFu) * (256 - f) + (q & 0xFF00FFu) * f) >> 8) & 0xFF00FFu;
+			u32 g = (((p & 0x00FF00u) * (256 - f) + (q & 0x00FF00u) * f) >> 8) & 0x00FF00u;
+			p = rb | g;
+		}
+		pLine[x] = m_bRLow ? 0xFF000000u | (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16)
+				   : 0xFF000000u | p;
+	}
+
+	unsigned nDstY = m_nGameY + y * M;
+	for (unsigned s = 0; s < M; s++)
+	{
+		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pLine, nGameW * 4);
+	}
+	FbFlush ();			// the line is in memory before the HVS reads it
 }
 
 // One centred line in the top or bottom black band (nSpans = 0 clears it)
@@ -356,10 +400,11 @@ void CVideoOut::DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nS
 	const unsigned S = m_nStatusScale;
 	const unsigned nY = bTop ? m_nTopY : m_nStatusY;
 	const unsigned nH = 9 * S;					// glyph + shadow
+	const unsigned nBuf = m_bRacing ? m_nBack ^ 1 : m_nBack;
 
 	for (unsigned y = nY; y < nY + nH && y < m_nHeight; y++)
 	{
-		u32 *p = Row (m_nBack, y);
+		u32 *p = Row (nBuf, y);
 		if (y >= m_nGameY && y < m_nHeight - m_nGameY)
 		{
 			// never inside the picture: clear only the side bands
@@ -415,7 +460,7 @@ void CVideoOut::DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nS
 						{
 							unsigned yy = nY + r * S + sy + o;
 							if (yy >= m_nHeight) continue;
-							u32 *p = Row (m_nBack, yy) + x + k * S + o;
+							u32 *p = Row (nBuf, yy) + x + k * S + o;
 							for (unsigned sx = 0; sx < S; sx++)
 							{
 								p[sx] = c;
