@@ -100,7 +100,6 @@ that only arcade games can give you.
 **Planned:**
 
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
-- UniBIOS support
 
 
 ## Requirements
