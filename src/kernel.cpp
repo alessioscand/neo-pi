@@ -8,6 +8,8 @@
 #include "profile.h"
 #include "raster.h"
 #include "race.h"
+#include "fbmap.h"
+#include "tvcore.h"
 #include <circle/machineinfo.h>
 #include <circle/memory.h>
 #include <circle/new.h>
@@ -80,6 +82,8 @@ static volatile unsigned s_nAudioSamples;	// stereo frames produced in the last 
 // beam racing (declared early: core 1's line callback uses them)
 static void RaceRowDone (unsigned nRow);
 static volatile boolean s_bRaceFrame = FALSE;	// this frame is raced (read by core 1)
+static volatile boolean s_bComposite = FALSE;	// COMPOSITE: the lines go to core 2
+static unsigned s_nTvBurst = 0;			// colour burst phase of the frame (0-2)
 extern "C" void (*geo_lspc_line_hook) (unsigned nScanline);
 
 static void AudioCallback (size_t nSamples)
@@ -121,7 +125,13 @@ public:
 	{
 		if (nCore == 1)
 		{
-			geo_lspc_mc_worker (&m_nStop);	// cores 2 and 3 stay idle
+			FbSetMair ();			// the framebuffer's write-combining type
+			geo_lspc_mc_worker (&m_nStop);
+		}
+		else if (nCore == 2)
+		{
+			FbSetMair ();
+			TvWorkerRun ();			// COMPOSITE (core 3 stays idle)
 		}
 	}
 	volatile unsigned m_nStop;
@@ -131,6 +141,13 @@ static unsigned s_nGeoFrames = 0, s_nMcFailFrame = 0;
 static inline void GEO_SYNC (void)		// wait until core 1 has finished the frame
 {
 	geo_lspc_mc_sync ();
+	if (s_bComposite)
+	{
+		TvSync ();			// and core 2 its lines
+		// the phase steps through all three values: the colour artifacts crawl
+		// along the edges even on a still picture (the classic dot crawl)
+		s_nTvBurst = (s_nTvBurst + 1) % COMP_PHASES;
+	}
 	s_nGeoFrames++;
 	if (geo_lspc_mc_failed && s_nMcFailFrame == 0)
 	{
@@ -142,7 +159,14 @@ static CVideoOut *s_pMcVideo = 0;
 static u32 s_McLine[GAME_W * 8], s_McDark[GAME_W * 8];
 static void McLineDone (unsigned nScanline)
 {
-	if (nScanline >= GAME_SRC_Y && nScanline < GAME_SRC_Y + GAME_H)
+	if (nScanline >= GAME_SRC_Y && nScanline < GAME_SRC_Y + GAME_H && s_bComposite)
+	{
+		// COMPOSITE: core 2 filters the line and puts it on the screen
+		unsigned nRow = nScanline - GAME_SRC_Y;
+		TvPost (s_VideoBuf + nScanline * GAME_SRC_PITCH + GAME_SRC_X,
+			(s_nTvBurst + nRow) % COMP_PHASES, nRow, s_bRaceFrame);
+	}
+	else if (nScanline >= GAME_SRC_Y && nScanline < GAME_SRC_Y + GAME_H)
 	{
 		s_pMcVideo->DrawGameLine (s_VideoBuf, nScanline - GAME_SRC_Y, s_McLine, s_McDark);
 		if (s_bRaceFrame)
@@ -270,7 +294,10 @@ static boolean s_bRaceGame = FALSE;	// racing in this game (until it gives up)
 static CRaster *s_pRaster = 0;
 static CBeamRacer *s_pRacer = 0;
 
-// core 0, every time the video chip's line counter changes during a raced frame
+// core 0, every time the video chip's line counter changes during a raced frame:
+// wait for the row's turn. The time spent waiting is added up: it is pacing,
+// not work (LOAD and the timings in LOG.TXT leave it out)
+static u64 s_nRaceWaitTicks;
 static void RaceLineHook (unsigned nScanline)
 {
 	if (nScanline < GAME_SRC_Y || nScanline >= GAME_SRC_Y + GAME_H)
@@ -283,11 +310,13 @@ static void RaceLineHook (unsigned nScanline)
 	u64 nRelease = s_pRacer->RowRelease (nRow);
 	if ((s64) (nNow - nRelease) < 0)
 	{
+		u64 nEnd;
 		do
 		{
 			s_pRaster->Sample ();
 		}
-		while ((s64) (ReadTicks () - nRelease) < 0);
+		while ((s64) ((nEnd = ReadTicks ()) - nRelease) < 0);
+		s_nRaceWaitTicks += nEnd - nNow;
 	}
 	else if ((nRow & 15) == 0)
 	{
@@ -1268,6 +1297,18 @@ void CKernel::McTest (unsigned nSel)
 #endif
 
 // the emulated frame to the back buffer (already there if core 1 drew it line by line)
+// COMPOSITE: a filtered line onto the screen (on core 2, or here without it)
+static CVideoOut *s_pTvVideo = 0;
+static u32 s_TvLine[GAME_W * 8];
+static void TvLineOut (unsigned nRow, const u32 *pNtsc, boolean bRace)
+{
+	s_pTvVideo->DrawNtscLine (nRow, pNtsc, COMP_OUT_W, s_TvLine);
+	if (bRace)
+	{
+		RaceRowDone (nRow);
+	}
+}
+
 void CKernel::DrawGameFrame (void)
 {
 #ifdef NEOPI_MC
@@ -1276,6 +1317,18 @@ void CKernel::DrawGameFrame (void)
 		return;
 	}
 #endif
+	if (s_bComposite)
+	{
+		// no core 1: the whole frame, filtered on core 2 (or here)
+		for (unsigned y = 0; y < GAME_H; y++)
+		{
+			TvPost (s_VideoBuf + (y + GAME_SRC_Y) * GAME_SRC_PITCH + GAME_SRC_X,
+				(s_nTvBurst + y) % COMP_PHASES, y, FALSE);
+		}
+		TvSync ();
+		s_nTvBurst = (s_nTvBurst + 1) % COMP_PHASES;
+		return;
+	}
 	m_Video.DrawGame (s_VideoBuf);
 }
 
@@ -1545,6 +1598,17 @@ void CKernel::ReportWindow (boolean bFinal)
 		  pm, s_nMissedVSync, qmin, qmax, und, adj,
 		  m_CPUThrottle.GetClockRate () / 1000000, m_CPUThrottle.GetTemperature ());
 	Log (Line, COLOR_TEXT);
+	if (m_Video.GetFilter () == FILTER_COMPOSITE)
+	{
+		unsigned nFilterUs, nDrawUs, nLines;
+		TvTakeStats (&nFilterUs, &nDrawUs, &nLines);
+		unsigned nFrames = nLines / GAME_H ? nLines / GAME_H : 1;
+		unsigned f = nFilterUs / nFrames, d = nDrawUs / nFrames;
+		snprintf (Line, sizeof Line, "   COMPOSITE: per frame %u.%u ms filtering + %u.%u ms drawing, %s",
+			  f / 1000, (f % 1000) / 100, d / 1000, (d % 1000) / 100,
+			  TvWorkerAlive () ? "on core 2" : "without core 2");
+		Log (Line, COLOR_TEXT);
+	}
 
 #ifdef NEOPI_MC
 	static boolean s_bFailLogged = FALSE;
@@ -1629,6 +1693,7 @@ const char *CKernel::FilterShort (unsigned nFilter)
 	case FILTER_SCAN_LIGHT:	 return "SCAN-L";
 	case FILTER_SCAN_MEDIUM: return "SCAN-M";
 	case FILTER_SCAN_STRONG: return "SCAN-S";
+	case FILTER_COMPOSITE:	 return "COMP";
 	default:		 return "NOFLT";
 	}
 }
@@ -1640,6 +1705,7 @@ const char *CKernel::FilterName (unsigned nFilter)
 	case FILTER_SCAN_LIGHT:	 return "SCANLINES_LIGHT";
 	case FILTER_SCAN_MEDIUM: return "SCANLINES";
 	case FILTER_SCAN_STRONG: return "SCANLINES_STRONG";
+	case FILTER_COMPOSITE:	 return "COMPOSITE";
 	default:		 return "NONE";
 	}
 }
@@ -1659,6 +1725,27 @@ void CKernel::VideoModeTag (char *pOut, size_t nSize)
 
 void CKernel::ApplyVideoMode (void)
 {
+	if (m_nFilter == FILTER_COMPOSITE && !TvReady ())
+	{
+		// the filter's tables, built the first time COMPOSITE is used
+		unsigned t0 = CTimer::GetClockTicks ();
+		if (TvInit ())
+		{
+			char Msg[100];
+			unsigned nMs = (CTimer::GetClockTicks () - t0) / 1000;
+			snprintf (Msg, sizeof Msg, "COMPOSITE: filter tables ready in %u ms, %s", nMs,
+				  TvWorkerAlive () ? "lines filtered on core 2" : "no core 2: lines filtered by the drawing core");
+			Log (Msg, TvWorkerAlive () ? COLOR_TEXT : COLOR_ERR);
+		}
+		else
+		{
+			Log ("COMPOSITE: not enough memory for the filter, scanlines instead", COLOR_ERR);
+			m_nFilter = FILTER_SCAN_MEDIUM;
+		}
+	}
+	TvSync ();
+	s_bComposite = m_nFilter == FILTER_COMPOSITE;
+	__asm__ volatile ("dsb ish" ::: "memory");
 	if (!m_Video.SetGameMode (m_nFilter, m_bHVS))
 	{
 		Fatal (NEOPI_ERR_FB, "cannot set up the game framebuffer");
@@ -1675,6 +1762,10 @@ void CKernel::ApplyVideoMode (void)
 	snprintf (Line, sizeof Line, "Video: pixel order %s (%u), red in the %s byte%s",
 		  m_Video.GetPixelOrder () ? "RGB" : "BGR", m_Video.GetPixelOrder (),
 		  m_Video.IsRedLow () ? "low" : "high", "");
+	Log (Line, COLOR_TEXT);
+	snprintf (Line, sizeof Line, "Video: framebuffer write-combining %s (%u pages of 64 KB)",
+		  m_Video.GetWCPages () ? "on" : (g_bFbWriteCombine ? "FAILED" : "off (writecombine=off)"),
+		  m_Video.GetWCPages ());
 	Log (Line, COLOR_TEXT);
 }
 
@@ -1726,17 +1817,16 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "region=USA"))	m_nRegion = REGION_US;
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
-	if (strstr (Text, "filter=TV"))				m_nFilter = FILTER_SCAN_MEDIUM;	// removed in 0.6.0
+	if (strstr (Text, "filter=COMPOSITE"))			m_nFilter = FILTER_COMPOSITE;
+	else if (strstr (Text, "filter=TV"))			m_nFilter = FILTER_SCAN_MEDIUM;	// removed in 0.6.0
 	else if (strstr (Text, "filter=SCANLINES_LIGHT"))	m_nFilter = FILTER_SCAN_LIGHT;
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
+	if (strstr (Text, "writecombine=off"))	g_bFbWriteCombine = FALSE;
 	if (strstr (Text, "filters=on"))	m_bFilterAllowed = m_bForceFilters = TRUE;	// e.g. to try them on a Pi 3
-#ifdef NEOPI_MC
-	// multicore on a Pi 3: core 0 has the margin for the scanlines
-	if (!strstr (Text, "multicore=off"))	m_bFilterAllowed = TRUE;
-#endif
-	if (!m_bFilterAllowed)			m_nFilter = FILTER_NONE;
+	// (multicore and the scanlines on a Pi 3: decided after LoadConfig, also
+	// when neopi.cfg does not exist yet)
 	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
 	// usbpoll=500 / 250 = every 2 / 4 ms, for pads that misbehave at 1000 Hz;
 	// usbpoll=native keeps the interval requested by the device
@@ -1933,8 +2023,14 @@ void CKernel::RunSystemMenu (void)
 		}
 		Items[SmSystem].pValue = m_nSystem == 0 ? "MVS" : "AES";
 		Items[SmRegion].pValue = RegionName (m_nRegion);
-		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG"};
+		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE"};
+#ifdef NEOPI_MC
+		// not allowed only on a Pi 3 with multicore=off
+		// ("MULTICORE ONLY" does not fit next to SCANLINES)
+		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "MULTICORE OFF";
+#else
 		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "PI 4 ONLY";
+#endif
 		Items[SmFilter].bDisabled = !m_bFilterAllowed;
 
 		const char *pShow = pMsg;
@@ -2633,6 +2729,7 @@ void CKernel::RunGame (void)
 				if (bRace)
 				{
 					s_bRaceFrame = TRUE;
+					s_nRaceWaitTicks = 0;
 					geo_lspc_line_hook = RaceLineHook;
 				}
 				geo_exec ();
@@ -2650,6 +2747,8 @@ void CKernel::RunGame (void)
 						s_pRacer->FrameEnd ();
 					}
 					s_pRaster->EndFrame ();
+					// the waits for the beam are not work: as if the frame had started later
+					t0 += (unsigned) s_pRaster->TicksToUs ((s64) s_nRaceWaitTicks);
 					if (s_pRacer->Failed ())
 					{
 						s_bRaceGame = FALSE;
@@ -2993,7 +3092,15 @@ TShutdownMode CKernel::Run (void)
 	f_mkdir (SAVE_DIR);
 	f_mkdir (SHOT_DIR);
 	m_bFilterAllowed = CMachineInfo::Get ()->GetModelMajor () >= 4;
+	s_pTvVideo = &m_Video;
+	TvSetOutput (TvLineOut);
 	LoadConfig ();
+#ifdef NEOPI_MC
+	// multicore on a Pi 3: core 0 has the margin for the scanlines (here, not
+	// in LoadConfig: it returns at once when neopi.cfg does not exist yet)
+	if (s_bMultiCore)			m_bFilterAllowed = TRUE;
+#endif
+	if (!m_bFilterAllowed)			m_nFilter = FILTER_NONE;
 #ifdef NEOPI_MC
 	if (s_bMultiCore)
 	{
@@ -3009,6 +3116,12 @@ TShutdownMode CKernel::Run (void)
 			geo_lspc_mc_linecb = McLineDone;
 			geo_lspc_mc_enabled = 1;
 			Log ("Multicore: video chip lines drawn on core 1", COLOR_TEXT);
+			while (!TvWorkerAlive () && CTimer::GetClockTicks () - nWait < 200000)
+			{
+			}
+			Log (TvWorkerAlive () ? "Multicore: core 2 ready for COMPOSITE"
+					      : "Multicore: core 2 not running, COMPOSITE on core 1",
+			     TvWorkerAlive () ? COLOR_TEXT : COLOR_ERR);
 		}
 		else
 		{

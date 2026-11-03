@@ -220,15 +220,31 @@ void CUI::ButtonIcon (int x, int y, char cButton)
 	{
 		return;
 	}
+	// a 13 x 13 disc drawn by hand, with an even 1-pixel black rim
+	static const char *const Disc[13] =
+	{
+		"....#####....",
+		"..##ooooo##..",
+		".#ooooooooo#.",
+		".#ooooooooo#.",
+		"#ooooooooooo#",
+		"#ooooooooooo#",
+		"#ooooooooooo#",
+		"#ooooooooooo#",
+		"#ooooooooooo#",
+		".#ooooooooo#.",
+		".#ooooooooo#.",
+		"..##ooooo##..",
+		"....#####....",
+	};
 	for (int j = 0; j < 13; j++)
 	{
 		for (int i = 0; i < 13; i++)
 		{
-			int dx = i - 6, dy = j - 6;
-			int d2 = 4 * (dx * dx + dy * dy);	// (2d)^2, radius 6.5 -> 169, rim from 5.6 -> 125
-			if (d2 <= 169)
+			char c = Disc[j][i];
+			if (c != '.')
 			{
-				Pixel (x + i, y + j, d2 > 125 ? 0x000000 : ButtonColor[b]);
+				Pixel (x + i, y + j, c == '#' ? 0x000000 : ButtonColor[b]);
 			}
 		}
 	}
@@ -262,7 +278,7 @@ static int HintIconWidth (char c)	{ (void) c; return 13; }
 
 void CUI::Buttons (int y, const TButtonHint *pHints, unsigned nHints)
 {
-	const int nGap = 14;
+	const int nGap = 24;
 	int nW = 0;
 	for (unsigned i = 0; i < nHints; i++)
 	{
@@ -639,7 +655,7 @@ void CUI::DrawCredits (const char *pVersion)
 	CText (y0 + 48, "BY ALESSIO SCANDEREBECH", UI_VALUE);
 	Fill (x0 + 8, y0 + 62, x1 - x0 - 15, 1, UI_FRAME2);
 
-	static const char *Rows[8][2] =
+	static const char *Rows[9][2] =
 	{
 		{"CORE",   "GEOLITH - R.CARMICHAEL"},
 		{"68000",  "MUSASHI - K.STENERUD"},
@@ -648,11 +664,12 @@ void CUI::DrawCredits (const char *pVersion)
 		{"AUDIO",  "SPEEX - J.M.VALIN"},
 		{"ZIP",    "MINIZ - R.GELDREICH"},
 		{"SYSTEM", "CIRCLE - R.STANGE"},
-		{"FONT",   "MATINEE - D.GUARD"}
+		{"FONT",   "MATINEE - D.GUARD"},
+		{"NTSC",   "BLARGG - S.GREEN"}
 	};
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < 9; i++)
 	{
-		int y = y0 + 68 + i * 11;
+		int y = y0 + 68 + i * 10;
 		Text (x0 + 12, y, Rows[i][0], Dim (UI_DIM, 80));
 		Text (x0 + 12 + 7 * 8, y, Rows[i][1], 0xEBEBEB);
 	}

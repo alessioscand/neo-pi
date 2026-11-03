@@ -3,6 +3,7 @@
  */
 #include "fontdata.h"
 #include "video.h"
+#include "fbmap.h"
 #include <circle/bcmpropertytags.h>
 #include <circle/font.h>
 #include <circle/util.h>
@@ -37,6 +38,7 @@ CVideoOut::CVideoOut (void)
 	m_pDark (0),
 
 	m_nPixelOrder (1),
+	m_nWCPages (0),
 	m_bRLow (TRUE)
 {
 }
@@ -86,6 +88,9 @@ boolean CVideoOut::Allocate (unsigned nWidth, unsigned nHeight)
 		m_nPixelOrder = Order.nValue;
 	}
 	m_bRLow = m_nPixelOrder != 0;
+
+	// write-combining: stores merged into bursts instead of one bus write each
+	m_nWCPages = FbWriteCombine ((uintptr) m_pBase, (size_t) m_nPitchPx * 4 * m_pFrameBuffer->GetVirtHeight ());
 
 	Clear (0, RGB (0, 0, 0));
 	Clear (1, RGB (0, 0, 0));
@@ -284,7 +289,10 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 	const unsigned nGameW = GAME_W * M;
 
 	// scanlines: bottom rows of each group darker (2 of 4 at 4x, 1 of 2 or 3)
-	const unsigned nDarkRows = m_nFilter != FILTER_NONE ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
+	// (COMPOSITE: none; the game lines come through DrawNtscLine, this draws
+	// the menus over the paused game)
+	const unsigned nDarkRows = m_nFilter != FILTER_NONE && m_nFilter != FILTER_COMPOSITE
+				   ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
 
 	// expand one source line horizontally into cached memory, converting
 	// Geolith's XRGB8888 (R high) to the framebuffer order if needed
@@ -349,6 +357,41 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 		const u32 *pSrcLine = s >= M - nDarkRows ? pDark : pLine;
 		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
 	}
+	FbFlush ();			// the line is in memory before the HVS reads it
+}
+
+void CVideoOut::DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine)
+{
+	const unsigned M = m_nM;
+	const unsigned nGameW = GAME_W * M;
+	const unsigned nBuffer = m_bRacing ? m_nBack ^ 1 : m_nBack;
+
+	// linear interpolation, 16.16: output pixel x samples the filtered line at
+	// (x + 0.5) * nNtscW / nGameW - 0.5
+	const u32 nStep = (nNtscW << 16) / nGameW;
+	s32 nPos = (s32) (nStep / 2) - 0x8000;
+	for (unsigned x = 0; x < nGameW; x++, nPos += nStep)
+	{
+		unsigned i = nPos < 0 ? 0 : (unsigned) nPos >> 16;
+		u32 f = nPos < 0 ? 0 : ((unsigned) nPos >> 8) & 0xFF;	// weight of the next pixel
+		u32 p = pNtsc[i];
+		if (f && i + 1 < nNtscW)
+		{
+			u32 q = pNtsc[i + 1];
+			u32 rb = (((p & 0xFF00FFu) * (256 - f) + (q & 0xFF00FFu) * f) >> 8) & 0xFF00FFu;
+			u32 g = (((p & 0x00FF00u) * (256 - f) + (q & 0x00FF00u) * f) >> 8) & 0x00FF00u;
+			p = rb | g;
+		}
+		pLine[x] = m_bRLow ? 0xFF000000u | (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16)
+				   : 0xFF000000u | p;
+	}
+
+	unsigned nDstY = m_nGameY + y * M;
+	for (unsigned s = 0; s < M; s++)
+	{
+		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pLine, nGameW * 4);
+	}
+	FbFlush ();			// the line is in memory before the HVS reads it
 }
 
 // One centred line in the top or bottom black band (nSpans = 0 clears it)

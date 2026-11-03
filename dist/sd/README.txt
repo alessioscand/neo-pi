@@ -1,5 +1,18 @@
-neo-pi 0.7.0-rc2 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.7.0 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
+
+WHAT'S NEW IN 0.7.0
+  - Less input lag: each frame reads the pads first and then draws the
+    picture, so what you press shows up one frame sooner than in 0.6.4.
+  - Frame delay and beam racing: the pads are read even later, just before
+    the picture goes to the TV (see INPUT LAG).
+  - Less audio delay. Pads polled every 1 ms, or every 2 or 4 ms for pads
+    that do not like it (usbpoll=500 / 250).
+  - Faster drawing on the screen, so lower LOAD.
+  - COMPOSITE: the picture of a composite cable on a TV of the time, on a
+    CPU core of its own, with no added lag. On a Pi 3 it still needs some
+    more testing to check that it stays smooth in every game.
+  - New background and button icons.
 
 SET-UP
   1. A micro SD card formatted FAT32 (with a normal partition table).
@@ -60,7 +73,16 @@ OPTIONS MENU (D in the list; A or left/right changes, B goes back)
   SYSTEM         MVS (arcade) or AES (home console), from the next game
   REGION         EUROPE / USA / JAPAN / ASIA (BIOS region: language,
                  censorship), from the next game
-  SCANLINES      OFF / LIGHT / MEDIUM / STRONG
+  SCANLINES      OFF / LIGHT / MEDIUM / STRONG / COMPOSITE. COMPOSITE: no
+                 scanlines but blargg's NTSC filter, the picture of a
+                 composite video cable on a TV of the time (soft colours,
+                 colour fringes, dots crawling along the edges). Each line
+                 is filtered as soon as it is drawn, on a CPU core of its
+                 own (core 2): no added lag, beam racing still works.
+                 On a Pi 3 COMPOSITE still needs more testing: if a game
+                 slows down, use the scanlines instead.
+                 On a Pi 3 the scanlines and COMPOSITE need both cores:
+                 with multicore=off this item shows MULTICORE OFF.
   CONTROLS       sets up a pad (with several pads: press a button on the
                  one to set up)
   POWER OFF      as above
@@ -69,7 +91,8 @@ OPTIONS MENU (D in the list; A or left/right changes, B goes back)
 STATUS LINE (Select + C), below the picture
   60 FPS   LOAD 62%   39 C   DLY 6.5   1080P 4X CPU+HVS
   LOAD is how much of each 1/60 s frame is used (green, yellow from 75%,
-  red above 95%). 4X HVS = scaled by the Pi's hardware scaler,
+  red above 95%); with beam racing it leaves out the time spent waiting
+  for the HDMI output between lines. 4X HVS = scaled by the Pi's hardware scaler,
   CPU+HVS = the CPU draws the scanlines at 2x and the scaler doubles it,
   CPU = all by the CPU. DLY is the frame delay in ms; with beam racing,
   RACE is the time in ms from reading the pads to the top of the picture
@@ -110,6 +133,8 @@ PICTURE
     usbpoll=250      every 4 ms
     usbpoll=native   at the rate the pad asks for (usually every 8-10 ms)
     resampler=speex  the previous, heavier audio resampler (comparison)
+    writecombine=off the framebuffer written the old way (slower; only to
+                     compare)
 
 FILES ON THE CARD (neopi folder)
   LOG.TXT      diagnostics: model, HDMI, pads, audio, per-minute timings.

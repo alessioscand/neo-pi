@@ -30,7 +30,8 @@
 #define FILTER_SCAN_LIGHT  1	// dark rows at 75%
 #define FILTER_SCAN_MEDIUM 2	// dark rows at 50%
 #define FILTER_SCAN_STRONG 3	// dark rows at 25%
-#define FILTER_COUNT	4
+#define FILTER_COMPOSITE   4	// blargg's NTSC filter (tvcore.h), no dark rows
+#define FILTER_COUNT	5
 
 // Logical colors (R in the low byte); CVideoOut converts them if the
 // framebuffer stores red in the high byte (Pi 4)
@@ -80,12 +81,16 @@ public:
 	{
 		DrawGameLineTo (m_bRacing ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark);
 	}
+	// COMPOSITE: one filtered line (nNtscW pixels 0x00RRGGBB) stretched to the
+	// game width, into the buffer being drawn; pLine = scratch (GAME_W * 8)
+	void DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine);
 	// One centred line of text in the top or bottom black band (no spans = clear)
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
 	void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans);
 
 	// Colors: RGB() values are converted to the framebuffer byte order
 	unsigned GetPixelOrder (void) const	{ return m_nPixelOrder; }
+	unsigned GetWCPages (void) const	{ return m_nWCPages; }	// framebuffer pages write-combining
 	boolean IsRedLow (void) const		{ return m_bRLow; }
 
 	unsigned GetBackBuffer (void) const	{ return m_nBack; }
@@ -133,6 +138,7 @@ private:
 	u32	*m_pLine;			// one scaled game line (cached memory)
 	u32	*m_pDark;			// the same line darkened (scanlines)
 	unsigned m_nPixelOrder;			// reported by the firmware
+	unsigned m_nWCPages;
 	boolean	 m_bRLow;			// red in the low byte of a pixel
 };
 

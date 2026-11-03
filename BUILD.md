@@ -1,4 +1,4 @@
-# neo-pi - how to build (version 0.6.4)
+# neo-pi - how to build (version 0.7.0)
 
 Build host: Linux x86_64.
 
@@ -17,7 +17,7 @@ Build host: Linux x86_64.
    ```
 
    ARM_ALLOW_MULTI_CORE: since 0.6.4 the video chip's lines are drawn on core 1
-   (see step 4). Copies without it in `circle-rpi4/` and `circle-rpi3/` build the
+   (see step 4); since 0.7.0 core 2 runs the COMPOSITE filter. Copies without it in `circle-rpi4/` and `circle-rpi3/` build the
    single core kernels of 0.6.3 and earlier with `NEOPI_SINGLE=1 ./build.sh all`.
 
    KERNEL_MAX_SIZE is 16 MB because the core's Neo Geo CD buffers do not fit in the default 2 MB.
@@ -41,6 +41,14 @@ Build host: Linux x86_64.
    picture is identical to single core. `multicore=off` in `neopi/neopi.cfg` keeps
    everything on core 0; an empty `neopi/MCTEST` file compares single core and
    multicore line by line (results in `neopi/MCTEST.TXT`).
+   It then applies `patches/geolith-phase.py` to the copies of `geo.c` and `geo_lspc.c`:
+   each emulated frame starts at line 248, so the vertical blank (when games read the
+   pads) comes first and the picture drawn after it is shown at the next vsync.
+
+   **snes_ntsc** 0.2.2 by Shay Green (blargg), LGPL 2.1+, in `third_party/snes_ntsc`,
+   unmodified: the COMPOSITE filter. `src/composite.c` includes it with its own
+   configuration; `src/tvcore.cpp` runs it on core 2, one line at a time as core 1
+   finishes it.
 5. `./build.sh all` builds `build/rpi4/kernel8-rpi4.img` and `build/rpi3/kernel8.img`.
    The Geolith core is compiled with `-O3` (the rest of neo-pi and Circle with `-O2`):
    on a Pi 3 it halves the frames that miss 60 Hz in heavy scenes, with identical
@@ -55,6 +63,9 @@ Build host: Linux x86_64.
   audio resampling (linear, 56.3 kHz to 48 kHz; `resampler=speex` uses Geolith's Speex path)
 - `src/profile.cpp` - sampling profiler used by the benchmark (`neopi/PROFILE.TXT`)
 - `src/video.cpp` - double-buffered framebuffer, HVS/CPU integer scaling, scanlines, text in the black bands
+- `src/fbmap.cpp` - maps the framebuffer as write-combining memory (`writecombine=off` in `neopi/neopi.cfg` to compare)
+- `src/raster.cpp`, `src/race.cpp` - beam racing: where the HDMI output is (HVS), and when each line can be sent
+- `src/composite.c`, `src/tvcore.cpp` - COMPOSITE filter (snes_ntsc) and its core 2 queue
 - `src/ui.cpp` - menus and screens drawn at Neo Geo resolution
 - `src/input.cpp` - USB pads and keyboard, control set-up (`neopi/pads.cfg`)
 - `src/audio.cpp` - HDMI audio with drift correction
@@ -64,6 +75,7 @@ Build host: Linux x86_64.
 - `src/Makefile.in`, `build.sh`, `make_release.sh`
 - `tools/resolve_profile.py` - turns `PROFILE.TXT` into time per function, using the kernel's .elf
 - `test/harness.c` - Linux test harness (same core and set-up): frames as PPM, audio as WAV
+- `test/race_sim.cpp` - host simulation of the beam racing plan (late or overwritten lines)
 
 ## Testing without hardware
 QEMU `-M raspi3b` with a Circle build using `-DNO_SDHOST -DNO_SCREEN_DMA_BURST_LENGTH`.
