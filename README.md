@@ -4,7 +4,9 @@ A streamlined, bare-metal Neo Geo emulator for Raspberry Pi 3 & 4, with no unnec
 
 Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
-If you enjoy neo-pi, please consider supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
+If you enjoy neo-pi or [nes-pi](https://alessioscand.github.io/nes-pi/)
+please consider supporting me:
+[paypal.me/alescandy](https://paypal.me/alescandy)
 
 ## Why neo-pi
 
