@@ -1,16 +1,18 @@
 # neo-pi
 
-A streamlined bare-metal Neo Geo emulator for Raspberry Pi 3 & 4.
+A streamlined, bare-metal Neo Geo emulator for Raspberry Pi 3 & 4, with no unnecessary layers and highly responsive input.
 
 Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
+If you enjoy neo-pi, please consider supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
+
 ## Why neo-pi
 
-I've been fascinated by the Neo Geo for as long as I can remember. I started
-collecting Neo Geo CD games in the early 2000s, briefly moved to AES, and
-eventually settled on MVS. I still own an MV1-FZ board and several
-cartridges, but rarely get to enjoy them due to the space and setup they
-require.
+I discovered the Neo Geo in the arcades as a kid, and I've been fascinated
+by it ever since. I started collecting Neo Geo CD games in the early 2000s,
+briefly moved to AES, and eventually settled on MVS. I still own an MV1-FZ
+board and several cartridges, but rarely get to enjoy them due to the space
+and setup they require.
 
 Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've
 dreamed of creating a focused, compact Neo Geo experience on the Raspberry
@@ -46,7 +48,7 @@ while the first runs the game. And since each line is ready while the frame
 is still being emulated, it can be sent to the screen just before the HDMI
 output reaches it: *beam racing!* So the pads are read only a couple of
 milliseconds before the picture appears, as they would be on the original
-hardware with a CRT. *(Beam racing is coming in an upcoming release.)*
+hardware with a CRT.
 
 **Custom audio resampler.** The Neo Geo's sound chip runs at about 56 kHz,
 while HDMI wants 48 kHz. Instead of a heavy general-purpose converter,
@@ -55,12 +57,12 @@ of the work (on a Pi 3, Geolith's standard Speex resampler took about 15%
 of every frame).
 
 **User experience.** The rest was a matter of choices. Display options are
-cut to the bone: integer scaling is always on, and scanlines are the only
-filter, so you just play, with nothing to tweak and nothing to distract
-you. Save states are limited to one slot per game: enough to soften the
-gameplay (think of the notoriously brutal bosses of some King of Fighters
-games) while keeping that edge-of-your-seat tension that only arcade games
-can give you.
+cut to the bone: integer scaling is always on, and the only filters are
+scanlines and an NTSC composite look, so you just play, with nothing to
+tweak and nothing to distract you. Save states are limited to one slot per
+game: enough to soften the gameplay (think of the notoriously brutal bosses
+of some King of Fighters games) while keeping that edge-of-your-seat tension
+that only arcade games can give you.
 
 ## Features
 
@@ -70,8 +72,10 @@ can give you.
   core: MVS (arcade) and AES (home console), all four BIOS regions
 - Responsive controls: pads are read every millisecond, and what you press
   shows up on screen almost as quickly as on the original hardware with a
-  CRT *(on Pi 4, coming in an upcoming release)*
-- Lazy finger (turbo buttons): Select + B toggles it; while on, holding A, B, C or D
+  CRT
+- Beam racing: each line is sent to the screen just after it is drawn, so
+  the pads are read a couple of milliseconds before the picture appears
+- *Lazy finger* (turbo buttons): Select + B toggles it; while on, holding A, B, C or D
   fires repeatedly
 - Save states: one slot per game
 
@@ -81,6 +85,9 @@ can give you.
   hardware scaler
 - Optional scanlines (light, medium, strong), drawn within the same frame:
   no added lag
+- Blargg's NTSC filter, the picture of a composite cable on a TV
+  of the time, filtered line by line on a core of its own: no added lag
+  *(to be tested on Pi 3)*
 
 **Convenience**
 
@@ -92,7 +99,6 @@ can give you.
 
 **Planned:**
 
-- Beam racing *(already available in the 0.7.0-rc1 pre-release)*
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
 - UniBIOS support
 
@@ -153,6 +159,8 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 | `framedelay=off` | no automatic frame delay |
 | `framedelay=5` | fixed frame delay in ms (1-12; too much = stutter) |
 | `multicore=off` | everything on one core, as up to 0.6.3 (heavier) |
+| `usbpoll=500` | poll pads every 2 ms instead of every 1 ms (if a pad misbehaves at 1000 Hz) |
+| `usbpoll=250` | poll pads every 4 ms |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
 | `resampler=speex` | Geolith's standard Speex resampler (heavier) |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler (slower) |
@@ -172,6 +180,7 @@ that is needed; for performance, add an empty `neopi/BENCH` file and send
 heatsink is recommended. The status line (Select + C) shows the
 temperature; the Pi 3 B+ lowers its CPU clock above 60 °C, the Pi 4 from
 about 80 °C.
+
 ## Building from source
 
 See [BUILD.md](BUILD.md). neo-pi is built with the xPack AArch64 GCC
@@ -193,6 +202,7 @@ partner Claude, standing on the shoulders of giants:
 | Resampler (optional) | speexdsp by Jean-Marc Valin |
 | Zip and PNG | miniz by Rich Geldreich |
 | Menu font | "Matinee" from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
+| NTSC filter | snes_ntsc by Shay Green (blargg) |
 
 
 ## License
@@ -200,7 +210,7 @@ partner Claude, standing on the shoulders of giants:
 neo-pi is free software, released under the
 [GNU General Public License v3](LICENSE) or any later version, as required
 by Circle (GPLv3). The third-party components keep their own licences
-(BSD 3-Clause and others); the full texts are in
+(BSD 3-Clause, LGPL and others); the full texts are in
 [`dist/sd/LICENSES.txt`](dist/sd/LICENSES.txt).
 
 NEO GEO is a trademark of SNK. neo-pi is an independent project, not
