@@ -93,8 +93,8 @@ that only arcade games can give you.
 
 - MV-1 mode: with only one game on the SD card, neo-pi skips the
   list and boots straight into it, like an arcade board
-- Screenshots (PNG) and an optional status line (FPS, load, temperature,
-  video mode)
+- Screenshots (PNG) and an optional status line (FPS, load, input lag,
+  temperature, video mode)
 - Safe power off that saves memory cards, MVS settings and the log
 
 **Planned:**
@@ -148,6 +148,20 @@ unplugging: it saves memory cards and settings.
 Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states,
 MVS memory, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
 `pads.cfg` (controls for each pad model), `LOG.TXT` (diagnostics).
+
+**Reading the status line.** Select + C shows FPS, LOAD, temperature,
+RACE (or DLY) and the video mode.
+
+- **LOAD** is how much of a frame the busiest moment of the last second
+  needed: below 100% no frame is lost.
+- **RACE** is the time, in ms, from reading the pads to the top of the
+  picture leaving the Pi: this is neo-pi's share of the lag, the only part
+  that depends on the emulator. On an original Neo Geo the same step takes
+  about 2 ms, so a RACE of 2-4 ms means neo-pi adds next to nothing. The
+  pad itself, the TV (use its game mode) and the game's own reaction time
+  come on top, as they would with any system.
+- **DLY** replaces RACE when *beam racing* is off: it is the frame delay,
+  how long after the vsync the pads are read.
 
 **Testing options.** The defaults are what neo-pi is designed and tuned
 for: the lines below are only meant for testing and comparisons, not for
