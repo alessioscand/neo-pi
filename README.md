@@ -158,12 +158,13 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 | `beamracing=off` | double buffer instead of beam racing (more lag) |
 | `framedelay=off` | no automatic frame delay |
 | `framedelay=5` | fixed frame delay in ms (1-12; too much = stutter) |
-| `multicore=off` | everything on one core, as up to 0.6.3 (heavier) |
+| `multicore=off` | everything on one core, as up to 0.6.3 (heavier; on a Pi 3, no scanlines or COMPOSITE) |
 | `usbpoll=500` | poll pads every 2 ms instead of every 1 ms (if a pad misbehaves at 1000 Hz) |
 | `usbpoll=250` | poll pads every 4 ms |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
 | `resampler=speex` | Geolith's standard Speex resampler (heavier) |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler (slower) |
+| `writecombine=off` | write the framebuffer the old way (slower) |
 
 An empty `neopi/BENCH` file runs a built-in benchmark on the selected game
 (results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file
@@ -202,7 +203,7 @@ partner Claude, standing on the shoulders of giants:
 | Resampler (optional) | speexdsp by Jean-Marc Valin |
 | Zip and PNG | miniz by Rich Geldreich |
 | Menu font | "Matinee" from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
-| NTSC filter | snes_ntsc by Shay Green (blargg) |
+| NTSC filter | by Shay Green (blargg) |
 
 
 ## License
