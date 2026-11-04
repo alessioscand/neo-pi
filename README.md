@@ -149,7 +149,8 @@ so a few of its combinations take a different route:
 | Memory card manager (A+B+C+D at start-up), test mode (B+C+D) | Press them while its splash screen is shown |
 
 The region is set in the Universe BIOS menu, and its settings are kept
-for each game.
+for each game, separate from the MVS BIOS ones: switching SYSTEM back and
+forth never mixes them.
 
 In the menus the buttons are shown on screen.
 Always switch off with POWER OFF (in-game menu or options) before
