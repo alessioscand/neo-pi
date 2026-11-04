@@ -1072,6 +1072,27 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	{
 		Fatal (NEOPI_ERR_BIOS, "the required BIOS (MVS/AES, region) is missing from neogeo.zip");
 	}
+	// Geolith trusts the sizes in the header and takes the ROMs one after the
+	// other from byte 4096: a truncated or damaged file would be read past its
+	// end (garbage on screen, or worse). Same layout as geo_neo_load(), so a
+	// file it reads correctly always passes
+	const u8 *h = (const u8 *) m_pGame;
+	u64 nNeed = 4096;
+	for (unsigned i = 4; i <= 24; i += 4)
+	{
+		nNeed += h[i] | (h[i+1] << 8) | (h[i+2] << 16) | ((u32) h[i+3] << 24);
+	}
+	if (m_nGameSize < nNeed)
+	{
+		snprintf (Line, sizeof Line, "  .neo file too short: %u bytes, the header needs %llu",
+			  (unsigned) m_nGameSize, (unsigned long long) nNeed);
+		Log (Line, COLOR_ERR);
+		geo_deinit ();
+		geo_bios_unload ();
+		delete [] m_pGame;
+		m_pGame = 0;
+		return FALSE;
+	}
 	if (!geo_neo_load (m_pGame, m_nGameSize))
 	{
 		Log ("  invalid .neo file", COLOR_ERR);
@@ -2043,7 +2064,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 				}
 				else if (nNew & BTN_A)
 				{
-					pMsg = "SCANLINES NEED MULTICORE";
+					pMsg = "NEEDS MULTICORE";
 				}
 				break;
 
@@ -2998,8 +3019,8 @@ void CKernel::RunGame (void)
 				u32 nMsgColor = nMenuMsgColor;
 				if (!MenuMsg[0] && Ids[nMenuSel] == GmBios)
 				{
-					pMsg = "RESETS THE GAME";
-					nMsgColor = UI_DIM;
+					pMsg = "RESTARTS THE GAME";
+					nMsgColor = UI_VALUE;		// a note, like APPLIES TO NEXT GAME
 				}
 				static const TButtonHint Hints[2] = {{'A', "SELECT"}, {'B', "RESUME"}};
 				m_pUI->DrawPanelMenu (TRUE, pName, Items, nIds, nMenuSel, pMsg, nMsgColor,
@@ -3359,7 +3380,7 @@ TShutdownMode CKernel::Run (void)
 
 		if (m_nLoaded != (int) nSel && !LoadGame (nSel))
 		{
-			m_pUI->DrawMessage ("CANNOT LOAD GAME", m_pGames[nSel].Name, "SEE neopi/LOG.TXT");
+			m_pUI->DrawMessage ("CANNOT LOAD GAME", 0, "SEE neopi/LOG.TXT");
 			SaveLog ();
 			for (unsigned i = 0; i < 180; i++)
 			{
