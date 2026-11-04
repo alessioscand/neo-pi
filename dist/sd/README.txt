@@ -1,4 +1,4 @@
-neo-pi 0.8.0-rc4 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
+neo-pi 0.8.0-rc5 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
 ==============================================================================
 
 WHAT'S NEW IN 0.8.0
