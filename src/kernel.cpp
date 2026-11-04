@@ -22,6 +22,7 @@ extern "C" {
 #include <stdint.h>
 #include "geo.h"
 #include "geo_lspc.h"
+#include "geo_m68k.h"
 #include "geo_mixer.h"
 #include "geo_neo.h"
 #include "geo_ymfm.h"
@@ -430,7 +431,10 @@ static unsigned InputJoystick (unsigned nPort)	{ return s_Joy[nPort & 1]; }
 static unsigned InputStatusA (void)		{ return s_StatA; }
 static unsigned InputStatusB (void)		{ return s_StatB; }
 static volatile unsigned s_nTestFrames = 0;		// > 0: TEST button held (MVS service menu)
-#define BOOT_KEYS_FRAMES	240			// 4 s: the Universe BIOS's splash screen
+// Universe BIOS menu: A+B+C held from the reset for 1.5 s. It reads them on its
+// splash screen (60 frames were enough in tests, 40 were not); held longer, its
+// menu would ignore the d-pad until they are released
+#define BOOT_KEYS_FRAMES	90
 static unsigned s_nBootKeys = 0;			// > 0: player 1's A+B+C held (Universe BIOS menu)
 static unsigned InputSystemType (void)	{ return s_nTestFrames ? 0x40 : 0xC0; }
 static unsigned InputDIPSwitches (void)	{ return 0xFF; }		// all DIP switches off
@@ -2923,8 +2927,13 @@ void CKernel::RunGame (void)
 				case GmBios:
 					if (m_nGameSystem == SYS_UNI)
 					{
-						// Universe BIOS: restart with A+B+C held on the splash
-						// screen, which opens its main menu
+						// Universe BIOS: reset with A+B+C held on the splash
+						// screen, which opens its main menu. The work RAM is
+						// cleared first, as at power-on: otherwise, during the
+						// game's start-up, the BIOS sees its own data there,
+						// takes it as a soft reset and skips the splash screen
+						// (the backup RAM, with its settings, is not touched)
+						memset ((void *) geo_m68k_ram_ptr (), 0, 0x10000);
 						geo_reset (1);
 						Rephase ();
 						s_nBootKeys = BOOT_KEYS_FRAMES;
@@ -2989,7 +2998,7 @@ void CKernel::RunGame (void)
 				u32 nMsgColor = nMenuMsgColor;
 				if (!MenuMsg[0] && Ids[nMenuSel] == GmBios)
 				{
-					pMsg = "RESTARTS THE GAME";
+					pMsg = "RESETS THE GAME";
 					nMsgColor = UI_DIM;
 				}
 				static const TButtonHint Hints[2] = {{'A', "SELECT"}, {'B', "RESUME"}};

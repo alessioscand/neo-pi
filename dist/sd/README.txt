@@ -1,4 +1,4 @@
-neo-pi 0.8.0-rc2 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.8.0-rc3 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
 ==============================================================================
 
 WHAT'S NEW IN 0.8.0
@@ -69,11 +69,11 @@ IN-GAME MENU (hold Select for 1 second; B resumes the game)
   LOAD STATE     loads it (available once something has been saved)
   BIOS SETTINGS  (MVS and UNIBIOS) MVS: presses the TEST button, the
                  BIOS's own menu appears (game and cabinet settings); its
-                 EXIT item restarts the game with the new settings.
-                 UNIBIOS: restarts the game into the Universe BIOS menu
+                 EXIT item resets the game with the new settings.
+                 UNIBIOS: resets the game into the Universe BIOS menu
   OPTIONS        the OPTIONS menu (below), over the paused game; B comes
                  back here. SYSTEM and REGION apply from the next game
-  RESET          restarts the game
+  RESET          resets the game
   GAME LIST      back to the game list
   POWER OFF      3 second countdown (B cancels), saves everything and
                  switches picture and sound off: then the power can be
