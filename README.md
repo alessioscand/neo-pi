@@ -69,7 +69,8 @@ that only arcade games can give you.
 **Gameplay**
 
 - Accurate emulation, built on the [Geolith](https://gitlab.com/jgemu/geolith)
-  core: MVS (arcade) and AES (home console), all four BIOS regions
+  core: MVS (arcade), AES (home console) and the Universe BIOS, all four
+  BIOS regions
 - Responsive controls: pads are read every millisecond, and what you press
   shows up on screen almost as quickly as on the original hardware with a
   CRT
@@ -87,7 +88,6 @@ that only arcade games can give you.
   no added lag
 - Blargg's NTSC filter, the picture of a composite cable on a TV
   of the time, filtered line by line on a core of its own: no added lag
-  *(to be tested on Pi 3)*
 
 **Convenience**
 
@@ -131,7 +131,7 @@ stick always work. Second pad connected is Player 2.
 | In game | |
 |---|---|
 | Select (short press) | Insert a coin (AES: Select) |
-| Select, held 1 s | In-game menu: save / load state, reset, BIOS settings, game list, power off |
+| Select, held 1 s | In-game menu: save / load state, BIOS settings, options, reset, game list, power off |
 | Select + A | Screenshot (PNG) |
 | Select + B | *Lazy finger* (turbo buttons) on/off |
 | Select + C | Status line on/off |
@@ -159,7 +159,7 @@ unplugging: it saves memory cards and settings.
 ## Tinkerer's corner
 
 Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states,
-MVS memory, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
+MVS memory, Universe BIOS settings, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
 `pads.cfg` (controls for each pad model), `LOG.TXT` (diagnostics).
 
 **Testing options.** The defaults are what neo-pi is designed and tuned

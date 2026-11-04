@@ -1,4 +1,4 @@
-neo-pi 0.8.0-rc4 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.8.0-rc4 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
 ==============================================================================
 
 WHAT'S NEW IN 0.8.0
@@ -17,8 +17,7 @@ WHAT'S NEW IN 0.7.0
     that do not like it (usbpoll=500 / 250).
   - Faster drawing on the screen, so lower LOAD.
   - COMPOSITE: the picture of a composite cable on a TV of the time, on a
-    CPU core of its own, with no added lag. On a Pi 3 it still needs some
-    more testing to check that it stays smooth in every game.
+    CPU core of its own, with no added lag.
   - New background and button icons.
 
 SET-UP
@@ -92,8 +91,6 @@ OPTIONS MENU (D in the list or OPTIONS in the in-game menu; A or
                  colour fringes, dots crawling along the edges). Each line
                  is filtered as soon as it is drawn, on a CPU core of its
                  own (core 2): no added lag, beam racing still works.
-                 On a Pi 3 COMPOSITE still needs more testing: if a game
-                 slows down, use the scanlines instead.
                  On a Pi 3 the scanlines and COMPOSITE need both cores:
                  with multicore=off this item shows MULTICORE OFF.
   CONTROLS       sets up a pad (with several pads: press a button on the
