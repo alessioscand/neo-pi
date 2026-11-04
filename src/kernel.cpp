@@ -1070,7 +1070,15 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	Log (Line, COLOR_DIM);
 	if (!geo_bios_load_mem (m_pBIOS, m_nBIOSSize))
 	{
-		Fatal (NEOPI_ERR_BIOS, "the required BIOS (MVS/AES, region) is missing from neogeo.zip");
+		// back to the list: SYSTEM or REGION can be changed in OPTIONS
+		snprintf (Line, sizeof Line, "  no BIOS for %s, region %s, in neogeo.zip",
+			  SystemName (), RegionName (m_nRegion));
+		Log (Line, COLOR_ERR);
+		geo_deinit ();
+		geo_bios_unload ();
+		delete [] m_pGame;
+		m_pGame = 0;
+		return FALSE;
 	}
 	// Geolith trusts the sizes in the header and takes the ROMs one after the
 	// other from byte 4096: a truncated or damaged file would be read past its
