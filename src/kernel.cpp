@@ -2906,7 +2906,9 @@ void CKernel::RunGame (void)
 				switch (nId)
 				{
 				case GmSave:
-					if (geo_state_save (Path))
+				{
+					boolean bOK = geo_state_save (Path);
+					if (bOK)
 					{
 						bSaved = TRUE;
 						snprintf (MenuMsg, sizeof MenuMsg, "SAVED");
@@ -2917,8 +2919,9 @@ void CKernel::RunGame (void)
 						snprintf (MenuMsg, sizeof MenuMsg, "SAVE FAILED");
 						nMenuMsgColor = UI_ERR;
 					}
-					Log (bSaved ? "  save state: saved" : "  save state: FAILED", COLOR_TEXT);
+					Log (bOK ? "  save state: saved" : "  save state: FAILED", COLOR_TEXT);
 					break;
+				}
 
 				case GmLoad:
 					if (!bSaved)
@@ -3014,7 +3017,7 @@ void CKernel::RunGame (void)
 					Items[i].pLabel = Labels[Ids[i]];
 					Items[i].pValue = 0;
 					Items[i].bDisabled = Ids[i] == GmLoad && !bSaved;
-						}
+				}
 				const char *pMsg = MenuMsg;
 				u32 nMsgColor = nMenuMsgColor;
 				if (!MenuMsg[0] && Ids[nMenuSel] == GmBios)
