@@ -621,8 +621,7 @@ CKernel::CKernel (void)
 	m_nRegion (REGION_EU),
 	m_nFilter (0),
 	m_bHVS (TRUE),
-	m_bFilterAllowed (TRUE),
-	m_bForceFilters (FALSE)
+	m_bFilterAllowed (TRUE)
 {
 	s_pThis = this;
 	m_LastRaw[0] = '\0';
@@ -1919,7 +1918,6 @@ void CKernel::LoadConfig (void)
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
-	if (strstr (Text, "filters=on"))	m_bFilterAllowed = m_bForceFilters = TRUE;	// e.g. to try them on a Pi 3
 	// (multicore and the scanlines on a Pi 3: decided after LoadConfig, also
 	// when neopi.cfg does not exist yet)
 	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
@@ -1976,10 +1974,6 @@ void CKernel::SaveConfig (void)
 	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\nfilter=%s\r\n%s",
 		  SystemName (), RegionName (m_nRegion),
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
-	if (m_bForceFilters)
-	{
-		strcat (Text, "filters=on\r\n");
-	}
 	if (g_nUSBInterruptPollMs != 1)
 	{
 		strcat (Text, "usbpoll=");

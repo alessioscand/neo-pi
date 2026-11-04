@@ -151,7 +151,6 @@ private:
 	unsigned		 m_nFilter;	// FILTER_*
 	boolean			 m_bHVS;		// FALSE: scaler=cpu in neopi.cfg
 	boolean			 m_bFilterAllowed;	// Pi 4 only
-	boolean			 m_bForceFilters;	// filters=on in neopi.cfg
 
 	static CKernel		*s_pThis;
 };
