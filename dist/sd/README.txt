@@ -1,4 +1,4 @@
-neo-pi 0.8.0-rc5 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
+neo-pi 0.8.0 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
 ==============================================================================
 
 WHAT'S NEW IN 0.8.0
@@ -7,6 +7,8 @@ WHAT'S NEW IN 0.8.0
   - OPTIONS in the in-game menu too: change SCANLINES and see it at once
     on the paused game.
   - The menus go through the chosen filter as well, COMPOSITE included.
+  - A missing BIOS or a damaged .neo file: CANNOT LOAD GAME and back to
+    the list, instead of stopping.
 
 WHAT'S NEW IN 0.7.0
   - Less input lag: each frame reads the pads first and then draws the
