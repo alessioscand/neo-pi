@@ -71,7 +71,8 @@ that only arcade games can give you.
 **Gameplay**
 
 - Accurate emulation, built on the [Geolith](https://gitlab.com/jgemu/geolith)
-  core: MVS (arcade) and AES (home console), all four BIOS regions
+  core: MVS (arcade), AES (home console) and the Universe BIOS, all four
+  BIOS regions
 - Responsive controls: pads are read every millisecond, and what you press
   shows up on screen almost as quickly as on the original hardware with a
   CRT
@@ -89,7 +90,6 @@ that only arcade games can give you.
   no added lag
 - Blargg's NTSC filter, the picture of a composite cable on a TV
   of the time, filtered line by line on a core of its own: no added lag
-  *(to be tested on Pi 3)*
 
 **Convenience**
 
@@ -102,7 +102,6 @@ that only arcade games can give you.
 **Planned:**
 
 - Composite video output for CRT TVs, through the Pi's 3.5 mm AV jack
-- UniBIOS support
 
 
 ## Requirements
@@ -134,11 +133,26 @@ stick always work. Second pad connected is Player 2.
 | In game | |
 |---|---|
 | Select (short press) | Insert a coin (AES: Select) |
-| Select, held 1 s | In-game menu: save / load state, reset, BIOS settings, game list, power off |
+| Select, held 1 s | In-game menu: save / load state, BIOS settings, options, reset, game list, power off |
 | Select + A | Screenshot (PNG) |
 | Select + B | *Lazy finger* (turbo buttons) on/off |
 | Select + C | Status line on/off |
 | Select + D | Credits |
+
+**With the Universe BIOS** (OPTIONS > SYSTEM > UNIBIOS, needs
+`uni-bios_4_0.rom` in `neogeo.zip`), neo-pi's own controls stay the same,
+so a few of its combinations take a different route:
+
+| Universe BIOS | On neo-pi |
+|---|---|
+| Main menu (A+B+C at start-up) | In-game menu > BIOS SETTINGS, or A+B+C while its splash screen is shown |
+| In-game menu (Start+A+B+C) | Works as is |
+| In-game menu (Start+Coin, Start+Select) | Not available: Select belongs to neo-pi (coin, menu, shortcuts); use Start+A+B+C |
+| Memory card manager (A+B+C+D at start-up), test mode (B+C+D) | Press them while its splash screen is shown |
+
+The region is set in the Universe BIOS menu, and its settings are kept
+for each game, separate from the MVS BIOS ones: switching SYSTEM back and
+forth never mixes them.
 
 In the menus the buttons are shown on screen.
 Always switch off with POWER OFF (in-game menu or options) before
@@ -148,7 +162,7 @@ unplugging: it saves memory cards and settings.
 ## Tinkerer's corner
 
 Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states,
-MVS memory, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
+MVS memory, Universe BIOS settings, memory cards), `shots/` (screenshots), `neopi.cfg` (options),
 `pads.cfg` (controls for each pad model), `LOG.TXT` (diagnostics).
 
 **Reading the status line.** Select + C shows FPS, LOAD, temperature,
@@ -180,7 +194,6 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
 | `resampler=speex` | Geolith's standard Speex resampler (heavier) |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler (slower) |
-| `writecombine=off` | write the framebuffer the old way (slower) |
 
 An empty `neopi/BENCH` file runs a built-in benchmark on the selected game
 (results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file

@@ -83,7 +83,7 @@ private:
 	void StateExt (char *pExt, unsigned nSlot) const;
 	void LoadConfig (void);
 	void SaveConfig (void);
-	void RunSystemMenu (void);
+	void RunSystemMenu (boolean bInGame);
 	boolean PowerOffCountdown (void);
 	void LoadPads (void);
 	void SavePads (void);
@@ -140,12 +140,17 @@ private:
 	unsigned		 m_nShots;
 
 	// configuration (neopi.cfg)
-	unsigned		 m_nSystem;	// 0 = MVS, 1 = AES
+	unsigned		 m_nSystem;	// SYS_MVS, SYS_AES, SYS_UNI
+	boolean			 m_bHasUni;	// uni-bios_4_0.rom is in neogeo.zip
+	unsigned		 m_nGameSystem;	// the system the loaded game runs with
+	boolean			 m_bReloadGame;	// SYSTEM or REGION changed while playing
+	const char *SystemName (void) const;
+	void DrawPicture (u32 *pBuffer);
+	const char *SaveExt (unsigned nType) const;
 	unsigned		 m_nRegion;	// REGION_*
 	unsigned		 m_nFilter;	// FILTER_*
 	boolean			 m_bHVS;		// FALSE: scaler=cpu in neopi.cfg
 	boolean			 m_bFilterAllowed;	// Pi 4 only
-	boolean			 m_bForceFilters;	// filters=on in neopi.cfg
 
 	static CKernel		*s_pThis;
 };

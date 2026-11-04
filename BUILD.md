@@ -1,4 +1,4 @@
-# neo-pi - how to build (version 0.7.0)
+# neo-pi - how to build (version 0.8.0)
 
 Build host: Linux x86_64.
 
@@ -63,7 +63,7 @@ Build host: Linux x86_64.
   audio resampling (linear, 56.3 kHz to 48 kHz; `resampler=speex` uses Geolith's Speex path)
 - `src/profile.cpp` - sampling profiler used by the benchmark (`neopi/PROFILE.TXT`)
 - `src/video.cpp` - double-buffered framebuffer, HVS/CPU integer scaling, scanlines, text in the black bands
-- `src/fbmap.cpp` - maps the framebuffer as write-combining memory (`writecombine=off` in `neopi/neopi.cfg` to compare)
+- `src/fbmap.cpp` - maps the framebuffer as write-combining memory
 - `src/raster.cpp`, `src/race.cpp` - beam racing: where the HDMI output is (HVS), and when each line can be sent
 - `src/composite.c`, `src/tvcore.cpp` - COMPOSITE filter (snes_ntsc) and its core 2 queue
 - `src/ui.cpp` - menus and screens drawn at Neo Geo resolution

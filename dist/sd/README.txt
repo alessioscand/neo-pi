@@ -1,5 +1,14 @@
-neo-pi 0.7.0 - bare metal Neo Geo emulator for Raspberry Pi 4 / 400 and Pi 3
+neo-pi 0.8.0 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
 ==============================================================================
+
+WHAT'S NEW IN 0.8.0
+  - Universe BIOS: with uni-bios_4_0.rom in neogeo.zip, OPTIONS > SYSTEM
+    can be UNIBIOS. BIOS SETTINGS in the in-game menu opens its menu.
+  - OPTIONS in the in-game menu too: change SCANLINES and see it at once
+    on the paused game.
+  - The menus go through the chosen filter as well, COMPOSITE included.
+  - A missing BIOS or a damaged .neo file: CANNOT LOAD GAME and back to
+    the list, instead of stopping.
 
 WHAT'S NEW IN 0.7.0
   - Less input lag: each frame reads the pads first and then draws the
@@ -10,8 +19,7 @@ WHAT'S NEW IN 0.7.0
     that do not like it (usbpoll=500 / 250).
   - Faster drawing on the screen, so lower LOAD.
   - COMPOSITE: the picture of a composite cable on a TV of the time, on a
-    CPU core of its own, with no added lag. On a Pi 3 it still needs some
-    more testing to check that it stays smooth in every game.
+    CPU core of its own, with no added lag.
   - New background and button icons.
 
 SET-UP
@@ -60,27 +68,31 @@ CONTROLS IN GAME
 IN-GAME MENU (hold Select for 1 second; B resumes the game)
   SAVE STATE     saves the game (one save per game)
   LOAD STATE     loads it (available once something has been saved)
+  BIOS SETTINGS  (MVS and UNIBIOS) MVS: presses the TEST button, the
+                 BIOS's own menu appears (game and cabinet settings); its
+                 EXIT item restarts the game with the new settings.
+                 UNIBIOS: restarts the game into the Universe BIOS menu
+  OPTIONS        the OPTIONS menu (below), over the paused game; B comes
+                 back here. SYSTEM and REGION apply from the next game
   RESET          restarts the game
-  BIOS SETTINGS  (MVS only) presses the TEST button: the BIOS's own menu
-                 appears (game and cabinet settings); its EXIT item
-                 restarts the game with the new settings
   GAME LIST      back to the game list
   POWER OFF      3 second countdown (B cancels), saves everything and
                  switches picture and sound off: then the power can be
                  unplugged
 
-OPTIONS MENU (D in the list; A or left/right changes, B goes back)
-  SYSTEM         MVS (arcade) or AES (home console), from the next game
+OPTIONS MENU (D in the list or OPTIONS in the in-game menu; A or
+              left/right changes, B goes back)
+  SYSTEM         MVS (arcade) or AES (home console), from the next game.
+                 UNIBIOS too, if uni-bios_4_0.rom is in neogeo.zip
   REGION         EUROPE / USA / JAPAN / ASIA (BIOS region: language,
-                 censorship), from the next game
+                 censorship), from the next game. With UNIBIOS the region
+                 is set in the Universe BIOS menu
   SCANLINES      OFF / LIGHT / MEDIUM / STRONG / COMPOSITE. COMPOSITE: no
                  scanlines but blargg's NTSC filter, the picture of a
                  composite video cable on a TV of the time (soft colours,
                  colour fringes, dots crawling along the edges). Each line
                  is filtered as soon as it is drawn, on a CPU core of its
                  own (core 2): no added lag, beam racing still works.
-                 On a Pi 3 COMPOSITE still needs more testing: if a game
-                 slows down, use the scanlines instead.
                  On a Pi 3 the scanlines and COMPOSITE need both cores:
                  with multicore=off this item shows MULTICORE OFF.
   CONTROLS       sets up a pad (with several pads: press a button on the
@@ -133,8 +145,6 @@ PICTURE
     usbpoll=250      every 4 ms
     usbpoll=native   at the rate the pad asks for (usually every 8-10 ms)
     resampler=speex  the previous, heavier audio resampler (comparison)
-    writecombine=off the framebuffer written the old way (slower; only to
-                     compare)
 
 FILES ON THE CARD (neopi folder)
   LOG.TXT      diagnostics: model, HDMI, pads, audio, per-minute timings.
