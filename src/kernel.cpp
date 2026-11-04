@@ -23,6 +23,7 @@ extern "C" {
 #include "geo.h"
 #include "geo_lspc.h"
 #include "geo_m68k.h"
+#include "geo_z80.h"
 #include "geo_mixer.h"
 #include "geo_neo.h"
 #include "geo_ymfm.h"
@@ -1005,6 +1006,19 @@ void CKernel::UnloadGame (void)
 	m_nLoaded = -1;
 }
 
+// 68000 and Z80 work RAM as at power-on (all zero). Geolith never clears them:
+// it expects one game per run, and its reset is the board's RESET button, which
+// keeps the RAM. Without this, a game loaded from the list starts with the RAM
+// of the previous one, and the Universe BIOS, finding its own data there, takes
+// it for a soft reset and keeps that game's active region instead of reading
+// its settings from the backup RAM (which is loaded per game and is right).
+// Also used by BIOS SETTINGS with UNIBIOS. The backup RAM is not touched.
+static void ClearWorkRAM (void)
+{
+	memset ((void *) geo_m68k_ram_ptr (), 0, 0x10000);
+	memset ((void *) geo_z80_ram_ptr (), 0, 0x800);
+}
+
 // Palette and video RAM as at power-on (all zero): otherwise, while the BIOS
 // runs its tests after the reset, the chip keeps showing what the previous
 // game left there. Done with the same writes the 68000 would make.
@@ -1122,6 +1136,7 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	}
 
 	geo_lspc_set_palette (0);		// resistor network palette (as on hardware)
+	ClearWorkRAM ();			// a game always starts as at power-on
 	geo_reset (1);
 	Rephase ();
 
@@ -2964,8 +2979,7 @@ void CKernel::RunGame (void)
 						// cleared first, as at power-on: otherwise, during the
 						// game's start-up, the BIOS sees its own data there,
 						// takes it as a soft reset and skips the splash screen
-						// (the backup RAM, with its settings, is not touched)
-						memset ((void *) geo_m68k_ram_ptr (), 0, 0x10000);
+						ClearWorkRAM ();
 						geo_reset (1);
 						Rephase ();
 						s_nBootKeys = BOOT_KEYS_FRAMES;
