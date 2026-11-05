@@ -147,7 +147,7 @@ code   { color: var(--white); }
   content: ""; position: absolute; left: 50%; top: 50%; z-index: -1;
   width: min(520px, 100vw); height: 340px;
   transform: translate(-50%, -50%);
-  background: radial-gradient(closest-side, rgba(70,120,255,.22), rgba(70,120,255,.08) 55%, rgba(6,14,30,0) 100%);
+  background: radial-gradient(closest-side, rgba(70,120,255,.34), rgba(70,120,255,.13) 55%, rgba(6,14,30,0) 100%);
   pointer-events: none;
 }
 .scanlines {
@@ -155,12 +155,13 @@ code   { color: var(--white); }
   background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.45) 2px 4px);
   -webkit-mask: url(img/logo.svg) center / 100% 100% no-repeat;
           mask: url(img/logo.svg) center / 100% 100% no-repeat;
-  visibility: hidden;
+  opacity: 0; transition: opacity 350ms ease;
+  animation: roll 400ms linear infinite;
 }
-/* easter egg: on hover the scanlines appear and roll down, like a CRT */
-.logo:hover .scanlines { visibility: visible; animation: roll 400ms linear infinite; }
+/* easter egg: on hover the scanlines fade in, rolling down like a CRT */
+.logo:hover .scanlines { opacity: 1; }
 @keyframes roll { to { background-position: 0 4px; } }
-@media (prefers-reduced-motion: reduce) { .logo:hover .scanlines { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .scanlines { animation: none; transition: none; } }
 
 /* the title on one line on wide screens */
 @media (min-width: 760px) {
