@@ -139,7 +139,9 @@ code   { color: var(--white); }
   color: var(--white); transform: skewX(-12deg); white-space: nowrap;
 }
 
-.logo { position: relative; width: 240px; height: 120px; isolation: isolate; }
+.logo { position: relative; display: block; width: 240px; height: 120px; isolation: isolate; }
+.logo:focus-visible { outline-offset: 6px; }
+#download { scroll-margin: 40vh 0; }	/* the logo scrolls it to the middle of the screen */
 .logo img { display: block; width: 240px; height: 120px; image-rendering: pixelated; }
 .logo::before {
   content: ""; position: absolute; left: 50%; top: 50%; z-index: -1;
@@ -153,7 +155,12 @@ code   { color: var(--white); }
   background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.45) 2px 4px);
   -webkit-mask: url(img/logo.svg) center / 100% 100% no-repeat;
           mask: url(img/logo.svg) center / 100% 100% no-repeat;
+  visibility: hidden;
 }
+/* easter egg: on hover the scanlines appear and roll down, like a CRT */
+.logo:hover .scanlines { visibility: visible; animation: roll 400ms linear infinite; }
+@keyframes roll { to { background-position: 0 4px; } }
+@media (prefers-reduced-motion: reduce) { .logo:hover .scanlines { animation: none; } }
 
 /* the title on one line on wide screens */
 @media (min-width: 760px) {
@@ -290,7 +297,7 @@ code   { color: var(--white); }
 
 <section class="hero wide">
   <div class="brand">
-    <div class="logo"><img src="img/logo.svg" alt="neo-pi logo" width="240" height="120"><div class="scanlines" aria-hidden="true"></div></div>
+    <a class="logo" href="#download" aria-label="neo-pi: go to Download"><img src="img/logo.svg" alt="neo-pi logo" width="240" height="120"><div class="scanlines" aria-hidden="true"></div></a>
     <div class="jp" lang="ja" aria-hidden="true">ベアメタル</div>
   </div>
   <h1>A <span class="underlined">bare-metal</span> NEO·GEO emulator for Raspberry Pi.</h1>
@@ -303,7 +310,7 @@ code   { color: var(--white); }
 </section>
 
 <section class="download wide" aria-label="Download">
-  <a class="button button-gold" href="https://github.com/alessioscand/neo-pi/releases/latest">Download</a>
+  <a id="download" class="button button-gold" href="https://github.com/alessioscand/neo-pi/releases/latest">Download now</a>
   <div class="download-info">
     <p class="note">For RPi 3 &amp; 4 · Free · GPLv3</p>
     <a class="coffee-link" href="#support"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"/></svg><span>Enjoying it? <span class="pink">Buy me a <em lang="it">crema caffè</em></span></span></a>
@@ -317,7 +324,7 @@ code   { color: var(--white); }
       <p>Powered by <strong>Geolith</strong>, a highly accurate Neo Geo emulator. Play in MVS arcade mode or AES home-console mode, in all BIOS regions and UniBIOS.</p>
     </div>
     <div>
-      <h2>Highly responsive input</h2>
+      <h2>Highly responsive</h2>
       <p>Gamepads are polled <strong>every millisecond</strong>. <em>Beam racing</em> keeps video output in sync with the HDMI signal for near-instant response.</p>
     </div>
     <div>
