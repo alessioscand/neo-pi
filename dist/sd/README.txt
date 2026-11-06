@@ -1,4 +1,4 @@
-neo-pi 0.8.0 - bare metal Neo Geo emulator for Raspberry Pi 3 and 4
+neo-pi 0.8.0 - bare metal NEOGEO emulator for Raspberry Pi 3 and 4
 ==============================================================================
 
 WHAT'S NEW IN 0.8.0
@@ -53,7 +53,7 @@ SETTING UP THE CONTROLS
 
 CONTROLS IN GAME
   d-pad or left stick     joystick
-  A B C D                 Neo Geo buttons
+  A B C D                 NEOGEO buttons
   Start                   start
   Select (short press)    insert a coin (AES: Select button)
   Select held 1 second    in-game menu (the game pauses)
@@ -104,11 +104,11 @@ STATUS LINE (Select + C), below the picture
   60 FPS   LOAD 62%   39 C   DLY 6.5   1080P 4X CPU+HVS
   LOAD is how much of each 1/60 s frame is used (green, yellow from 75%,
   red above 95%); with beam racing it leaves out the time spent waiting
-  for the HDMI output between lines. 4X HVS = scaled by the Pi's hardware scaler,
-  CPU+HVS = the CPU draws the scanlines at 2x and the scaler doubles it,
-  CPU = all by the CPU. DLY is the frame delay in ms; with beam racing,
-  RACE is the time in ms from reading the pads to the top of the picture
-  being sent to the TV (see INPUT LAG).
+  for the HDMI output between lines. 4X HVS = scaled by the Pi's hardware
+  scaler, CPU+HVS = the CPU draws the scanlines at 2x and the scaler
+  doubles it, CPU = all by the CPU. DLY is the frame delay in ms; with
+  beam racing, RACE is the time in ms from reading the pads to the top of
+  the picture being sent to the TV (see INPUT LAG).
 
 INPUT LAG
   Each frame starts with the vertical blank, when games read the pads, and
@@ -120,7 +120,7 @@ INPUT LAG
   heavier. LOG.TXT shows it every minute.
   Beam racing: the picture is not prepared in advance and shown
   at the next vsync, it is drawn line by line just ahead of the HDMI
-  output, as a real Neo Geo draws it on a CRT: the pads are read about
+  output, as a real NEOGEO draws it on a CRT: the pads are read about
   2-4 ms before the top of the picture is sent to the TV. At start-up
   neo-pi measures the Pi's video scaler for about one second (LOG.TXT:
   "raster" and "Beam racing" lines). The margins adapt to each game; if
@@ -167,5 +167,6 @@ IF SOMETHING GOES WRONG
   No picture at all: put a # in front of hdmi_group and hdmi_mode in
   config.txt.
 
-neo-pi by Alessio Scanderebech. Licence: GPLv3 (see LICENSES.txt).
-NEO GEO is a trademark of SNK. BIOS and games are not included.
+neo-pi is a human-led, vibe-coded experiment by Alessio Scanderebech,
+written with Claude. Free software, GPLv3 (see LICENSES.txt).
+NEOGEO is a trademark of SNK. BIOS and games are not included.

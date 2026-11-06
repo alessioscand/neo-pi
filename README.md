@@ -1,23 +1,24 @@
 # neo-pi
 
-A streamlined, bare-metal Neo Geo emulator for Raspberry Pi 3 & 4, with no unnecessary layers and highly responsive input.
+A streamlined, bare-metal NEO·GEO emulator for Raspberry Pi 3 & 4, with no unnecessary layers and highly responsive input.
 
 Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
-If you enjoy neo-pi or [nes-pi](https://alessioscand.github.io/nes-pi/)
-please consider supporting me:
-[paypal.me/alescandy](https://paypal.me/alescandy)
+neo-pi is a human-led, vibe-coded experiment by Alessio Scanderebech.
+If you enjoy it, [nes-pi](https://alessioscand.github.io/nes-pi/) or
+[m92-pi](https://alessioscand.github.io/m92-pi/), please consider
+supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
 
 ## Why neo-pi
 
-I discovered the Neo Geo in the arcades as a kid, and I've been fascinated
-by it ever since. I started collecting Neo Geo CD games in the early 2000s,
+I discovered the NEO·GEO in the arcades as a kid, and I've been fascinated
+by it ever since. I started collecting NEO·GEO CD games in the early 2000s,
 briefly moved to AES, and eventually settled on MVS. I still own an MV1-FZ
 board and several cartridges, but rarely get to enjoy them due to the space
 and setup they require.
 
 Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've
-dreamed of creating a focused, compact Neo Geo experience on the Raspberry
+dreamed of creating a focused, compact NEO·GEO experience on the Raspberry
 Pi, as close to the original hardware as possible, but with all the
 conveniences of modern emulation (LCD displays with visual filters, save
 states, turbo buttons) but prioritizing the responsiveness of the controls.
@@ -36,13 +37,13 @@ talks to the hardware directly, down to the video scaler's registers.
 **Circle** provides the essential drivers (USB, SD, HDMI, audio), so bare metal
 doesn't mean starting from scratch.
 
-**Geolith.** This accurate Neo Geo emulator is a real gem, written in plain,
+**Geolith.** This accurate NEO·GEO emulator is a real gem, written in plain,
 portable C that doesn't assume an OS: it renders into a buffer it is given,
 talks to the outside world through a few callbacks, and loads the BIOS and
 games straight from memory. That made it a natural fit for Circle.
 
 **Scanline-based rendering.** Above all, Geolith draws the picture the way
-the real Neo Geo does: one line at a time, as the emulated video chip
+the real NEO·GEO does: one line at a time, as the emulated video chip
 reaches it. Each line is drawn always at the same moment and never touched
 again, so it can be handed over as soon as it's done. This opened up a
 whole range of possibilities. The lines can be drawn on a second CPU core
@@ -52,7 +53,7 @@ output reaches it: *beam racing!* So the pads are read only a couple of
 milliseconds before the picture appears, as they would be on the original
 hardware with a CRT.
 
-**Custom audio resampler.** The Neo Geo's sound chip runs at about 56 kHz,
+**Custom audio resampler.** The NEO·GEO's sound chip runs at about 56 kHz,
 while HDMI wants 48 kHz. Instead of a heavy general-purpose converter,
 neo-pi uses a small one written just for it: same clean sound, a fraction
 of the work (on a Pi 3, Geolith's standard Speex resampler took about 15%
@@ -109,7 +110,7 @@ that only arcade games can give you.
 - Raspberry Pi 4 (the Pi 400 should work too) or Raspberry Pi 3 B+
 - A micro SD card formatted FAT32
 - A USB gamepad and an HDMI TV or monitor
-- Your own Neo Geo BIOS (`neogeo.zip`) and games in `.neo` format.
+- Your own NEO·GEO BIOS (`neogeo.zip`) and games in `.neo` format.
   **They are not included and are never distributed with neo-pi.**
 
 
@@ -172,7 +173,7 @@ RACE (or DLY) and the video mode.
   needed: below 100% no frame is lost.
 - **RACE** is the time, in ms, from reading the pads to the top of the
   picture leaving the Pi: this is neo-pi's share of the lag, the only part
-  that depends on the emulator. On an original Neo Geo the same step takes
+  that depends on the emulator. On an original NEO·GEO the same step takes
   about 2 ms, so a RACE of 2-4 ms means neo-pi adds next to nothing. The
   pad itself, the TV (use its game mode) and the game's own reaction time
   come on top, as they would with any system.
@@ -225,7 +226,7 @@ partner Claude, standing on the shoulders of giants:
 | Component | Thanks to |
 |---|---|
 | Bare-metal system | [Circle](https://github.com/rsta2/circle) by Rene Stange |
-| Neo Geo core | [Geolith](https://gitlab.com/jgemu/geolith) by Rupert Carmichael |
+| NEO·GEO core | [Geolith](https://gitlab.com/jgemu/geolith) by Rupert Carmichael |
 | 68000 CPU | Musashi by Karl Stenerud |
 | Z80 CPU | by Nicolas Allemand and Rupert Carmichael |
 | Sound | ymfm by Aaron Giles (C port by Rupert Carmichael) |
@@ -243,6 +244,6 @@ by Circle (GPLv3). The third-party components keep their own licences
 (BSD 3-Clause, LGPL and others); the full texts are in
 [`dist/sd/LICENSES.txt`](dist/sd/LICENSES.txt).
 
-NEO GEO is a trademark of SNK. neo-pi is an independent project, not
+NEO·GEO is a trademark of SNK. neo-pi is an independent project, not
 affiliated with or endorsed by SNK, and contains no BIOS, games or other
 SNK material.
