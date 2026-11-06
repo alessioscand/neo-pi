@@ -5,7 +5,7 @@ A streamlined, bare-metal NEO·GEO emulator for Raspberry Pi 3 & 4, with no unne
 Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
 neo-pi is a human-led, vibe-coded experiment by Alessio Scanderebech.
-If you enjoy it, [nes-pi](https://alessioscand.github.io/nes-pi/) or
+If you enjoy neo-pi, [nes-pi](https://alessioscand.github.io/nes-pi/) or
 [m92-pi](https://alessioscand.github.io/m92-pi/), please consider
 supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
 
