@@ -206,10 +206,10 @@ checks that one core and two cores give the same picture, line by line.
 
 **If something goes wrong.** The green LED blinks a number of times,
 repeatedly: 2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game,
-6 = emulator, 7 = memory. With no picture at all, put a `#` in front of `hdmi_group` and
-`hdmi_mode` in `config.txt`. To report a problem, `neopi/LOG.TXT` is all
-that is needed; for performance, add an empty `neopi/BENCH` file and send
-`BENCH.TXT` and `PROFILE.TXT` too.
+6 = emulator, 7 = memory. With no picture at all, put a `#` in front of
+`hdmi_group` and `hdmi_mode` in `config.txt`. To report a problem,
+`neopi/LOG.TXT` is all that is needed; for performance, add an empty
+`neopi/BENCH` file and send `BENCH.TXT` and `PROFILE.TXT` too.
 
 **Heat.** If games start to slow down after a while, it is usually heat: a
 heatsink is recommended. The status line (Select + C) shows the
