@@ -1,0 +1,45 @@
+#
+# neo-pi Makefile (generated per target by build.sh)
+#
+CIRCLEHOME = @CIRCLEHOME@
+GEO = @GEO@
+
+GEO_OBJS = m68kcpu.o m68kops.o z80.o ymfm_adpcm.o ymfm_opn.o ymfm_ssg.o \
+	   geo.o geo_cd.o geo_lc8951.o geo_lspc.o geo_m68k.o geo_memcard.o \
+	   geo_mixer.o geo_neo.o geo_rtc.o geo_serial.o geo_vfs.o geo_ymfm.o \
+	   geo_z80.o miniz.o resample.o
+
+OBJS	= main.o kernel.o console.o games.o settings.o menus.o gameloop.o bench.o \
+	  report.o racing.o frame.o mcline.o \
+	  video.o ui.o fontdata.o vfs.o ziphelp.o shim.o geo_disc_stub.o \
+	  audio.o input.o raster.o race.o profile.o fbmap.o composite.o tvcore.o \
+	  stats.o pacing.o \
+	  $(GEO_OBJS) libc_a-setjmp.o
+
+LIBS	= $(CIRCLEHOME)/addon/fatfs/libfatfs.a \
+	  $(CIRCLEHOME)/addon/SDCard/libsdcard.a \
+	  $(CIRCLEHOME)/lib/usb/libusb.a \
+	  $(CIRCLEHOME)/lib/input/libinput.a \
+	  $(CIRCLEHOME)/lib/sound/libsound.a \
+	  $(CIRCLEHOME)/lib/fs/libfs.a \
+	  $(CIRCLEHOME)/lib/libcircle.a
+
+EXTRAINCLUDE = -I @SRC@ -I @COMMON@ -isystem $(GEO)/src -isystem $(GEO)/src/m68k -isystem $(GEO)/src/z80 \
+	       -isystem $(GEO)/src/ymfm -isystem $(GEO)/deps -isystem $(GEO)/deps/miniz \
+	       -isystem $(GEO)/deps/speex -isystem $(GEO)/deps/dr -isystem $(GEO)/../snes_ntsc
+
+C_STANDARD = -std=gnu11
+OPTIMIZE = -O2
+
+DEFINE += -DNDEBUG -DMINIZ_NO_STDIO -DMINIZ_NO_TIME \
+	  -DRANDOM_PREFIX=geo -DFIXED_POINT
+CFLAGS += -fno-math-errno -Wextra -Wshadow -Wno-unused-parameter	# Circle's headers have unused parameters
+
+include $(CIRCLEHOME)/Rules.mk
+
+# the emulator core is where the time goes: optimise it harder
+# (GEO_OPTIMIZE=-O2 in the environment builds the previous way, for comparison)
+GEO_OPTIMIZE ?= -O3
+$(GEO_OBJS): OPTIMIZE = $(GEO_OPTIMIZE)
+
+-include $(DEPS)
