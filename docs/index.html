@@ -158,7 +158,8 @@ code   { color: var(--white); }
 /* the logo with "bare metal" in katakana under it */
 .brand { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .brand .jp {
-  font-family: "M PLUS 1", sans-serif; font-weight: 900; font-size: 30px; line-height: 1;
+  font-family: "M PLUS 1", sans-serif; font-weight: 900; font-size: 18px; line-height: 1;
+  letter-spacing: .8em; margin-right: -.8em;  /* the last letter's spacing would shift it left */
   color: var(--white); transform: skewX(-12deg); white-space: nowrap;
 }
 
