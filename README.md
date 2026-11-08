@@ -193,7 +193,7 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 | `beamracing=off` | double buffer instead of beam racing (more lag) |
 | `framedelay=off` | no automatic frame delay |
 | `framedelay=5` | fixed frame delay in ms (1-12; too much = stutter) |
-| `multicore=off` | everything on one core, as up to 0.6.3 (heavier; on a Pi 3, no scanlines or COMPOSITE) |
+| `multicore=off` | everything on one core (heavier; on a Pi 3, no scanlines or COMPOSITE) |
 | `usbpoll=500` | poll pads every 2 ms instead of every 1 ms (if a pad misbehaves at 1000 Hz) |
 | `usbpoll=250` | poll pads every 4 ms |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
@@ -206,7 +206,7 @@ checks that one core and two cores give the same picture, line by line.
 
 **If something goes wrong.** The green LED blinks a number of times,
 repeatedly: 2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game,
-7 = memory. With no picture at all, put a `#` in front of `hdmi_group` and
+6 = emulator, 7 = memory. With no picture at all, put a `#` in front of `hdmi_group` and
 `hdmi_mode` in `config.txt`. To report a problem, `neopi/LOG.TXT` is all
 that is needed; for performance, add an empty `neopi/BENCH` file and send
 `BENCH.TXT` and `PROFILE.TXT` too.
