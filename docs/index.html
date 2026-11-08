@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>neo-pi – bare-metal NEO·GEO emulator for Raspberry Pi</title>
-<meta name="description" content="neo-pi is a free, bare-metal NEO·GEO emulator for Raspberry Pi: no operating system, boots straight into the game, USB pads polled every 1 ms, integer scaling. MVS and AES, all BIOS regions.">
+<meta name="description" content="neo-pi is a free, bare-metal NEO·GEO emulator for Raspberry Pi: no operating system, boots straight into the game, USB pads polled every 1 ms, beam racing, integer scaling. MVS and AES, all BIOS regions.">
 <link rel="canonical" href="https://alessioscand.github.io/neo-pi/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://alessioscand.github.io/neo-pi/">
@@ -21,7 +21,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "neo-pi",
-  "description": "neo-pi is a free, bare-metal NEO·GEO emulator for Raspberry Pi: no operating system, boots straight into the game, USB pads polled every 1 ms, integer scaling. MVS and AES, all BIOS regions.",
+  "description": "neo-pi is a free, bare-metal NEO·GEO emulator for Raspberry Pi: no operating system, boots straight into the game, USB pads polled every 1 ms, beam racing, integer scaling. MVS and AES, all BIOS regions.",
   "url": "https://alessioscand.github.io/neo-pi/",
   "applicationCategory": "GameApplication",
   "operatingSystem": "Raspberry Pi (bare metal, no operating system)",
@@ -42,17 +42,17 @@
    Colours and fonts
    ========================================================================== */
 :root {
-  --bg:       #060E1E;  
-  --line:     #1C2A44;  
-  --text:     #D8DEE8;  
-  --soft:     #AAB3C2;  
-  --muted:    #7C8696;  
-  --nav:      #96A0AF;  
-  --white:    #F8F8F8;  
-  --gold:     #F0C81E;  
-  --gold-hi:  #FFE27A;  
+  --bg:       #060E1E;
+  --line:     #1C2A44;
+  --text:     #D8DEE8;
+  --soft:     #AAB3C2;
+  --muted:    #7C8696;
+  --nav:      #96A0AF;
+  --white:    #F8F8F8;
+  --gold:     #F0C81E;
+  --gold-hi:  #FFE27A;
   --sky:      #78C8FF;  /* "Bare-metal" underline, focus ring */
-  --pink:     #FF4FA8;  
+  --pink:     #FF4FA8;
   --ink:      #141414;  /* dark text on coloured buttons */
 
   --pixel: 'Silkscreen', monospace;
@@ -164,7 +164,7 @@ code   { color: var(--white); }
 
 .logo { position: relative; display: block; width: 240px; height: 120px; isolation: isolate; }
 .logo:focus-visible { outline-offset: 6px; }
-#download { scroll-margin: 40vh 0; }	/* the logo scrolls it to the middle of the screen */
+#download { scroll-margin: 40vh 0; }  /* the logo scrolls it to the middle of the screen */
 .logo img { display: block; width: 240px; height: 120px; image-rendering: pixelated; }
 .logo::before {
   content: ""; position: absolute; left: 50%; top: 50%; z-index: -1;
@@ -190,6 +190,10 @@ code   { color: var(--white); }
 @media (min-width: 760px) {
   .hero h1 { white-space: nowrap; }
 }
+/* on two lines, a little more room between them */
+@media (max-width: 759px) {
+  .hero h1 { line-height: 1.85; }
+}
 
 /* ==========================================================================
    Screenshots
@@ -198,7 +202,7 @@ code   { color: var(--white); }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px;
 }
 .shots img { display: block; width: 100%; max-width: 912px; height: auto; margin: 0 auto;
-  border: 1px solid var(--line); }
+  border: 1px solid var(--line); border-radius: 6px; }
 .shots img { cursor: zoom-in; transition: border-color .15s; }
 .shots img:hover { border-color: #4a5a8a; }
 
@@ -265,7 +269,6 @@ code   { color: var(--white); }
 }
 .coffee-link:hover { color: var(--white); }
 .coffee-link svg { flex: none; }
-.coffee-link .pink { color: var(--pink); text-decoration: underline; }
 
 /* ==========================================================================
    Features
@@ -274,8 +277,60 @@ code   { color: var(--white); }
   display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px 56px;
   padding-top: 80px; padding-bottom: 80px;
 }
-.features h2 { margin-bottom: 8px; font-size: 18px; color: var(--gold); }
-.features p  { color: var(--soft); }
+.features h2, .beam h2 { margin-bottom: 8px; font-size: 18px; color: var(--gold); }
+.features p,  .beam p  { color: var(--soft); }
+
+/* ==========================================================================
+   Highly responsive: a button press followed over three frames
+   ========================================================================== */
+.beam       { margin-top: -40px; padding-bottom: 80px; }  /* one more feature, under the grid */
+.beam > *   { max-width: 760px; }
+.beam .lead { margin-bottom: 32px; }
+
+.timeline {
+  display: grid; grid-template-columns: 120px 176px minmax(0, 1fr); gap: 12px 16px; align-items: center;
+  font-size: 13px;
+}
+.timeline .label      { font: 12px/1.4 var(--pixel); color: var(--muted); }
+.timeline .label.ours { color: var(--gold); }
+.timeline .spacer     { grid-column: 1 / 3; }
+
+.tv { display: block; width: 176px; height: auto; border: 1px solid var(--line); image-rendering: pixelated; }
+
+.scale      { position: relative; height: 18px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.scale .s0  { left: 0; transform: none; }
+.scale .s1  { left: 33.333%; }
+.scale .s2  { left: 66.667%; }
+.scale .s3  { left: 100%; transform: translateX(-100%); }
+
+/* one column per frame (16.7 ms) */
+.track {
+  position: relative; height: 32px;
+  border: 1px solid var(--line);
+  background: repeating-linear-gradient(90deg, transparent 0 calc(33.333% - 1px), var(--line) calc(33.333% - 1px) 33.333%);
+}
+.event    { position: absolute; top: 3px; bottom: 3px; opacity: .25; transition: opacity .15s; }
+.event.on { opacity: 1; }
+.press    { width: 4px; background: var(--white); }
+.read     { width: 4px; background: var(--sky); }
+/* upper half: rendering; lower half: sending to the TV */
+.drawn    { bottom: calc(50% + 1px); background: rgba(240, 200, 30, .3); border: 1px solid var(--gold); }
+.shown    { top: calc(50% + 1px); background: var(--gold); }
+.playhead { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--white); }
+
+.key   { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 16px; font-size: 14px; color: var(--muted); }
+.key i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
+.key .press, .key .read, .key .drawn, .key .shown { position: static; width: 12px; height: 12px; }
+
+.readout { min-height: 1.6em; margin-top: 14px; font-size: 14px; color: var(--soft); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 520px) {
+  .timeline { grid-template-columns: 88px minmax(0, 1fr); gap: 6px 12px; }
+  .timeline .label  { grid-column: 1 / -1; margin-top: 10px; }
+  .timeline .spacer { grid-column: 1; }
+  .tv { width: 88px; }
+}
 
 /* ==========================================================================
    Install and Controls
@@ -356,7 +411,7 @@ code   { color: var(--white); }
   <a id="download" class="button button-gold" href="https://github.com/alessioscand/neo-pi/releases/latest">Download now</a>
   <div class="download-info">
     <p class="note">For RPi 3 &amp; 4 · Free · GPLv3</p>
-    <a class="coffee-link" href="#support"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"/></svg><span>Enjoying it? <span class="pink">Buy me a <em lang="it">crema caffè</em></span></span></a>
+    <a class="coffee-link" href="#support"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"/></svg><span>Enjoying it?</span></a>
   </div>
 </section>
 
@@ -367,31 +422,54 @@ code   { color: var(--white); }
       <p>Powered by <strong>Geolith</strong>, a highly accurate NEO·GEO emulator. Play in MVS arcade mode or AES home-console mode, in all BIOS regions and UniBIOS.</p>
     </div>
     <div>
-      <h2>Highly responsive</h2>
-      <p>Gamepads are polled every millisecond. <strong>Beam racing</strong> keeps video output in sync with the HDMI signal for near-instant response.</p>
+      <h2>Fast boot</h2>
+      <p>A lightweight <strong>bare-metal</strong> system that gets you into the game in just a few seconds. Just one game on your SD card? neo-pi boots straight into it!</p>
     </div>
     <div>
       <h2>Pixel-perfect</h2>
-      <p>Crisp, square pixels at 1080p or 720p, with optional scanlines, <strong>lag-free</strong>.</p>
+      <p>With <strong>integer scaling</strong> at 1080p or 720p, every pixel stays sharp and square. If you miss your old TV, add scanlines or a composite filter.</p>
     </div>
-    <div>
-      <h2>Fast boot</h2>
-      <p>A lightweight <strong>bare-metal</strong> system that gets you into the game in just a few seconds.
+  </div>
+  <div class="beam wide">
+    <h2>Highly responsive</h2>
+    <p class="lead">Gamepads are polled every millisecond, and neo-pi uses <strong>beam racing</strong> to send each scanline to the TV as soon as it is rendered, in sync with the display's refresh. An emulator with double buffering instead waits for the entire frame to be rendered, adding up to one frame of latency.</p>
+    <div class="timeline">
+      <div class="spacer"></div>
+      <div class="scale" aria-hidden="true"><span class="s0">0 ms</span><span class="s1">16.7</span><span class="s2">33.4</span><span class="s3">50 ms</span></div>
+
+      <div class="label ours">beam racing</div>
+      <canvas class="tv" width="176" height="130" data-shown=".364" aria-label="What the TV shows with neo-pi"></canvas>
+      <div class="track">
+        <div class="event press" data-at=".08"></div>
+        <div class="event read"  data-at=".3333"></div>
+        <div class="event drawn" data-at=".336" data-width=".31"></div>
+        <div class="event shown" data-at=".364" data-width=".3333"></div>
+        <div class="playhead"></div>
+      </div>
+
+      <div class="label">double buffering</div>
+      <canvas class="tv" width="176" height="130" data-shown=".6667" aria-label="What the TV shows with a double-buffered emulator"></canvas>
+      <div class="track">
+        <div class="event press" data-at=".08"></div>
+        <div class="event read"  data-at=".3333"></div>
+        <div class="event drawn" data-at=".336"  data-width=".12"></div>
+        <div class="event shown" data-at=".6667" data-width=".3333"></div>
+        <div class="playhead"></div>
+      </div>
     </div>
-    <div>
-      <h2>Streamlined</h2>
-      <p>Save states, BIOS settings, screenshots, <em>lazy finger</em> (turbo buttons). All driven from the gamepad.</p>
+    <div class="key">
+      <span><i class="press"></i>button pressed</span>
+      <span><i class="read"></i>the game reads the pads</span>
+      <span><i class="drawn"></i>frame rendered</span>
+      <span><i class="shown"></i>frame sent to the TV, line by line</span>
     </div>
-    <div>
-      <h2>MV-1 mode</h2>
-      <p>Got just one game on your SD card? neo-pi boots straight into it!</p>
-    </div>
+    <div class="readout" aria-live="off"></div>
   </div>
 </section>
 
 <section id="install" class="band">
   <div class="narrow">
-    <h2>Get started in 3 steps</h2>
+    <h2>Get started</h2>
     <ol class="steps">
       <li>Download the neo-pi package and extract its contents to the root of a <span class="nowrap"><span class="hl">FAT32</span>-formatted</span> microSD card.</li>
       <li>Copy your <code>neogeo.zip</code> BIOS file and your <code>.neo</code> game files into the <code>neopi</code> folder.</li>
@@ -409,7 +487,7 @@ code   { color: var(--white); }
       <dt>Select</dt>          <dd>Insert a coin</dd>
       <dt>Select, held 1s</dt> <dd>In-game menu: save and load state, reset, BIOS settings, game list, power off</dd>
       <dt>Select + A</dt>      <dd>Screenshot</dd>
-      <dt>Select + B</dt>      <dd><em>Lazy finger</em> (turbo buttons) on/off</dd>
+      <dt>Select + B</dt>      <dd><em class="hl">Lazy finger</em> (turbo buttons) on/off</dd>
       <dt>Select + C</dt>      <dd>Status line on/off</dd>
       <dt>Select + D</dt>      <dd>Credits</dd>
     </dl>
@@ -419,7 +497,7 @@ code   { color: var(--white); }
 
 <section id="support" class="band">
   <div class="support narrow">
-    <p>neo-pi is <strong>free software</strong>,<br /><a href="https://github.com/alessioscand/neo-pi">learn more</a> and if you enjoy it</p>
+    <p>neo-pi is <strong>free software</strong>,<br /><a href="https://github.com/alessioscand/neo-pi">learn more</a>. Like it?</p>
     <a class="button button-pink" href="https://paypal.me/alescandy" target="_blank" rel="noopener"><svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges"><path d="M1 0h2v1h1V0h2v1h1v2h-1v1h-1v1h-1v1H3V5H2V4H1V3H0V1h1z" fill="#FF4FA8"/></svg>Buy me a coffee</a>
     <p class="footnote">Siblings: <a href="https://alessioscand.github.io/nes-pi/">nes-pi</a> · <a href="https://alessioscand.github.io/m92-pi/">m92-pi</a></p>
   </div>
@@ -442,9 +520,7 @@ code   { color: var(--white); }
 </dialog>
 
 <script>
-/* The viewer: a click on a screenshot opens it at its real size. Arrows
-   (on screen or on the keyboard) move to the others; Esc, the close
-   button or a click outside closes it. */
+/* The viewer: a click on a screenshot opens it at its real size */
 const viewer = document.querySelector('.viewer');
 const shots = [...document.querySelectorAll('.shots figure')];
 let current = 0;
@@ -468,6 +544,66 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') show(current - 1);
   if (e.key === 'ArrowRight') show(current + 1);
 });
+
+/* Beam racing: 50 ms (three frames) replayed every 6 s; Terry's kick
+   reaches each TV line by line */
+(() => {
+  const PERIOD = 6;                  // seconds per pass
+  const FRAME = 1 / 3;               // one frame, as a fraction of the pass
+  const W = 176, H = 130;            // the size of the two pictures
+  const BG = '#060E1E', GOLD = '#F0C81E';
+  const before = new Image(); before.src = 'img/tv-before.png';
+  const after  = new Image(); after.src  = 'img/tv-after.png';
+
+  const tracks  = [...document.querySelectorAll('.track')];
+  const tvs     = [...document.querySelectorAll('.tv')];
+  const readout = document.querySelector('.readout');
+
+  for (const e of document.querySelectorAll('.event')) {
+    e.style.left = (e.dataset.at * 100) + '%';
+    if (e.dataset.width) e.style.width = (e.dataset.width * 100) + '%';
+  }
+
+  function drawTV(canvas, f) {
+    const g = canvas.getContext('2d');
+    if (!before.complete || !after.complete) return;
+    g.drawImage(before, 0, 0);
+    const rows = Math.max(0, Math.min(H, Math.floor((f - canvas.dataset.shown) / FRAME * H)));
+    if (rows > 0) {
+      g.drawImage(after, 0, 0, W, rows, 0, 0, W, rows);
+      if (rows < H) {                    // the line being sent
+        g.fillStyle = BG;
+        g.fillRect(0, rows - 2, W, 8);
+        g.fillStyle = GOLD;
+        g.fillRect(0, rows, W, 4);
+      }
+    }
+  }
+
+  function draw(f) {                     // f: 0..1 over 50 ms
+    for (const t of tracks) {
+      t.querySelector('.playhead').style.left = (f * 100) + '%';
+      for (const e of t.querySelectorAll('.event')) e.classList.toggle('on', e.dataset.at <= f);
+    }
+    tvs.forEach(c => drawTV(c, f));
+    const [ours, theirs] = tvs.map(c => +c.dataset.shown);
+    readout.textContent = (f * 50).toFixed(1) + ' ms' +
+      (f >= theirs ? ' · with double buffering the answer starts, '
+                     + ((theirs - ours) * 50).toFixed(1) + ' ms later'
+       : f >= ours ? ' · with beam racing the answer is on its way to the TV' : '');
+  }
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    after.onload = before.onload = () => draw(.7);
+    draw(.7);
+    return;
+  }
+  const t0 = performance.now();
+  (function tick(now) {
+    draw(((now - t0) / 1000 % PERIOD) / PERIOD);
+    requestAnimationFrame(tick);
+  })(t0);
+})();
 </script>
 </body>
 </html>
