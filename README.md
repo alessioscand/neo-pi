@@ -1,13 +1,13 @@
 # neo-pi
 
-A streamlined, bare-metal NEO·GEO emulator for Raspberry Pi 3 & 4, with no
-unnecessary layers and highly responsive input.
+A streamlined, bare-metal NEO·GEO emulator for Raspberry Pi 3 & 4, with
+highly responsive input.
 
 Website:
 [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
 neo-pi is a human-led, vibe-coded experiment by Alessio Scanderebech.
-If you enjoy neo-pi, [nes-pi](https://alessioscand.github.io/nes-pi/) or
+If you like neo-pi, [nes-pi](https://alessioscand.github.io/nes-pi/) or
 [m92-pi](https://alessioscand.github.io/m92-pi/), please consider
 supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
 
