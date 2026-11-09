@@ -6,7 +6,7 @@ highly responsive input.
 Website:
 [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
-neo-pi is a human-led, vibe-coded experiment by Alessio Scanderebech.
+**neo-pi** is a human-led, vibe-coded experiment by Alessio Scanderebech.  
 If you like neo-pi, [nes-pi](https://alessioscand.github.io/nes-pi/) or
 [m92-pi](https://alessioscand.github.io/m92-pi/), please consider
 supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
@@ -76,11 +76,9 @@ that only arcade games can give you.
 - Accurate emulation, built on the
   [Geolith](https://gitlab.com/jgemu/geolith) core: MVS (arcade), AES
   (home console) and the Universe BIOS, all four BIOS regions
-- Responsive controls: pads are read every millisecond, and what you press
-  shows up on screen almost as quickly as on the original hardware with a
-  CRT
-- Beam racing: each line is sent to the screen just after it is drawn, so
-  the pads are read a couple of milliseconds before the picture appears
+- Responsive controls: pads are read every millisecond and, thanks to
+  beam racing, a couple of milliseconds before the picture appears, almost
+  as on the original hardware with a CRT
 - *Lazy finger* (turbo buttons): Select + B toggles it; while on, holding
   A, B, C or D fires repeatedly
 - Save states: one slot per game
