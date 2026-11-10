@@ -197,6 +197,28 @@ void CKernel::StatePath (char *pOut, size_t nSize) const
 	GamePath (pOut, nSize, Ext);
 }
 
+// what each file on the card holds, so that an unchanged one is not written
+// again (nSize 0 = not known: the next save writes it)
+static const unsigned s_MemType[3] = {GEO_MEMTYPE_NVRAM, GEO_MEMTYPE_CARTRAM, GEO_MEMTYPE_MEMCARD};
+static u8 s_OnCardNv[SIZE_64K], s_OnCardSrm[SIZE_8K], s_OnCardMcr[SIZE_2K];
+static u8 *const s_OnCard[3] = {s_OnCardNv, s_OnCardSrm, s_OnCardMcr};
+static const size_t s_OnCardMax[3] = {SIZE_64K, SIZE_8K, SIZE_2K};
+static size_t s_nOnCard[3];
+
+// the save data in memory is now what the card holds
+static void RememberOnCard (unsigned nType)
+{
+	size_t nSize = 0;
+	const void *pData = geo_mem_ptr (s_MemType[nType], &nSize);
+	s_nOnCard[nType] = 0;
+	if (pData && nSize > 0 && nSize <= s_OnCardMax[nType])
+	{
+		memcpy (s_OnCard[nType], pData, nSize);
+		s_nOnCard[nType] = nSize;
+	}
+}
+
+// only what changed since it was read or written
 void CKernel::SaveGameData (void)
 {
 	if (m_nLoaded < 0)
@@ -205,9 +227,18 @@ void CKernel::SaveGameData (void)
 	}
 	for (unsigned i = 0; i < 3; i++)
 	{
+		size_t nSize = 0;
+		const void *pData = geo_mem_ptr (s_MemType[i], &nSize);
+		if (pData && nSize == s_nOnCard[i] && memcmp (pData, s_OnCard[i], nSize) == 0)
+		{
+			continue;
+		}
 		char Path[160];
 		GamePath (Path, sizeof Path, SaveExt (i));
-		geo_savedata_save (i, Path);
+		if (geo_savedata_save (i, Path) == 1)
+		{
+			RememberOnCard (i);
+		}
 	}
 }
 
@@ -348,7 +379,14 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	{
 		char SavePath[160];
 		GamePath (SavePath, sizeof SavePath, SaveExt (i));
-		geo_savedata_load (i, SavePath);
+		if (geo_savedata_load (i, SavePath) == 1)
+		{
+			RememberOnCard (i);
+		}
+		else
+		{
+			s_nOnCard[i] = 0;		// not on the card yet
+		}
 	}
 
 	geo_lspc_set_palette (0);		// resistor network palette (as on hardware)
