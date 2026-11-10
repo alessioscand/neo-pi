@@ -81,6 +81,9 @@ that only arcade games can give you.
   as on the original hardware with a CRT
 - *Lazy finger* (turbo buttons): Select + B toggles it; while on, holding
   A, B, C or D fires repeatedly
+- CPU speed: NORMAL runs the 68000 as on the hardware; TURBO runs it
+  twice as fast, for fewer slowdowns where the original slows down. On a
+  Pi 3, TURBO may slow down the heaviest games instead
 - Save states: one slot per game
 
 **Picture**
