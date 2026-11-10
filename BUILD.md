@@ -45,8 +45,8 @@ Build host: Linux x86_64.
    pads) comes first and the picture drawn after it is shown at the next vsync.
 
    **snes_ntsc** 0.2.2 by Shay Green (blargg), LGPL 2.1+, in `third_party/snes_ntsc`,
-   unmodified: the COMPOSITE filter. `src/composite.c` includes it with its own
-   configuration; `src/tvcore.cpp` runs it on core 2, one line at a time as core 1
+   unmodified: the COMPOSITE filter. `common/composite.c` includes it with its own
+   configuration; `common/tvcore.cpp` runs it on core 2, one line at a time as core 1
    finishes it.
 5. `./build.sh all` builds `build/rpi4/kernel8-rpi4.img` and `build/rpi3/kernel8.img`.
    The Geolith core is compiled with `-O3` (the rest of neo-pi and Circle with `-O2`):

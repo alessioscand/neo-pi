@@ -39,7 +39,7 @@ static void AudioCallback (size_t nValues)
 	g_nAudioFrames = nValues / 2;		// the core counts int16 values (L+R)
 }
 
-// Light resampler (default since 0.6.2-rc1): the core hands over the raw
+// Light resampler (the default): the core hands over the raw
 // YM2610 output (about 56.3 kHz) and it is brought to 48 kHz by linear
 // interpolation, carrying the position and the last sample across frames.
 // Same rate ratio as Geolith's Speex path, a fraction of its cost (Speex at
