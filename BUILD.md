@@ -52,9 +52,10 @@ Build host: Linux x86_64.
    The Geolith core is compiled with `-O3` (the rest of neo-pi and Circle with `-O2`):
    on a Pi 3 it halves the frames that miss 60 Hz in heavy scenes, with identical
    emulation. `GEO_OPTIMIZE=-O2 ./build.sh 3` builds the core the old way, for comparison.
-6. **Raspberry Pi firmware**: raspberrypi/firmware commit 0641c5bf (the one Circle uses),
-   copied into `dist/sd/` (bootcode.bin, start*.elf, fixup*.dat, bcm2711-*.dtb,
-   armstub8-rpi4.bin, LICENCE.broadcom).
+6. **Raspberry Pi firmware** in `third_party/rpi-firmware`, unmodified (raspberrypi/firmware
+   commit 0641c5bf, the one Circle uses; see `COMMIT`): bootcode.bin, start*.elf, fixup*.dat,
+   bcm2711-*.dtb, LICENCE.broadcom, and Circle's armstub8-rpi4.bin. `make_release.sh` puts
+   them on the card.
 7. `./make_release.sh` checks and packages `dist/neo-pi-<version>-sd.zip` (see below).
 
 ## Source files
@@ -114,7 +115,7 @@ To read it, keep the `.elf` of the kernel that produced it:
 
 ## Release
 `./make_release.sh` (after `./build.sh all`) checks that both kernels are built
-and carry the version in `src/project.h`, that the firmware files are in `dist/sd/`
-and that no BIOS, games, BENCH file or other user data are in the package, then
+and carry the version in `src/project.h`, that the firmware (`third_party/rpi-firmware/`) and the
+card files (`dist/sd/`) are there and that no BIOS, games, BENCH file or other user data are in the package, then
 writes `dist/neo-pi-<version>-sd.zip`. The source archive comes from the GitHub
 release itself (tag `v<version>`).
