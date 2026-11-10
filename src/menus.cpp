@@ -4,6 +4,10 @@
 #include "kernel.h"
 #include "frame.h"
 
+extern "C" {
+#include "geo.h"		// geo_set_div68k (CPU SPEED)
+}
+
 void CKernel::ShowUIFrame (boolean bWait, const char *pTopMessage)
 {
 	FrameDrawPicture (m_pUI->GetBuffer ());
@@ -96,12 +100,12 @@ unsigned CKernel::RunList (unsigned nSel)
 
 void CKernel::RunSystemMenu (boolean bInGame)
 {
-	enum { SmSystem, SmRegion, SmFilter, SmControls, SmPower, SmCount };
+	enum { SmSystem, SmRegion, SmCpu, SmFilter, SmControls, SmPower, SmCount };
 	static const unsigned Regions[4] = {REGION_EU, REGION_US, REGION_JP, REGION_AS};
 
 	unsigned nSel = 0;
 	u32 nPrev = ~0u;
-	unsigned nOldSystem = m_nSystem, nOldRegion = m_nRegion, nOldFilter = m_nFilter;
+	unsigned nOldSystem = m_nSystem, nOldRegion = m_nRegion, nOldFilter = m_nFilter, nOldCpu = m_nCpuSpeed;
 	const char *pMsg = "";
 	unsigned nFrame = 0;
 
@@ -159,6 +163,16 @@ void CKernel::RunSystemMenu (boolean bInGame)
 				m_nRegion = Regions[i];
 				break; }
 
+			case SmCpu:
+				// the 68000 as on the hardware, or twice as fast against the
+				// slowdowns; applies at once
+				m_nCpuSpeed = m_nCpuSpeed == CPU_TURBO ? CPU_NORMAL : CPU_TURBO;
+				if (m_nLoaded >= 0)
+				{
+					geo_set_div68k (m_nCpuSpeed != CPU_TURBO);
+				}
+				break;
+
 			case SmFilter:
 				if (m_bFilterAllowed)
 				{
@@ -202,7 +216,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 			break;
 		}
 
-		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "SCANLINES", "CONTROLS", "POWER OFF"};
+		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "SCANLINES", "CONTROLS", "POWER OFF"};
 		TMenuItem Items[SmCount];
 		for (unsigned i = 0; i < SmCount; i++)
 		{
@@ -213,6 +227,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		Items[SmSystem].pValue = SystemName ();
 		Items[SmRegion].pValue = m_nSystem == SYS_UNI ? "SET IN UNIBIOS" : RegionName (m_nRegion);
 		Items[SmRegion].bDisabled = m_nSystem == SYS_UNI;
+		Items[SmCpu].pValue = m_nCpuSpeed == CPU_TURBO ? "TURBO" : "NORMAL";
 		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE"};
 		// not allowed only on a Pi 3 with multicore=off
 		// ("MULTICORE ONLY" does not fit next to SCANLINES)
@@ -220,7 +235,11 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		Items[SmFilter].bDisabled = !m_bFilterAllowed;
 
 		const char *pShow = pMsg;
-		if (!pShow[0] && (m_nSystem != nOldSystem || m_nRegion != nOldRegion))
+		if (!pShow[0] && nSel == SmCpu)
+		{
+			pShow = m_nCpuSpeed == CPU_TURBO ? "FEWER SLOWDOWNS" : "AS THE REAL HARDWARE";
+		}
+		else if (!pShow[0] && (m_nSystem != nOldSystem || m_nRegion != nOldRegion))
 		{
 			pShow = "APPLIES TO NEXT GAME";
 		}
@@ -230,12 +249,13 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		ShowUIFrame ();
 	}
 
-	if (m_nSystem != nOldSystem || m_nRegion != nOldRegion || m_nFilter != nOldFilter)
+	if (m_nSystem != nOldSystem || m_nRegion != nOldRegion || m_nFilter != nOldFilter || m_nCpuSpeed != nOldCpu)
 	{
 		SaveConfig ();
 		char Line[120];
-		snprintf (Line, sizeof Line, "New settings: system %s, region %s, filter %s",
-			  SystemName (), RegionName (m_nRegion), FilterName (m_nFilter));
+		snprintf (Line, sizeof Line, "New settings: system %s, region %s, CPU speed %s, filter %s",
+			  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
+			  FilterName (m_nFilter));
 		Log (Line, COLOR_TEXT);
 	}
 	if ((m_nSystem != nOldSystem || m_nRegion != nOldRegion) && m_nLoaded >= 0)

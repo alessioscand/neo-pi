@@ -24,6 +24,7 @@ void FrameSync (void);			// wait until cores 1 and 2 have finished the frame
 void FrameRephase (void);		// after a reset or a loaded state (see pacing.h)
 
 void FrameLinesToScreen (boolean bOn);	// core 1 passes each finished line on
+boolean FrameTvInit (void);		// COMPOSITE's tables (about 4 MB, built once)
 void FrameSetComposite (boolean bOn);
 boolean FrameIsComposite (void);
 void FrameSetRaced (boolean bOn);	// this frame is beam raced

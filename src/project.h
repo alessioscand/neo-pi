@@ -5,11 +5,19 @@
 #define PROJECT_H
 
 #define PROJECT_NAME	"neo-pi"
-#define PROJECT_VERSION	"1.0.0"
+#define PROJECT_VERSION	"1.1.0"
 
 /* The emulated picture */
 #define PROJECT_WIDTH	304
 #define PROJECT_HEIGHT	224
+
+/* TV filter (common/tvcore, common/composite): one line in (304 pixels
+   0x00RRGGBB), the filtered line out (COMP_OUT_W) */
+#define PROJECT_TV_IN_BYTES	(304 * 4)
+#define PROJECT_TV_OUT_W	714
+
+/* Players: one pad each (common/input) */
+#define PROJECT_PLAYERS	2
 
 /* Buttons besides the directions, START and SELECT: A B C D */
 #define PROJECT_BUTTONS	4

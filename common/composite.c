@@ -1,5 +1,5 @@
 /*
- * COMPOSITE: blargg's snes_ntsc 0.2.2 (LGPL 2.1+, third_party/snes_ntsc,
+ * The TV filter: blargg's snes_ntsc 0.2.2 (LGPL 2.1+, third_party/snes_ntsc,
  * unmodified) with our own configuration: RGB565 in (converted from
  * 0x00RRGGBB), 0x00RRGGBB out, one line at a time.
  */
@@ -23,28 +23,41 @@
 
 #include "composite.h"
 
-typedef char check_out_width [SNES_NTSC_OUT_WIDTH (COMP_IN_W) == COMP_OUT_W ? 1 : -1];
+#define MAX_IN_W	512		/* longest line in */
 
 size_t composite_size (void)
 {
 	return sizeof (snes_ntsc_t);
 }
 
-void composite_init (void *pMem)
+void composite_init (void *pMem, const TCompLook *pLook)
 {
 	snes_ntsc_setup_t Setup = snes_ntsc_composite;
+	if (pLook)
+	{
+		Setup.artifacts  = pLook->fArtifacts;
+		Setup.fringing   = pLook->fFringing;
+		Setup.bleed      = pLook->fBleed;
+		Setup.sharpness  = pLook->fSharpness;
+		Setup.resolution = pLook->fResolution;
+		Setup.saturation = pLook->fSaturation;
+	}
 	Setup.merge_fields = 0;		/* the real thing: artifacts crawl and shimmer */
 	snes_ntsc_init ((snes_ntsc_t *) pMem, &Setup);
 }
 
-void composite_line (const void *pTables, const unsigned *pIn, unsigned nPhase, unsigned *pOut)
+void composite_line (const void *pTables, const unsigned *pIn, unsigned nInW, unsigned nPhase, unsigned *pOut)
 {
-	unsigned short In[COMP_IN_W];
-	for (unsigned x = 0; x < COMP_IN_W; x++)
+	unsigned short In[MAX_IN_W];
+	if (nInW > MAX_IN_W)
+	{
+		nInW = MAX_IN_W;
+	}
+	for (unsigned x = 0; x < nInW; x++)
 	{
 		unsigned p = pIn[x];
 		In[x] = (unsigned short) (((p >> 8) & 0xF800) | ((p >> 5) & 0x07E0) | ((p >> 3) & 0x001F));
 	}
-	snes_ntsc_blit ((const snes_ntsc_t *) pTables, In, COMP_IN_W, (int) (nPhase % COMP_PHASES),
-			COMP_IN_W, 1, pOut, COMP_OUT_W * 4);
+	snes_ntsc_blit ((const snes_ntsc_t *) pTables, In, nInW, (int) (nPhase % COMP_PHASES),
+			nInW, 1, pOut, COMP_OUT_WIDTH (nInW) * 4);
 }

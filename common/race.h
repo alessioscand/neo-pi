@@ -31,15 +31,15 @@
 #include "raster.h"
 #include "project.h"
 
-#define RACE_ROWS	PROJECT_HEIGHT
+#define RACE_ROWS	PROJECT_HEIGHT		// the most rows a picture can have
 
 class CBeamRacer
 {
 public:
 	CBeamRacer (CRaster *pRaster);
 
-	// framebuffer line of the first game row, CPU scale m, HVS factor k
-	void SetGeometry (unsigned nGameY, unsigned nM, unsigned nK);
+	// framebuffer line of the first game row, CPU scale m, HVS factor k, rows
+	void SetGeometry (unsigned nGameY, unsigned nM, unsigned nK, unsigned nRows = RACE_ROWS);
 	void Restart (void);			// new game, after a pause: large margins again
 	void Rearm (void);			// a game started from the list: try again after Failed()
 
@@ -80,6 +80,7 @@ public:
 
 private:
 	CRaster *m_pRaster;
+	unsigned m_nRows;
 	unsigned m_Need[RACE_ROWS];		// output line that sets each row's deadline
 
 	volatile u64 m_Deadline[RACE_ROWS];

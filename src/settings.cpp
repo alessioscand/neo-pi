@@ -66,7 +66,7 @@ void CKernel::ApplyVideoMode (void)
 	{
 		// the filter's tables, built the first time COMPOSITE is used
 		unsigned t0 = CTimer::GetClockTicks ();
-		if (TvInit ())
+		if (FrameTvInit ())
 		{
 			char Msg[100];
 			unsigned nMs = (CTimer::GetClockTicks () - t0) / 1000;
@@ -155,6 +155,7 @@ void CKernel::LoadConfig (void)
 	BlankComments (Text);
 
 	if (strstr (Text, "system=AES"))	m_nSystem = SYS_AES;
+	if (strstr (Text, "cpu=turbo"))		m_nCpuSpeed = CPU_TURBO;
 	if (strstr (Text, "system=UNIBIOS"))	m_nSystem = SYS_UNI;	// checked against neogeo.zip later
 	if (strstr (Text, "region=USA"))	m_nRegion = REGION_US;
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
@@ -198,9 +199,10 @@ void CKernel::LoadConfig (void)
 		}
 	}
 
-	char Line[140];
-	snprintf (Line, sizeof Line, "Settings: system %s, region %s, filter %s, USB polling %s%s, resampler %s",
-		  SystemName (), RegionName (m_nRegion), FilterName (m_nFilter),
+	char Line[160];
+	snprintf (Line, sizeof Line, "Settings: system %s, region %s, CPU speed %s, filter %s, USB polling %s%s, resampler %s",
+		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
+		  FilterName (m_nFilter),
 		  UsbPollName (), g_nUSBInterruptPollMs ? " Hz" : "", m_bSpeex ? "speex" : "linear");
 	Log (Line, COLOR_TEXT);
 	char Delay[16];
@@ -216,8 +218,8 @@ void CKernel::LoadConfig (void)
 void CKernel::SaveConfig (void)
 {
 	char Text[200];
-	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\nfilter=%s\r\n%s",
-		  SystemName (), RegionName (m_nRegion),
+	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\ncpu=%s\r\nfilter=%s\r\n%s",
+		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
 	if (g_nUSBInterruptPollMs != 1)
 	{

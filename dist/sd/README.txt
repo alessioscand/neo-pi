@@ -1,10 +1,17 @@
-neo-pi 1.0.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
+neo-pi 1.1.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
 ============================================================================
 
-WHAT'S NEW IN 1.0.0
+WHAT'S NEW IN 1.1.0
 
-  - The first stable release: the code has been reorganised from top to
-    bottom, also to provide future support for CRT monitors.
+  - OPTIONS > CPU SPEED: TURBO runs the 68000 at twice its speed, for
+    fewer slowdowns (see below).
+  - Menu font: a clearer 7.
+  - Alignment of the code shared with the other projects (nes-pi,
+    m92-pi).
+  - Save data (MVS memory, cartridge RAM, memory card) is written to the
+    card only when it has changed.
+  - In neopi/neopi.cfg, a line starting with # is a comment.
+  - Only two pads are used: a third one is ignored.
   - To update a card, copy the new files over the old ones: BIOS, games,
     saves, settings and pads.cfg in neopi are kept and work as before.
 
@@ -90,6 +97,10 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
   REGION        EUROPE / USA / JAPAN / ASIA: the BIOS region (language,
                 censorship), from the next game. With UNIBIOS the region
                 is set in the Universe BIOS menu.
+  CPU SPEED     NORMAL: the original 12 MHz. TURBO: 24 MHz: less slowdown
+                where the original hardware slows down. Some games may
+                behave differently; NORMAL is the accurate setting. On a
+                Pi 3, TURBO may slow down the heaviest games.
   SCANLINES     OFF / LIGHT / MEDIUM / STRONG / COMPOSITE. COMPOSITE has no
                 scanlines: blargg's NTSC filter gives the look of a
                 composite video connection of the time. Each line is

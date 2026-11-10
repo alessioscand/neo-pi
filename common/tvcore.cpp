@@ -1,32 +1,31 @@
 /*
- * COMPOSITE on core 2 (see tvcore.h)
+ * The TV filter's core (see tvcore.h)
  *
- * One ring of lines, written by core 1 (or core 0 without multicore) only at
- * the head and by core 2 only at the tail (the same scheme as the video chip
- * on core 1): release and acquire on the two counters, dsb + sev to wake the
- * other side from wfe.
+ * One ring of lines, written by the producer only at the head and by the TV
+ * filter's core only at the tail: release and acquire on the two counters,
+ * dsb + sev to wake the other side from wfe.
  */
 #include "tvcore.h"
 #include "smp.h"
-#include <circle/new.h>
 #include <circle/util.h>
 
 #define RING	256				// lines: more than a frame
 
 struct TTvLine
 {
-	u32	 Src[COMP_IN_W];
+	u8	 Src[PROJECT_TV_IN_BYTES];
 	unsigned nPhase;
 	unsigned nRow;
 	boolean	 bRace;
+	u32	 *pOut;
 };
 
 static TTvLine s_Ring[RING];
 static unsigned s_nHead;			// written by the producer only
-static unsigned s_nTail;			// written by core 2 only
-static boolean s_bAlive = FALSE;		// core 2 is running the loop
-static boolean s_bDead = FALSE;			// core 2 stopped answering
-static void *s_pTables = 0;
+static unsigned s_nTail;			// written by the TV filter's core only
+static boolean s_bAlive = FALSE;		// the core is running the loop
+static boolean s_bDead = FALSE;			// the core stopped answering
+static TTvFilter *s_pFilter = 0;
 static TTvLineOut *s_pOut = 0;
 
 // time spent (for LOG.TXT); only one side processes at a time
@@ -35,14 +34,15 @@ static unsigned s_nLines;
 
 static void Process (const TTvLine *e)
 {
-	static u32 Out[2][COMP_OUT_W];		// [0] core 2, [1] the caller without it
-	u32 *pOut = Out[SharedLoad (s_bAlive) && !SharedLoad (s_bDead) ? 0 : 1];
+	static u32 Out[2][PROJECT_TV_OUT_W];	// [0] the TV filter's core, [1] the caller
+	const unsigned nSide = TvWorkerAlive () ? 0 : 1;
+	u32 *pOut = e->pOut ? e->pOut : Out[nSide];
 	u64 t0 = Ticks ();
-	composite_line (s_pTables, e->Src, e->nPhase, pOut);
+	s_pFilter (e->Src, e->nPhase, pOut);
 	u64 t1 = Ticks ();
 	if (s_pOut)
 	{
-		s_pOut (e->nRow, pOut, e->bRace);
+		s_pOut (e->nRow, pOut, e->bRace, nSide);
 	}
 	u64 t2 = Ticks ();
 	SharedStore (s_nFilterTicks, s_nFilterTicks + (t1 - t0));
@@ -50,24 +50,15 @@ static void Process (const TTvLine *e)
 	SharedStore (s_nLines, s_nLines + 1);
 }
 
-boolean TvInit (void)
+void TvSetFilter (TTvFilter *pFilter)
 {
-	if (s_pTables == 0)
-	{
-		void *p = new u8[composite_size ()];
-		if (p == 0)
-		{
-			return FALSE;
-		}
-		composite_init (p);
-		SharedRelease (s_pTables, p);
-	}
-	return TRUE;
+	TvSync ();
+	SharedRelease (s_pFilter, pFilter);
 }
 
 boolean TvReady (void)
 {
-	return s_pTables != 0;
+	return s_pFilter != 0;
 }
 
 void TvSetOutput (TTvLineOut *pOut)
@@ -113,7 +104,7 @@ void TvSync (void)
 	{
 		if (Ticks () > nLimit)
 		{
-			// core 2 stopped answering: finish here, without it from now on
+			// the core stopped answering: finish here, without it from now on
 			SharedStore (s_bDead, (boolean) TRUE);
 			for (unsigned t = SharedLoad (s_nTail); t != s_nHead; t++)
 			{
@@ -125,9 +116,9 @@ void TvSync (void)
 	}
 }
 
-void TvPost (const u32 *pSource, unsigned nPhase, unsigned nRow, boolean bRace)
+void TvPost (const void *pSource, unsigned nPhase, unsigned nRow, boolean bRace, u32 *pOut)
 {
-	if (s_pTables == 0)
+	if (s_pFilter == 0)
 	{
 		return;
 	}
@@ -138,6 +129,7 @@ void TvPost (const u32 *pSource, unsigned nPhase, unsigned nRow, boolean bRace)
 		Line.nPhase = nPhase;
 		Line.nRow = nRow;
 		Line.bRace = bRace;
+		Line.pOut = pOut;
 		Process (&Line);
 		return;
 	}
@@ -145,7 +137,7 @@ void TvPost (const u32 *pSource, unsigned nPhase, unsigned nRow, boolean bRace)
 	if (h - SharedAcquire (s_nTail) >= RING)
 	{
 		TvSync ();			// full (never in practice)
-		TvPost (pSource, nPhase, nRow, bRace);
+		TvPost (pSource, nPhase, nRow, bRace, pOut);
 		return;
 	}
 	TTvLine *e = &s_Ring[h & (RING - 1)];
@@ -153,6 +145,7 @@ void TvPost (const u32 *pSource, unsigned nPhase, unsigned nRow, boolean bRace)
 	e->nPhase = nPhase;
 	e->nRow = nRow;
 	e->bRace = bRace;
+	e->pOut = pOut;
 	SharedRelease (s_nHead, h + 1);
 	SignalEvent ();
 }

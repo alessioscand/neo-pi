@@ -325,6 +325,7 @@ boolean CKernel::LoadGame (unsigned nIndex)
 	geo_mixer_init ();
 	FrameAudioStart (m_bSpeex);
 	geo_init ();
+	geo_set_div68k (m_nCpuSpeed != CPU_TURBO);	// TURBO: the 68000 without its clock divider
 	geo_set_region ((int) m_nRegion);
 	ClearVideoMemory ();
 	snprintf (Line, sizeof Line, "  system %s, region %s", SystemName (), RegionName (m_nRegion));

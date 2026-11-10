@@ -67,6 +67,7 @@ CKernel::CKernel (void)
 	m_nSystem (SYS_MVS),
 	m_nRegion (REGION_EU),
 	m_nFilter (0),
+	m_nCpuSpeed (CPU_NORMAL),
 	m_bHVS (TRUE),
 	m_bSpeex (FALSE),
 	m_bMultiCore (TRUE),

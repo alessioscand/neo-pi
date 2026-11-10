@@ -1,35 +1,42 @@
 /*
- * COMPOSITE on core 2.
+ * The TV filter's core: a whole core that filters the picture one line at a
+ * time.
  *
- * Core 1 draws the video chip's lines; with COMPOSITE it queues each finished
- * line for core 2 and goes on. Core 2 runs blargg's filter on it (COMP_IN_W
- * -> COMP_OUT_W pixels) and hands it to the output callback, which scales it
- * onto the screen and tells the beam racer. Nothing waits for a whole frame:
- * no added lag, beam racing still works. Without core 2 (multicore=off, or it
- * stops answering) the lines are filtered by the caller instead.
+ * The core that finishes a line queues it here and goes on; the TV filter's
+ * core runs the project's filter on it (PROJECT_TV_IN_BYTES in,
+ * PROJECT_TV_OUT_W pixels out) and hands it to the output callback, which
+ * puts it on screen and tells the beam racer. Nothing waits for a whole
+ * frame: no added lag, beam racing still works. If that core does not run,
+ * or stops answering, the lines are filtered by the caller instead.
+ *
+ * The project starts the core (CMultiCoreSupport) and calls TvWorkerRun ()
+ * from it; the filter itself is the project's own.
  */
 #ifndef TVCORE_H
 #define TVCORE_H
 
 #include <circle/types.h>
-#include "composite.h"
+#include "project.h"
 
-// called for each filtered line (on core 2, or on the caller without it)
-typedef void TTvLineOut (unsigned nRow, const u32 *pNtsc, boolean bRace);
+// one line: the source in, the filtered pixels (0x00RRGGBB) out
+typedef void TTvFilter (const void *pSource, unsigned nPhase, u32 *pOut);
 
-// the filter's tables (about 4 MB, built once; takes a moment)
-boolean TvInit (void);
+// called for each filtered line; nSide = 0 on the TV filter's core, 1 on the
+// caller (each side needs its own scratch)
+typedef void TTvLineOut (unsigned nRow, const u32 *pFiltered, boolean bRace, unsigned nSide);
+
+void TvSetFilter (TTvFilter *pFilter);	// once the filter is ready to use
 boolean TvReady (void);
-
 void TvSetOutput (TTvLineOut *pOut);
 
-// core 2's loop (from CMultiCoreSupport::Run); never returns
+// the TV filter's core loop (from CMultiCoreSupport::Run); never returns
 void TvWorkerRun (void);
 boolean TvWorkerAlive (void);
 
-// queues one line: COMP_IN_W pixels 0x00RRGGBB (copied), its burst phase,
-// its row in the picture, whether the frame is raced
-void TvPost (const u32 *pSource, unsigned nPhase, unsigned nRow, boolean bRace);
+// queues one line: PROJECT_TV_IN_BYTES of source (copied), its colour burst
+// phase, its row in the picture, whether the frame is raced, and where the
+// filtered pixels go (0: a scratch line)
+void TvPost (const void *pSource, unsigned nPhase, unsigned nRow, boolean bRace, u32 *pOut = 0);
 
 // waits until every queued line has been filtered and drawn
 void TvSync (void);

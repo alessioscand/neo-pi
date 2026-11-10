@@ -15,6 +15,7 @@
 
 CBeamRacer::CBeamRacer (CRaster *pRaster)
 :	m_pRaster (pRaster),
+	m_nRows (RACE_ROWS),
 	m_nMinSlack (0),
 	m_nLateRowsFrame (0),
 	m_nRowsDone (0),
@@ -39,9 +40,10 @@ CBeamRacer::CBeamRacer (CRaster *pRaster)
 	ResetStats ();
 }
 
-void CBeamRacer::SetGeometry (unsigned nGameY, unsigned nM, unsigned nK)
+void CBeamRacer::SetGeometry (unsigned nGameY, unsigned nM, unsigned nK, unsigned nRows)
 {
-	for (unsigned r = 0; r < RACE_ROWS; r++)
+	m_nRows = nRows < RACE_ROWS ? nRows : RACE_ROWS;
+	for (unsigned r = 0; r < m_nRows; r++)
 	{
 		int n = (int) ((nGameY + r * nM) * nK) - (int) nK - 2;
 		m_Need[r] = n > 0 ? (unsigned) n : 0;
@@ -98,7 +100,7 @@ u64 CBeamRacer::PlanFrame (u64 nNow)
 	m_bStarted = TRUE;
 
 	u64 nOrigin = R->Origin (k);
-	for (unsigned r = 0; r < RACE_ROWS; r++)
+	for (unsigned r = 0; r < m_nRows; r++)
 	{
 		m_Deadline[r] = nOrigin + (u64) R->ComposeOffset (m_Need[r]);
 	}

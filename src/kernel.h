@@ -69,6 +69,9 @@ int snprintf (char *pBuffer, size_t nSize, const char *pFormat, ...);
 #define COLOR_DIM	RGB (140, 140, 140)
 
 // OPTIONS > SYSTEM
+#define CPU_NORMAL	0		// the 68000 at 12 MHz, as on the hardware
+#define CPU_TURBO	1		// twice as fast: fewer slowdowns
+
 #define SYS_MVS		0
 #define SYS_AES		1
 #define SYS_UNI		2		// MVS hardware with the Universe BIOS
@@ -227,6 +230,7 @@ private:
 	unsigned		 m_nSystem;	// SYS_MVS, SYS_AES, SYS_UNI
 	unsigned		 m_nRegion;	// REGION_*
 	unsigned		 m_nFilter;	// FILTER_*
+	unsigned		 m_nCpuSpeed;	// CPU_NORMAL, CPU_TURBO
 	boolean			 m_bHVS;	// FALSE: scaler=cpu
 	boolean			 m_bSpeex;	// resampler=speex
 	boolean			 m_bMultiCore;	// FALSE: multicore=off

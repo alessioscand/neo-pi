@@ -7,6 +7,8 @@
 #include "racing.h"
 #include "smp.h"
 #include "tvcore.h"
+#include "composite.h"
+#include <circle/new.h>
 
 extern "C" {
 #include "geo.h"
@@ -22,7 +24,7 @@ unsigned g_nAudioFrames;
 
 static CScreen *s_pVideo = 0;
 static u32 s_Line[GAME_W * 8], s_Dark[GAME_W * 8];	// core 1's scanline buffers
-static u32 s_TvLine[GAME_W * 8];			// core 2's
+static u32 s_TvLine[2][GAME_W * 8];		// core 2's, and the caller's without it
 
 // read by core 1 for each line
 static boolean s_bComposite = FALSE;
@@ -123,14 +125,39 @@ static void LineDone (unsigned nScanline)
 	}
 }
 
-// core 2 (or the caller without it): a filtered line
-static void TvLineOut (unsigned nRow, const u32 *pNtsc, boolean bRace)
+// core 2 (or the caller without it, nSide 1): a filtered line
+static void TvLineOut (unsigned nRow, const u32 *pNtsc, boolean bRace, unsigned nSide)
 {
-	s_pVideo->DrawNtscLine (nRow, pNtsc, COMP_OUT_W, s_TvLine);
+	s_pVideo->DrawNtscLine (nRow, pNtsc, COMP_OUT_W, s_TvLine[nSide]);
 	if (bRace)
 	{
 		RaceRowDone (nRow);
 	}
+}
+
+// COMPOSITE: blargg's own composite look, on the game's lines
+static_assert (COMP_OUT_W == PROJECT_TV_OUT_W, "project.h: PROJECT_TV_OUT_W");
+static void *s_pTables = 0;
+
+static void CompositeLine (const void *pSource, unsigned nPhase, u32 *pOut)
+{
+	composite_line (s_pTables, (const unsigned *) pSource, GAME_W, nPhase, pOut);
+}
+
+boolean FrameTvInit (void)
+{
+	if (s_pTables == 0)
+	{
+		void *p = new u8[composite_size ()];
+		if (p == 0)
+		{
+			return FALSE;
+		}
+		composite_init (p, 0);
+		s_pTables = p;
+		TvSetFilter (CompositeLine);
+	}
+	return TRUE;
 }
 
 void FrameSetup (CScreen *pVideo)
