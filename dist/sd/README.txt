@@ -142,7 +142,9 @@ LOW INPUT LAG
 PIXEL PERFECT
 
   Integer scaling only (square pixels, never stretched), with black
-  borders. 1080p: 1216x896 picture. 720p: 912x672 picture.
+  borders. 1080p: 1216x896 picture. 720p: 912x672 picture, which on
+  some monitors fills more of the screen (less black around it); to
+  use it, change hdmi_mode=16 to hdmi_mode=4 in config.txt.
 
 TESTING OPTIONS (in neopi/neopi.cfg, one per line)
 
