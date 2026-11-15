@@ -5,7 +5,7 @@
 #define PROJECT_H
 
 #define PROJECT_NAME	"neo-pi"
-#define PROJECT_VERSION	"1.1.0"
+#define PROJECT_VERSION	"1.2.0"
 
 /* The emulated picture, inside Geolith's buffer (320 x 264, pitch 320) */
 #define PROJECT_WIDTH	304

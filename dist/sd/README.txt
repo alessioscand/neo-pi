@@ -1,17 +1,24 @@
-neo-pi 1.1.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
+neo-pi 1.2.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
 ============================================================================
 
-WHAT'S NEW IN 1.1.0
+WHAT'S NEW IN 1.2.0
 
-  - OPTIONS > CPU SPEED: TURBO runs the 68000 at twice its speed, for
-    fewer slowdowns (see below).
-  - Menu font: a clearer 7.
-  - Alignment of the code shared with the other projects (nes-pi,
-    m92-pi).
-  - Save data (MVS memory, cartridge RAM, memory card) is written to the
-    card only when it has changed.
-  - In neopi/neopi.cfg, a line starting with # is a comment.
-  - Only two pads are used: a third one is ignored.
+  - New look, shared with s16-pi and m92-pi: dark grid of diamonds
+    behind the menus, panels with a thick frame, the logo above the game
+    list, the list in the BIOS's own letters.
+  - OPTIONS > BEZEL: what is around the picture while playing.
+    GRID+INFO (default): the grid, and at 1080p the game's title, maker
+    and year above the picture (from the .neo file). GRID: the grid
+    only. INFO: the texts on black. OFF: black. The border is drawn
+    once, never during play.
+  - Status line (Select + C) and messages beside the picture, in the
+    left and right columns, at 720p too. They are redrawn only when they
+    change: no more flickering lines.
+  - At 1080p the picture is scaled 2x by the CPU and 2x by the video
+    scaler, so that the texts around it are sharp.
+  - POWER OFF: only the countdown box, over the paused game.
+  - CONTROLS: to skip a function, press a button already assigned: it
+    stays unassigned (shown as -).
   - To update a card, copy the new files over the old ones: BIOS, games,
     saves, settings and pads.cfg in neopi are kept and work as before.
 
@@ -49,8 +56,9 @@ SETTING UP THE CONTROLS
   B, C, D, START, SELECT/COIN. After the last one, the set-up is saved
   (SAVED).
 
-  Directions need no set-up: the d-pad, hat and left stick always work. A
-  button already assigned is ignored. On a keyboard, Esc cancels.
+  Directions need no set-up: the d-pad, hat and left stick always work.
+  To skip a function, press a button already assigned: it stays
+  unassigned (shown as -). On a keyboard, Esc cancels.
 
   The set-up applies to every pad of the same model and is stored in
   neopi/pads.cfg. To redo it: OPTIONS (D in the game list) > CONTROLS.
@@ -108,19 +116,26 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
                 added lag. On a Pi 3 the scanlines and COMPOSITE need
                 multicore: with multicore=off this item shows MULTICORE
                 OFF.
+  BEZEL         Around the picture while playing: GRID+INFO, GRID, INFO
+                or OFF (see WHAT'S NEW). In neopi.cfg: bezel=gridinfo,
+                grid, info or off.
   CONTROLS      Set up a pad (with several pads, press a button on the one
                 to set up).
   POWER OFF     As in the in-game menu.
 
 STATUS LINE (Select + C)
 
-  Below the picture:
+  In the left column, at the bottom, one item per line:
 
-    60 FPS   LOAD 62%   39 C   DLY 6.5   1080P 4X CPU+HVS
+    FPS 60
+    LOAD 62%
+    CPU 39 C
+    DELAY 6.5 MS
+    1080P 4X CPU+HVS
 
   - LOAD: how much of each frame is used (green; yellow from 75%; red
     above 95%).
-  - DLY: the frame delay in ms. With beam racing, RACE instead: the ms
+  - DELAY: the frame delay in ms. With beam racing, RACE instead: the ms
     from reading the pads to sending the top of the picture to the TV.
 
 LOW INPUT LAG
