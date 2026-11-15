@@ -416,7 +416,7 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 			 const TMenuItem *pItems, unsigned nItems, unsigned nSel,
 			 const char *pMessage, u32 nMessageColor,
 			 const TButtonHint *pHints, unsigned nHints, const char *pFooter,
-			 unsigned nRows, boolean bMoreAbove, boolean bMoreBelow)
+			 boolean bWide, unsigned nRows, boolean bMoreAbove, boolean bMoreBelow)
 {
 	const TUITheme &T = g_Theme;
 	Backdrop (bOverGame);
@@ -426,7 +426,7 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 	const int nInner = 22 + (int) nSpace * nStep + 22;	// title + rows + message line
 	int y0 = (190 - nInner) / 2 + 4;
 	if (y0 < 4) y0 = 4;
-	const int x0 = 44, x1 = UI_W - 45;
+	const int x0 = bWide ? 12 : 44, x1 = bWide ? UI_W - 13 : UI_W - 45;
 	Panel (x0, y0, x1, y0 + nInner + 8);
 
 	// 25 characters fit in the panel: a longer title is cut at a word

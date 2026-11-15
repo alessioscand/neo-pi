@@ -68,14 +68,16 @@ public:
 		       boolean bOverGame, unsigned nTicks);
 	// the picture behind the next menus, darkened: call when they open
 	void SnapshotGame (const u32 *pGameBuf);
-	// A panel with a title and rows. nRows: sized for that many rows (a list
-	// that scrolls keeps its shape); bMoreAbove / bMoreBelow: arrows in the
-	// corners, more rows out of view
+	// A panel with a title and rows. bWide: as wide as the game list (DIP
+	// SWITCHES: MAME's names, label and value up to 30 characters); nRows:
+	// sized for that many rows (a list that scrolls keeps its shape);
+	// bMoreAbove / bMoreBelow: arrows on the frame, more rows out of view
 	void DrawPanelMenu (boolean bOverGame, const char *pTitle,
 			    const TMenuItem *pItems, unsigned nItems, unsigned nSel,
 			    const char *pMessage, u32 nMessageColor,
 			    const TButtonHint *pHints, unsigned nHints, const char *pFooter,
-			    unsigned nRows = 0, boolean bMoreAbove = FALSE, boolean bMoreBelow = FALSE);
+			    boolean bWide = FALSE, unsigned nRows = 0,
+			    boolean bMoreAbove = FALSE, boolean bMoreBelow = FALSE);
 	// a small box alone, over the paused game or the background
 	void DrawBox (boolean bOverGame, const char *pLine1, const char *pLine2, const TButtonHint *pHint);
 	// CONTROLS: nStep = the slot being asked (A B C D START SELECT, then E F
