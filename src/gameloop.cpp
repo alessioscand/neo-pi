@@ -666,8 +666,8 @@ boolean CKernel::PlayMenu (const u32 Pad[2])
 	return TRUE;
 }
 
-// black bands: the status line at the bottom, messages at the top (only while
-// playing)
+// beside the picture, only while playing: the status line in the left
+// column, the messages in the right one
 void CKernel::PlayDrawBands (void)
 {
 	TPlay &P = m_Play;
