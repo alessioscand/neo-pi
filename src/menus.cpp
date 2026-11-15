@@ -11,9 +11,9 @@ extern "C" {
 void CKernel::ShowUIFrame (boolean bWait, const char *pTopMessage)
 {
 	UpdateBezel ();
-	// no game behind the menu: no filter, so that its grid and the border's
-	// are one
-	FrameDrawPicture (m_pUI->GetBuffer (), m_nLoaded >= 0);
+	// a menu over the grid (no game behind it): no filter, so that its grid
+	// and the border's are one
+	FrameDrawPicture (m_pUI->GetBuffer (), m_nLoaded >= 0 && !m_pUI->ShowsGrid ());
 	if (pTopMessage && pTopMessage[0])
 	{
 		// in the left column, where the status line goes while playing

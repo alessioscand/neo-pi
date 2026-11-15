@@ -45,8 +45,10 @@ struct TUITheme
 
 extern const TUITheme g_Theme;
 
-// The background (the menus' and the border's "grid") at a pixel of the
-// picture, 0xRRGGBB; x and y can be outside it (the border), even negative
+// The background (the menus' and the border's "grid"), 0xRRGGBB, at a game
+// pixel counted from the screen's centre, x and y >= 0: the same towards
+// every side, so that the grid is symmetric; ThemeGround: its empty colour
 u32 ThemeGrid (int x, int y);
+u32 ThemeGround (void);
 
 #endif

@@ -57,5 +57,11 @@ const TUITheme g_Theme =
 // the grid: a lattice of diamonds, a line every 16 pixels along both diagonals
 u32 ThemeGrid (int x, int y)
 {
+	// a lattice of diamonds, two diagonals crossing at the centre
 	return ((x + y) & 15) == 0 || ((x - y) & 15) == 0 ? 0x122344 : 0x060E1E;
+}
+
+u32 ThemeGround (void)
+{
+	return 0x060E1E;
 }

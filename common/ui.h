@@ -57,6 +57,8 @@ public:
 	CUI (void);
 
 	u32 *GetBuffer (void)	{ return m_Buf; }
+	// the last menu is over the grid (no game behind): shown with no filter
+	boolean ShowsGrid (void) const	{ return m_bGrid; }
 
 	// another font for the game list's titles (neo-pi: the BIOS's own)
 	void SetListFont (const unsigned char (*pFont)[8], boolean bLower);
@@ -110,6 +112,7 @@ private:
 	u32	m_Snapshot[GAME_SRC_PITCH * GAME_SRC_LINES];
 	const unsigned char (*m_pListFont)[8];
 	boolean	m_bListLower;
+	boolean	m_bGrid;
 	int	m_nClipX0, m_nClipX1;	// Pixel draws only inside (a scrolling title)
 };
 

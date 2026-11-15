@@ -86,6 +86,8 @@ private:
 		       unsigned nTextScale, const CCharGenerator &Font);
 	// the border
 	struct TTarget { u32 *pBase; unsigned nPitch, nW, nH; };	// where text goes
+	void GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const;
+	u32 GridPixel (unsigned x, unsigned y) const;		// framebuffer order
 	u32 BgPixel (unsigned x, unsigned y) const;		// framebuffer order
 	void FillBorder (unsigned nBuf);
 	void DrawInfoLines (unsigned nBuf);
@@ -126,6 +128,7 @@ private:
 	TRect	 m_Text[2][2];			// [buffer][right column]: text drawn there
 	u32	 m_nTextSum[2][2];		// and what it says (0 = nothing)
 	u32	*m_pBlock;			// a column's text, prepared before the copy
+	u32	*m_pGridPic;			// the grid where the picture goes (the UI's GRID_HOLE)
 
 	u32 Native (u32 c) const		// RGB() (R low) -> framebuffer order
 	{

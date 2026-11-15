@@ -14,13 +14,20 @@
 
 #define MAX_LINE	(GAME_W * 8)		// longest scaled line we support
 
-// the border: the theme's grid (ThemeGrid), the same as behind the menus
+// the border: the theme's grid (ThemeGrid), the same as behind the menus.
+// Around a game it gives way to the background colour near the picture:
+// nothing within GRID_CLEAR game pixels, then a retro dither (4x4 Bayer)
+// up to GRID_FADE, where the grid is whole
+#define GRID_CLEAR	6
+#define GRID_FADE	32
+static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
 // the text: Area51 at 2 screen pixels per font pixel
 #define TEXT_H		7			// font pixels: capitals and digits
 #define TEXT_PITCH	12			// between lines
 #define INFO_WHITE	0xECECECu
 #define INFO_GREY	0x808A8Fu
+#define INFO_NEAR	6			// title and buttons: from the picture
 #define SIDE_LINES	8
 #define SIDE_CHARS	48
 #define BLOCK_H		(SIDE_LINES * TEXT_PITCH * 2 + 4)	// a column's text, 2x
@@ -53,6 +60,7 @@ CVideoOut::CVideoOut (void)
 	m_nBezelId (0),
 	m_bBezelDrawn (FALSE),
 	m_pBlock (0),
+	m_pGridPic (0),
 	m_pLine (0),
 	m_pDark (0),
 
@@ -71,6 +79,7 @@ CVideoOut::~CVideoOut (void)
 	delete [] m_pLine;
 	delete [] m_pDark;
 	delete [] m_pBlock;
+	delete [] m_pGridPic;
 }
 
 boolean CVideoOut::Allocate (unsigned nWidth, unsigned nHeight)
@@ -224,6 +233,21 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nColTop = m_nGameY > m_nGap ? m_nGameY : m_nGap;
 	m_nColBot = m_nGameY + nGameH;
 	if (m_nColBot > m_nHeight - m_nGap) m_nColBot = m_nHeight - m_nGap;
+
+	// the grid where the picture goes, for the menus with no game
+	delete [] m_pGridPic;
+	m_pGridPic = new u32[nGameW * nGameH];
+	if (m_pGridPic == 0)
+	{
+		return FALSE;
+	}
+	for (unsigned y = 0; y < nGameH; y++)
+	{
+		for (unsigned x = 0; x < nGameW; x++)
+		{
+			m_pGridPic[y * nGameW + x] = GridPixel (m_nGameX + x, m_nGameY + y);
+		}
+	}
 
 	// the border: drawn again by the next SetBezel
 	m_bBezelDrawn = FALSE;			// Allocate cleared both buffers
@@ -401,7 +425,21 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 	for (unsigned s = 0; s < M; s++)
 	{
 		const u32 *pSrcLine = s >= M - nDarkRows ? pDark : pLine;
-		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pSrcLine, nGameW * 4);
+		u32 *pRow = Row (nBuffer, nDstY + s) + m_nGameX;
+		memcpy (pRow, pSrcLine, nGameW * 4);
+		if (!bFilter)
+		{
+			// the menus: where they show the grid, the screen's own, offset
+			// by half a game pixel, which the UI cannot draw
+			const u32 *pGrid = m_pGridPic + (y * M + s) * nGameW;
+			for (unsigned x = 0; x < GAME_W; x++)
+			{
+				if (pSrc[x] == GRID_HOLE)
+				{
+					memcpy (pRow + x * M, pGrid + x * M, M * 4);
+				}
+			}
+		}
 	}
 	FbFlush ();			// the line is in memory before the HVS reads it
 }
@@ -442,18 +480,50 @@ void CVideoOut::DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32
 
 // ---------------------------------------------------------------- the border
 
+// The grid at a framebuffer pixel. It is counted in game pixels from the
+// screen's centre, the same towards every side, so that it is symmetric
+// around the picture: the centre falls between two framebuffer pixels, and
+// the +1 makes the game pixels (M framebuffer pixels) meet there
+void CVideoOut::GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const
+{
+	const unsigned W2 = m_nWidth / 2, H2 = m_nHeight / 2;
+	const unsigned cx = x >= W2 ? x - W2 : W2 - 1 - x;
+	const unsigned cy = y >= H2 ? y - H2 : H2 - 1 - y;
+	*pGX = (int) ((cx + 1) / m_nM);
+	*pGY = (int) ((cy + 1) / m_nM);
+}
+
+u32 CVideoOut::GridPixel (unsigned x, unsigned y) const
+{
+	int gx, gy;
+	GridAt (x, y, &gx, &gy);
+	const u32 c = ThemeGrid (gx, gy);
+	return Native (RGB ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF));
+}
+
 u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 {
 	if (!(m_nBezel & BEZEL_GRID))
 	{
 		return 0xFF000000u;
 	}
-	// the picture's pixel this one belongs to (negative: left of or above it)
-	const int M = (int) m_nM;
-	const int dx = (int) x - (int) m_nGameX, dy = (int) y - (int) m_nGameY;
-	const int gx = dx >= 0 ? dx / M : -((-dx + M - 1) / M);
-	const int gy = dy >= 0 ? dy / M : -((-dy + M - 1) / M);
-	const u32 c = ThemeGrid (gx, gy);
+	if (m_nBezelId == 0)
+	{
+		return GridPixel (x, y);			// no game: the grid, whole
+	}
+	// around a game: how far from the picture, in game pixels
+	int gx, gy;
+	GridAt (x, y, &gx, &gy);
+	int d = gx - GAME_W / 2;
+	if (gy - GAME_H / 2 > d) d = gy - GAME_H / 2;
+	if (d >= GRID_FADE)
+	{
+		return GridPixel (x, y);
+	}
+	// smoothstep (d / FADE) against the dither's threshold, in integers
+	const int v = d * d * (3 * GRID_FADE - 2 * d);
+	const int t = (2 * s_Bayer[gy & 3][gx & 3] + 1) * (GRID_FADE * GRID_FADE * GRID_FADE / 32);
+	const u32 c = d < GRID_CLEAR || v <= t ? ThemeGround () : ThemeGrid (gx, gy);
 	return Native (RGB ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF));
 }
 
@@ -567,9 +637,9 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 {
 	const TTarget T = {Row (nBuf, 0), m_nPitchPx, m_nWidth, m_nHeight};
 	const unsigned U = m_nU, nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
-	const unsigned nTop = (m_nGameY - TEXT_H * U) / 2;
-	const unsigned nBelow = m_nHeight - m_nGameY - nGameH;
-	const unsigned nBottom = m_nGameY + nGameH + (nBelow - TEXT_H * U) / 2;
+	// near the picture, inside the clear strip before the grid's first line
+	const unsigned nTop = m_nGameY - (TEXT_H + INFO_NEAR) * U;
+	const unsigned nBottom = m_nGameY + nGameH + INFO_NEAR * U;
 
 	unsigned x = m_nGameX;
 	if (m_Info.pTitle)

@@ -19,6 +19,7 @@ static const u8 s_Ellipsis[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x92, 0x00}
 CUI::CUI (void)
 :	m_pListFont (g_Theme.pListFont),
 	m_bListLower (g_Theme.bListLower),
+	m_bGrid (FALSE),
 	m_nClipX0 (0),
 	m_nClipX1 (UI_W)
 {
@@ -85,7 +86,8 @@ const char *BezelName (unsigned nBezel, boolean bMenu)
 
 // ---- pieces ----------------------------------------------------------------
 
-// the whole picture, not only the layout: it goes on in the border
+// the whole picture: the screen's grid shows through (GRID_HOLE), the same
+// as in the border
 void CUI::Background (void)
 {
 	for (int y = 0; y < GAME_H; y++)
@@ -93,9 +95,10 @@ void CUI::Background (void)
 		u32 *p = &m_Buf[(y + GAME_SRC_Y) * GAME_SRC_PITCH + GAME_SRC_X];
 		for (int x = 0; x < GAME_W; x++)
 		{
-			p[x] = ARGB (ThemeGrid (x, y));
+			p[x] = GRID_HOLE;
 		}
 	}
+	m_bGrid = TRUE;
 }
 
 // the paused game (darkened) or, with no game loaded, the background
@@ -104,6 +107,7 @@ void CUI::Backdrop (boolean bOverGame)
 	if (bOverGame)
 	{
 		memcpy (m_Buf, m_Snapshot, sizeof m_Buf);
+		m_bGrid = FALSE;
 	}
 	else
 	{
@@ -521,6 +525,7 @@ void CUI::DrawBlack (void)
 	{
 		m_Buf[i] = 0xFF000000u;
 	}
+	m_bGrid = FALSE;
 }
 
 void CUI::DrawLoading (const char *pName, unsigned nPercent)
