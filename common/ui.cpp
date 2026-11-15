@@ -447,8 +447,9 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 				Fill (x0 + 12 + t, y + t, 1, 8 - 2 * t, T.nCursor);
 			}
 		}
+		// on the band everything is white (POWER OFF too: the band may be red)
 		u32 nColor = pItems[n].bDisabled ? Dim (T.nDim, 55) : (bSel ? UI_WHITE : T.nDim);
-		if (   !pItems[n].bDisabled
+		if (   !pItems[n].bDisabled && !bSel
 		    && (strcmp (pItems[n].pLabel, "POWER OFF") == 0 || strcmp (pItems[n].pLabel, "CLEAR MEMORY") == 0))
 		{
 			nColor = T.nPower;
@@ -456,7 +457,7 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 		Text (x0 + 22, y, pItems[n].pLabel, nColor);
 		if (pItems[n].pValue)
 		{
-			const u32 nValColor = pItems[n].bDisabled ? Dim (T.nDim, 45) : (bSel ? T.nValue : Dim (T.nDim, 75));
+			const u32 nValColor = pItems[n].bDisabled ? Dim (T.nDim, 45) : (bSel ? UI_WHITE : Dim (T.nDim, 75));
 			Text (x1 - 10 - (int) strlen (pItems[n].pValue) * 8, y, pItems[n].pValue, nValColor);
 		}
 	}
