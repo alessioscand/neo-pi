@@ -1,7 +1,7 @@
 /*
  * neo-pi - the game loop: pads to the Neo Geo panels, one emulated frame per
  * screen frame (beam raced, or double buffered with a frame delay), the
- * in-game menu, the messages and the status line in the black bands
+ * in-game menu, the messages and the status line beside the picture
  */
 #include "kernel.h"
 #include "frame.h"
@@ -10,7 +10,7 @@
 #include "racing.h"
 #include "stats.h"
 #include "smp.h"
-#include "fontdata.h"
+#include "fonts.h"
 
 extern "C" {
 #include "geo.h"
@@ -105,6 +105,7 @@ static unsigned WaitForFrameStart (boolean bRace, boolean bPlaying, unsigned nLa
 void CKernel::RunGame (void)
 {
 	PlayStart ();
+	UpdateBezel ();			// the title and the buttons around the picture
 	m_pInput->RestartDiagnostics ();		// log the pad reports of this game too
 	m_ActLED.On ();			// steady while playing (no firmware call every second)
 
@@ -342,8 +343,7 @@ void CKernel::PlayReadPanels (const u32 Pad[2], TPlayInput *pIn)
 			if (nNew & BTN_B)
 			{
 				P.bLazy[p] = !P.bLazy[p];
-				snprintf (P.Toast, sizeof P.Toast, "%sLAZY FINGER %s",
-					  p == 0 ? "" : "P2 ", P.bLazy[p] ? "ON" : "OFF");
+				snprintf (P.Toast, sizeof P.Toast, "LAZY FINGER\nP%u %s", p + 1, P.bLazy[p] ? "ON" : "OFF");
 				P.nToast = 60;
 				Log (P.bLazy[p] ? "  lazy finger on" : "  lazy finger off", COLOR_TEXT);
 			}
@@ -460,7 +460,7 @@ unsigned CKernel::PlayFrame (boolean bRace, boolean bScreenshot, unsigned *pT0, 
 		*pOddFrame = TRUE;
 		// the frame on screen, before emulating the next one
 		const char *pFile = SaveScreenshot ();
-		snprintf (P.Toast, sizeof P.Toast, pFile ? "SCREENSHOT SAVED  %s" : "SCREENSHOT FAILED", pFile);
+		snprintf (P.Toast, sizeof P.Toast, pFile ? "SHOT SAVED" : "SHOT FAILED");
 		P.nToast = 60;
 	}
 	if (bRace)
@@ -673,31 +673,32 @@ void CKernel::PlayDrawBands (void)
 	TPlay &P = m_Play;
 	if (m_bStatusOn && !P.bMenu && P.bStatusReady)
 	{
+		// "FPS 60", "LOAD 42%", "CPU 48°C", "RACE 3.2 MS", "1080P 4X CPU+HVS"
 		const CScreen::TTextSpan Spans[] =
 		{
-			{P.StFps, P.nFpsColor}, {"   LOAD ", UI_GREY}, {P.StLoad, P.nLoadColor},
-			{"   ", UI_GREY}, {P.StTemp, P.nTempColor},
-			{g_Race.bGame ? "   RACE " : "   DLY ", UI_GREY}, {P.StDelay, UI_WHITE},
-			{"   ", UI_GREY}, {P.StRes, UI_WHITE}, {P.StScale, UI_GREY}
+			{"FPS ", UI_GREY}, {P.StFps, P.nFpsColor}, {"\nLOAD ", UI_GREY}, {P.StLoad, P.nLoadColor},
+			{"\nCPU ", UI_GREY}, {P.StTemp, P.nTempColor},
+			{g_Race.bGame ? "\nRACE " : "\nDELAY ", UI_GREY}, {P.StDelay, UI_WHITE},
+			{"\n", UI_GREY}, {P.StRes, UI_GREY}, {P.StScale, UI_GREY}
 		};
-		m_Video.DrawBandText (FALSE, Spans, sizeof Spans / sizeof Spans[0]);
+		m_Video.DrawSideText (FALSE, Spans, sizeof Spans / sizeof Spans[0]);
 		m_nClearStatus = 2;
 	}
 	else if (m_nClearStatus)
 	{
-		m_Video.DrawBandText (FALSE, 0, 0);
+		m_Video.DrawSideText (FALSE, 0, 0);
 		m_nClearStatus--;
 	}
 	if (P.nToast && !P.bMenu)
 	{
 		const CScreen::TTextSpan Span = {P.Toast, UI_WHITE};
-		m_Video.DrawBandText (TRUE, &Span, 1);
+		m_Video.DrawSideText (TRUE, &Span, 1);
 		P.nToast--;
 		P.nClearToast = 2;
 	}
 	else if (P.nClearToast)
 	{
-		m_Video.DrawBandText (TRUE, 0, 0);
+		m_Video.DrawSideText (TRUE, 0, 0);
 		P.nClearToast--;
 	}
 }
@@ -718,9 +719,9 @@ void CKernel::PlayStatusLine (unsigned nNow, unsigned *pNextDeadline)
 	}
 
 	if (nFPS100 >= 5995)
-		snprintf (P.StFps, sizeof P.StFps, "%u FPS", (nFPS100 + 50) / 100);
+		snprintf (P.StFps, sizeof P.StFps, "%u", (nFPS100 + 50) / 100);
 	else
-		snprintf (P.StFps, sizeof P.StFps, "%u.%u FPS", nFPS100 / 100, (nFPS100 % 100) / 10);
+		snprintf (P.StFps, sizeof P.StFps, "%u.%u", nFPS100 / 100, (nFPS100 % 100) / 10);
 	P.nFpsColor = nFPS100 < 5990 ? UI_WARN : UI_WHITE;
 	unsigned nLoad = P.nWorkMax * 100 / 16667;
 	snprintf (P.StLoad, sizeof P.StLoad, "%u%%", nLoad);
@@ -735,11 +736,11 @@ void CKernel::PlayStatusLine (unsigned nNow, unsigned *pNextDeadline)
 	if (g_Race.bGame)
 	{
 		unsigned us = (unsigned) g_Race.pRaster->TicksToUs ((s64) g_Race.pRacer->GetPadToPicture ());
-		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u", us / 1000, (us % 1000) / 100);
+		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u MS", us / 1000, (us % 1000) / 100);
 	}
 	else
 	{
-		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u", g_Delay.nUs / 1000, (g_Delay.nUs % 1000) / 100);
+		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u MS", g_Delay.nUs / 1000, (g_Delay.nUs % 1000) / 100);
 	}
 	unsigned k = m_Video.GetHVSFactor (), S = m_Video.GetScale ();
 	snprintf (P.StScale, sizeof P.StScale, " %uX %s", S,

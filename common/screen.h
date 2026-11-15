@@ -1,23 +1,23 @@
 /*
- * neo-pi - the screen: what the kernel draws the game, the menus and the
- * console on
+ * The screen: what the kernel draws the game, the menus and the console on
  *
  * The kernel uses only this interface. CVideoOut (video.cpp) is the HDMI
  * screen; another output (a CRT on the composite jack) would be another
- * implementation, in its own files, chosen in kernel.h.
+ * implementation, in its own files.
  */
-#ifndef SCREEN_H
-#define SCREEN_H
+#ifndef COMMON_SCREEN_H
+#define COMMON_SCREEN_H
 
 #include <circle/types.h>
+#include "project.h"
 
-// Neo Geo visible area inside the Geolith buffer (320 x 264, pitch 320)
-#define GAME_SRC_PITCH   320
-#define GAME_SRC_LINES   264
-#define GAME_SRC_X       8
-#define GAME_SRC_Y       24
-#define GAME_W           304
-#define GAME_H           224
+// The game's buffer and the visible picture inside it (project.h)
+#define GAME_SRC_PITCH   PROJECT_SRC_PITCH
+#define GAME_SRC_LINES   PROJECT_SRC_LINES
+#define GAME_SRC_X       PROJECT_SRC_X
+#define GAME_SRC_Y       PROJECT_SRC_Y
+#define GAME_W           PROJECT_WIDTH
+#define GAME_H           PROJECT_HEIGHT
 
 #define FILTER_NONE	0
 #define FILTER_SCAN_LIGHT  1	// dark rows at 75%
@@ -25,6 +25,10 @@
 #define FILTER_SCAN_STRONG 3	// dark rows at 25%
 #define FILTER_COMPOSITE   4	// blargg's NTSC filter (tvcore.h), no dark rows
 #define FILTER_COUNT	5
+
+// What is around the picture: with a game, OPTIONS > BEZEL; with none, the grid
+#define BEZEL_GRID	1	// the background (theme.h); else black
+#define BEZEL_INFO	2	// the game's title and buttons (where there is room)
 
 // Logical colours (R in the low byte); the screen converts them if the
 // framebuffer stores red in the high byte (Pi 4)
@@ -63,8 +67,9 @@ public:
 			       u32 nFG, u32 nBG) = 0;
 	virtual void ClearRows (unsigned nBuffer, unsigned nFirstRow, unsigned nRows, u32 nColor) = 0;
 
-	// The visible GAME_W x GAME_H area into the back buffer
-	virtual void DrawGame (const u32 *pSource) = 0;
+	// The visible GAME_W x GAME_H area into the back buffer; bFilter = FALSE:
+	// no scanlines (the menus with no game behind them)
+	virtual void DrawGame (const u32 *pSource, boolean bFilter = TRUE) = 0;
 	// one line of it, with the caller's scratch lines (GAME_W * 8 pixels each):
 	// called by core 1 as each line is finished
 	virtual void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark) = 0;
@@ -72,9 +77,26 @@ public:
 	// game width; pLine = scratch (GAME_W * 8)
 	virtual void DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine) = 0;
 
-	// One centred line of text in the top or bottom black band (no spans = clear)
+	// The border around the picture: nMode = BEZEL_GRID and / or BEZEL_INFO
+	// (0: black). Drawn in both buffers when the mode or nId (the game)
+	// changes; SetGameMode forgets it
+	struct TBezelInfo
+	{
+		const char *pTitle;			// "GOLDEN AXE"
+		const char *pMaker;			// "SEGA 1989"
+		const char *pButtons[6];		// buttons A..F, 0 after the last
+	};
+	virtual void SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId) = 0;
+
+	// Text beside the picture, '\n' starts a new line (a line too long for
+	// the column wraps at a space). Left column: lines right-aligned to the
+	// picture, the last one level with its bottom (status line, CONNECT A USB
+	// GAMEPAD); right column: left-aligned, the first one level with its top
+	// (messages). Where the columns are too narrow (a 4:3 display) the left
+	// column goes in the band below the picture and the right one in the band
+	// above, on one line. No spans = clear.
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
-	virtual void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans) = 0;
+	virtual void DrawSideText (boolean bRight, const TTextSpan *pSpans, unsigned nSpans) = 0;
 
 	// for the log
 	virtual unsigned GetPixelOrder (void) const = 0;

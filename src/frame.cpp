@@ -242,9 +242,9 @@ void FrameDraw (void)
 
 // the menus and screens go through the same filter as the game, with a fixed
 // colour burst phase, so the dots do not crawl on still text
-void FrameDrawPicture (u32 *pBuffer)
+void FrameDrawPicture (u32 *pBuffer, boolean bFilter)
 {
-	if (s_bComposite)
+	if (s_bComposite && bFilter)
 	{
 		for (unsigned y = 0; y < GAME_H; y++)
 		{
@@ -253,7 +253,7 @@ void FrameDrawPicture (u32 *pBuffer)
 		TvSync ();
 		return;
 	}
-	s_pVideo->DrawGame (pBuffer);
+	s_pVideo->DrawGame (pBuffer, bFilter);
 }
 
 unsigned FrameMcFailFrame (void)

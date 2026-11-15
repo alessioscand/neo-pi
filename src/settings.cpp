@@ -94,6 +94,7 @@ void CKernel::ApplyVideoMode (void)
 		  m_Video.GetHVSFactor (), m_Video.GetScale () / m_Video.GetHVSFactor (),
 		  FilterName (m_Video.GetFilter ()), m_bHVS ? "" : " (scaler=cpu)");
 	Log (Line, COLOR_TEXT);
+	UpdateBezel ();
 	snprintf (Line, sizeof Line, "Video: pixel order %s (%u), red in the %s byte%s",
 		  m_Video.GetPixelOrder () ? "RGB" : "BGR", m_Video.GetPixelOrder (),
 		  m_Video.IsRedLow () ? "low" : "high", "");
@@ -102,6 +103,27 @@ void CKernel::ApplyVideoMode (void)
 		  m_Video.GetWCPages () ? "on" : "FAILED",
 		  m_Video.GetWCPages ());
 	Log (Line, COLOR_TEXT);
+}
+
+// the border around the picture: with no game loaded always the grid; with
+// a game, OPTIONS > BEZEL, with the game's title, maker and year
+void CKernel::UpdateBezel (void)
+{
+	if (m_nLoaded < 0)
+	{
+		m_Video.SetBezel (BEZEL_GRID, 0, 0);
+		return;
+	}
+	// the title and "SNK 1992" from the .neo header (games.cpp); the buttons
+	// are not known yet
+	CScreen::TBezelInfo Info;
+	Info.pTitle = m_pGames[m_nLoaded].Name;
+	Info.pMaker = m_pGames[m_nLoaded].Info;
+	for (unsigned i = 0; i < 6; i++)
+	{
+		Info.pButtons[i] = 0;
+	}
+	m_Video.SetBezel (m_nBezel, &Info, 1 + (unsigned) m_nLoaded);
 }
 
 // usbpoll= value for the log and neopi.cfg
@@ -166,6 +188,10 @@ void CKernel::LoadConfig (void)
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
+	if (strstr (Text, "bezel=off"))			m_nBezel = 0;
+	else if (strstr (Text, "bezel=gridinfo"))	m_nBezel = BEZEL_GRID | BEZEL_INFO;
+	else if (strstr (Text, "bezel=grid"))		m_nBezel = BEZEL_GRID;
+	else if (strstr (Text, "bezel=info"))		m_nBezel = BEZEL_INFO;
 	// (multicore and the scanlines on a Pi 3: decided after LoadConfig, also
 	// when neopi.cfg does not exist yet)
 	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
@@ -200,9 +226,9 @@ void CKernel::LoadConfig (void)
 	}
 
 	char Line[160];
-	snprintf (Line, sizeof Line, "Settings: system %s, region %s, CPU speed %s, filter %s, USB polling %s%s, resampler %s",
+	snprintf (Line, sizeof Line, "Settings: system %s, region %s, CPU speed %s, filter %s, bezel %s, USB polling %s%s, resampler %s",
 		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
-		  FilterName (m_nFilter),
+		  FilterName (m_nFilter), BezelName (m_nBezel, FALSE),
 		  UsbPollName (), g_nUSBInterruptPollMs ? " Hz" : "", m_bSpeex ? "speex" : "linear");
 	Log (Line, COLOR_TEXT);
 	char Delay[16];
@@ -221,6 +247,12 @@ void CKernel::SaveConfig (void)
 	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\ncpu=%s\r\nfilter=%s\r\n%s",
 		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
+	if (m_nBezel != (BEZEL_GRID | BEZEL_INFO))
+	{
+		strcat (Text, "bezel=");
+		strcat (Text, BezelName (m_nBezel, FALSE));
+		strcat (Text, "\r\n");
+	}
 	if (g_nUSBInterruptPollMs != 1)
 	{
 		strcat (Text, "usbpoll=");

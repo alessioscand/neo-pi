@@ -7,9 +7,13 @@
 #define PROJECT_NAME	"neo-pi"
 #define PROJECT_VERSION	"1.1.0"
 
-/* The emulated picture */
+/* The emulated picture, inside Geolith's buffer (320 x 264, pitch 320) */
 #define PROJECT_WIDTH	304
 #define PROJECT_HEIGHT	224
+#define PROJECT_SRC_PITCH	320		/* the game's buffer */
+#define PROJECT_SRC_LINES	264
+#define PROJECT_SRC_X	8			/* the picture in it */
+#define PROJECT_SRC_Y	24
 
 /* TV filter (common/tvcore, common/composite): one line in (304 pixels
    0x00RRGGBB), the filtered line out (COMP_OUT_W) */

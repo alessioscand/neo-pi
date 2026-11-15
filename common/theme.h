@@ -1,0 +1,52 @@
+/*
+ * What makes the menus and the border one project's own: colours, fonts,
+ * logo, credits and the background ("grid"). Each project defines them in
+ * its src/theme.cpp; common/ui.cpp and common/video.cpp use them.
+ */
+#ifndef COMMON_THEME_H
+#define COMMON_THEME_H
+
+#include <circle/types.h>
+
+struct TUITheme
+{
+	const char	*pName;			// "S16-PI": the credits' title
+
+	// colours, 0xRRGGBB
+	u32		 nFrame1;		// the panels' frame
+	u32		 nFrame2;		// its outline, the separators
+	u32		 nPanel;		// inside a panel
+	u32		 nBand;			// the selected line
+	u32		 nCursor;		// the triangle on it
+	u32		 nTitle;		// panel titles, LOADING, the bar
+	u32		 nValue;		// values, counters
+	u32		 nDim;			// labels, names not selected
+	u32		 nPower;		// POWER OFF, CLEAR MEMORY
+
+	// fonts: 96 characters from 0x20, 8x8 (fonts.h)
+	const unsigned char (*pMenuFont)[8];
+	const unsigned char (*pListFont)[8];	// the game list's titles
+	boolean		 bListLower;		// it has lower case (else capitals)
+
+	// the logo above the game list: one string per row, one character per
+	// pixel; pLogoKeys[i] is drawn in pLogoColors[i], anything else is clear
+	const char *const *pLogo;
+	unsigned	 nLogoRows;
+	unsigned	 nLogoScale;		// 1 or 2
+	const char	*pLogoKeys;
+	const u32	*pLogoColors;
+
+	// credits: up to 10 rows "WHAT", "WHO", then two lines at the bottom
+	const char *const (*pCredits)[2];
+	unsigned	 nCredits;
+	const char	*pTrademark1;
+	const char	*pTrademark2;
+};
+
+extern const TUITheme g_Theme;
+
+// The background (the menus' and the border's "grid") at a pixel of the
+// picture, 0xRRGGBB; x and y can be outside it (the border), even negative
+u32 ThemeGrid (int x, int y);
+
+#endif

@@ -1,12 +1,12 @@
 /*
- * neo-pi - menu font: 8x8, characters 0x20-0x7F, bit 7 = left pixel.
  * "Matinee" from the ZX Origins collection by Damien Guard
- * (https://damieng.com/typography/zx-origins/), free for use in games
- * with credit. Character 0x7F is replaced with a degree sign drawn for neo-pi.
+ * (https://damieng.com/typography/zx-origins/), free for use in games with
+ * credit. 8x8, characters 0x20-0x7F, bit 7 = left pixel.
+ * Menus of neo-pi and nes-pi. Character 0x7F is a degree sign.
  */
-#include "fontdata.h"
+#include "fonts.h"
 
-const unsigned char g_MenuFont[96][8] =
+const unsigned char g_FontMatinee[96][8] =
 {
 	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},	//  
 	{0x38, 0x38, 0x38, 0x38, 0x00, 0x38, 0x38, 0x00},	// !

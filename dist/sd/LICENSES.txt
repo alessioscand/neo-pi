@@ -139,9 +139,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 ==============================================================================
-Menu font "Matinee" - ZX Origins by Damien Guard
+Fonts "Matinee" and "Area51" - ZX Origins by Damien Guard
 ==============================================================================
-The menu font is "Matinee" from the ZX Origins collection by Damien Guard,
+The menu font "Matinee" and "Area51" (the text around the picture) are from
+the ZX Origins collection by Damien Guard,
 https://damieng.com/typography/zx-origins/ - free to use in games with
 credit. Thank you, Damien.
 

@@ -10,18 +10,21 @@ extern "C" {
 
 void CKernel::ShowUIFrame (boolean bWait, const char *pTopMessage)
 {
-	FrameDrawPicture (m_pUI->GetBuffer ());
+	UpdateBezel ();
+	// no game behind the menu: no filter, so that its grid and the border's
+	// are one
+	FrameDrawPicture (m_pUI->GetBuffer (), m_nLoaded >= 0);
 	if (pTopMessage && pTopMessage[0])
 	{
-		// in the black band above the picture, like the in-game messages
-		const CVideoOut::TTextSpan Span = {pTopMessage, UI_ERR};
-		m_Video.DrawBandText (TRUE, &Span, 1);
+		// in the left column, where the status line goes while playing
+		const CScreen::TTextSpan Span = {pTopMessage, UI_ERR};
+		m_Video.DrawSideText (FALSE, &Span, 1);
 	}
 	else
 	{
-		m_Video.DrawBandText (TRUE, 0, 0);	// no status line or message over menus
+		m_Video.DrawSideText (FALSE, 0, 0);	// no status line or message over menus
 	}
-	m_Video.DrawBandText (FALSE, 0, 0);
+	m_Video.DrawSideText (TRUE, 0, 0);
 	m_Video.Flip ();
 	if (!bWait)
 	{
@@ -42,6 +45,8 @@ unsigned CKernel::RunList (unsigned nSel)
 	u32 nPrev = ~0u;		// require a release before acting
 	unsigned nRepeat = 0;
 	unsigned nFrame = 0;
+	unsigned nTicks = 0;		// frames since the selection changed
+	unsigned nShown = nSel;
 
 	while (1)
 	{
@@ -93,19 +98,22 @@ unsigned CKernel::RunList (unsigned nSel)
 		nPrev = n;
 
 		const char *pMsg = m_pInput->GetPadCount () == 0 ? "CONNECT A USB GAMEPAD" : "";
-		m_pUI->DrawList (m_pGames, m_nGames, nSel, "", m_nLoaded >= 0);
+		nTicks = nSel == nShown ? nTicks + 1 : 0;
+		nShown = nSel;
+		m_pUI->DrawList (m_pGames, m_nGames, nSel, m_nLoaded >= 0, nTicks);
 		ShowUIFrame (TRUE, pMsg);
 	}
 }
 
 void CKernel::RunSystemMenu (boolean bInGame)
 {
-	enum { SmSystem, SmRegion, SmCpu, SmFilter, SmControls, SmPower, SmCount };
+	enum { SmSystem, SmRegion, SmCpu, SmFilter, SmBezel, SmControls, SmPower, SmCount };
 	static const unsigned Regions[4] = {REGION_EU, REGION_US, REGION_JP, REGION_AS};
 
 	unsigned nSel = 0;
 	u32 nPrev = ~0u;
-	unsigned nOldSystem = m_nSystem, nOldRegion = m_nRegion, nOldFilter = m_nFilter, nOldCpu = m_nCpuSpeed;
+	unsigned nOldSystem = m_nSystem, nOldRegion = m_nRegion, nOldFilter = m_nFilter, nOldCpu = m_nCpuSpeed,
+		 nOldBezel = m_nBezel;
 	const char *pMsg = "";
 	unsigned nFrame = 0;
 
@@ -185,6 +193,10 @@ void CKernel::RunSystemMenu (boolean bInGame)
 				}
 				break;
 
+			case SmBezel:
+				m_nBezel = BezelNext (m_nBezel, nDir);	// drawn by the next frame
+				break;
+
 			case SmControls:
 				if (nNew & BTN_A)
 				{
@@ -216,7 +228,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 			break;
 		}
 
-		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "SCANLINES", "CONTROLS", "POWER OFF"};
+		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "SCANLINES", "BEZEL", "CONTROLS", "POWER OFF"};
 		TMenuItem Items[SmCount];
 		for (unsigned i = 0; i < SmCount; i++)
 		{
@@ -233,6 +245,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		// ("MULTICORE ONLY" does not fit next to SCANLINES)
 		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "MULTICORE OFF";
 		Items[SmFilter].bDisabled = !m_bFilterAllowed;
+		Items[SmBezel].pValue = BezelName (m_nBezel, TRUE);
 
 		const char *pShow = pMsg;
 		if (!pShow[0] && nSel == SmCpu)
@@ -249,13 +262,14 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		ShowUIFrame ();
 	}
 
-	if (m_nSystem != nOldSystem || m_nRegion != nOldRegion || m_nFilter != nOldFilter || m_nCpuSpeed != nOldCpu)
+	if (   m_nSystem != nOldSystem || m_nRegion != nOldRegion || m_nFilter != nOldFilter
+	    || m_nCpuSpeed != nOldCpu || m_nBezel != nOldBezel)
 	{
 		SaveConfig ();
-		char Line[120];
-		snprintf (Line, sizeof Line, "New settings: system %s, region %s, CPU speed %s, filter %s",
+		char Line[140];
+		snprintf (Line, sizeof Line, "New settings: system %s, region %s, CPU speed %s, filter %s, bezel %s",
 			  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
-			  FilterName (m_nFilter));
+			  FilterName (m_nFilter), BezelName (m_nBezel, FALSE));
 		Log (Line, COLOR_TEXT);
 	}
 	if ((m_nSystem != nOldSystem || m_nRegion != nOldRegion) && m_nLoaded >= 0)
@@ -317,14 +331,18 @@ int CKernel::ChoosePad (void)
 // keyboard cancels.
 boolean CKernel::RunMapping (unsigned nSlot, boolean bOverGame)
 {
-	static const char *Names[6] = {"A", "B", "C", "D", "START", "SELECT / COIN"};
+	// slots in the order of the logical bits: A B C D START SELECT;
+	// asked in the order A B C D SELECT START
+	enum { Slots = 6 };
+	static const char *Names[Slots] = {"A", "B", "C", "D", "START", "SELECT / COIN"};
+	static const unsigned SlotOfStep[Slots] = {0, 1, 2, 3, 5, 4};
 	const unsigned nSteps = MAP_COUNT - MAP_FIRST_BUTTON;
 
 	TBind Binds[MAP_COUNT];
 	memset (Binds, 0, sizeof Binds);
-	static char Values[6][16];
-	const char *pValues[6];
-	for (unsigned i = 0; i < 6; i++)
+	static char Values[Slots][16];
+	const char *pValues[Slots];
+	for (unsigned i = 0; i < Slots; i++)
 	{
 		Values[i][0] = '\0';
 		pValues[i] = Values[i];
@@ -375,28 +393,23 @@ boolean CKernel::RunMapping (unsigned nSlot, boolean bOverGame)
 			int nButton = m_pInput->CaptureButton (nSlot);
 			if (nButton >= 0)
 			{
-				boolean bUsed = FALSE;
-				for (unsigned i = 0; i < nStep; i++)
+				const unsigned nCur = SlotOfStep[nStep];
+				TBind &B = Binds[MAP_FIRST_BUTTON + nCur];
+				if (!CInput::IsButtonBound (Binds, MAP_COUNT, nButton))
 				{
-					if (Binds[MAP_FIRST_BUTTON + i].nIndex == (u8) nButton)
-					{
-						bUsed = TRUE;
-					}
-				}
-				if (!bUsed)
-				{
-					TBind &B = Binds[MAP_FIRST_BUTTON + nStep];
 					B.nType = BindButton;
 					B.nIndex = (u8) nButton;
 					B.nValue = 0;
-					CInput::DescribeBind (B, Values[nStep], sizeof Values[nStep]);
-					nStep++;
 				}
+				// a button already assigned skips this function: it stays unassigned
+				CInput::DescribeBind (B, Values[nCur], sizeof Values[nCur]);
+				nStep++;
 				bWaitRelease = TRUE;
 			}
 		}
 
-		m_pUI->DrawMapping (bOverGame, Title, (int) nStep, pValues, Footer);
+		m_pUI->DrawMapping (bOverGame, Title, nStep < nSteps ? (int) SlotOfStep[nStep] : Slots,
+				    pValues, Footer);
 		ShowUIFrame ();
 	}
 
@@ -404,7 +417,8 @@ boolean CKernel::RunMapping (unsigned nSlot, boolean bOverGame)
 	SavePads ();
 	for (unsigned i = 0; i < nSteps; i++)
 	{
-		snprintf (Line, sizeof Line, "  %s = %s", Names[i], Values[i]);
+		unsigned k = SlotOfStep[i];
+		snprintf (Line, sizeof Line, "  %s = %s", Names[k], Values[k]);
 		Log (Line, COLOR_TEXT);
 	}
 	Log ("  controls saved to neopi/pads.cfg", COLOR_TEXT);
@@ -413,7 +427,7 @@ boolean CKernel::RunMapping (unsigned nSlot, boolean bOverGame)
 	// "SAVED" for one second
 	for (unsigned f = 0; f < 60; f++)
 	{
-		m_pUI->DrawMapping (bOverGame, Title, (int) nSteps, pValues, Footer);
+		m_pUI->DrawMapping (bOverGame, Title, Slots, pValues, Footer);
 		ShowUIFrame ();
 	}
 	return TRUE;
@@ -421,8 +435,8 @@ boolean CKernel::RunMapping (unsigned nSlot, boolean bOverGame)
 
 boolean CKernel::PowerOffCountdown (void)
 {
-	// 3 seconds, B cancels; drawn over whatever the UI buffer shows
-	static u32 Saved[GAME_SRC_PITCH * GAME_SRC_LINES];
+	// 3 seconds, B cancels: a box alone, over the paused game or the grid
+	static u32 Saved[GAME_SRC_PITCH * GAME_SRC_LINES];	// the menu, for B
 	memcpy (Saved, m_pUI->GetBuffer (), sizeof Saved);
 	u32 nPrev = ~0u;
 	for (unsigned f = 0; f < 180; f++)
@@ -438,9 +452,8 @@ boolean CKernel::PowerOffCountdown (void)
 		}
 		char Line[24];
 		snprintf (Line, sizeof Line, "POWER OFF IN %u", 3 - f / 60);
-		memcpy (m_pUI->GetBuffer (), Saved, sizeof Saved);
 		static const TButtonHint Cancel = {'B', "CANCEL"};
-		m_pUI->DrawBox (Line, "", &Cancel);
+		m_pUI->DrawBox (m_nLoaded >= 0, Line, "", &Cancel);
 		ShowUIFrame ();
 	}
 	return TRUE;

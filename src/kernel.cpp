@@ -72,6 +72,7 @@ CKernel::CKernel (void)
 	m_bSpeex (FALSE),
 	m_bMultiCore (TRUE),
 	m_bFilterAllowed (TRUE),
+	m_nBezel (BEZEL_GRID | BEZEL_INFO),
 	m_bVSync (TRUE),
 	m_bStatusOn (FALSE),
 	m_nClearStatus (0)
@@ -288,15 +289,35 @@ void CKernel::LoadBIOS (void)
 		Log ("  system=UNIBIOS in neopi.cfg but no Universe BIOS: MVS", COLOR_ERR);
 	}
 	void *pFix = neopi_zip_extract (m_pBIOS, m_nBIOSSize, "sfix.sfix", &nFixSize);
-	if (pFix)
+	if (pFix && nFixSize >= 128 * 32)
 	{
-		m_pUI->SetFont ((const u8 *) pFix, nFixSize);
-		free (pFix);
+		// the console's own font for the game list: fix-layer tiles, 32 bytes,
+		// columns ordered 0x10, 0x18, 0x00, 0x08, low nibble = left pixel; in
+		// the BIOS font colour 1 is the glyph
+		static unsigned char Font[96][8];
+		static const unsigned Col[4] = {0x10, 0x18, 0x00, 0x08};
+		for (unsigned c = 32; c < 128; c++)
+		{
+			const u8 *t = (const u8 *) pFix + c * 32;
+			for (unsigned y = 0; y < 8; y++)
+			{
+				u8 nRow = 0;
+				for (unsigned p = 0; p < 4; p++)
+				{
+					u8 b = t[Col[p] + y];
+					if ((b & 0x0F) == 1) nRow |= 0x80 >> (p * 2);
+					if ((b >> 4) == 1)   nRow |= 0x80 >> (p * 2 + 1);
+				}
+				Font[c - 32][y] = nRow;
+			}
+		}
+		m_pUI->SetListFont (Font, TRUE);
 	}
 	else
 	{
 		Log ("  sfix.sfix not found in the BIOS: fallback font", COLOR_ERR);
 	}
+	free (pFix);
 }
 
 // the game the list starts on: the last one played (LAST.TXT)

@@ -1,8 +1,8 @@
 /*
- * neo-pi - HDMI output
+ * HDMI output
  *
  * Console mode: framebuffer at the HDMI resolution (boot text, errors).
- * Game mode: integer scaling of the 304x224 Neo Geo picture, split between
+ * Game mode: integer scaling of the game's picture (project.h), split between
  * the CPU (draw scale m) and the hardware scaler HVS (factor k), S = m * k:
  *   - the framebuffer is (display / k), so the HVS enlarges it exactly k times
  *     with the same factor in both directions (square pixels, no stretching);
@@ -10,9 +10,16 @@
  *   - if the display is not divisible by any useful k, k = 1 (CPU only).
  * Filters (applied while drawing, no extra buffering, no added lag):
  *   scanlines in three strengths (dark rows at 75%, 50% or 25%).
+ * The border (BEZEL): black, or the theme's grid going on around the
+ * picture; with a game, its title above the picture and its buttons below
+ * (only where the bands are tall enough: 1080p). Drawn once in both buffers
+ * when it changes. The status line and the messages go in the side columns,
+ * in the Area51 font with a hard shadow: drawn by the caller's core (core 0)
+ * only when they change, prepared apart and copied a finished row at a time,
+ * only over the border, so the line drawing (beam racing) does not change.
  */
-#ifndef VIDEO_H
-#define VIDEO_H
+#ifndef COMMON_VIDEO_H
+#define COMMON_VIDEO_H
 
 #include "screen.h"
 #include "smp.h"
@@ -49,13 +56,14 @@ public:
 		       u32 nFG, u32 nBG) override;
 	void ClearRows (unsigned nBuffer, unsigned nFirstRow, unsigned nRows, u32 nColor) override;
 
-	void DrawGame (const u32 *pSource) override;
+	void DrawGame (const u32 *pSource, boolean bFilter = TRUE) override;
 	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark) override
 	{
-		DrawGameLineTo (SharedLoad (m_bRacing) ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark);
+		DrawGameLineTo (SharedLoad (m_bRacing) ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark, TRUE);
 	}
 	void DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine) override;
-	void DrawBandText (boolean bTop, const TTextSpan *pSpans, unsigned nSpans) override;
+	void SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId) override;
+	void DrawSideText (boolean bRight, const TTextSpan *pSpans, unsigned nSpans) override;
 
 	unsigned GetPixelOrder (void) const override	{ return m_nPixelOrder; }
 	unsigned GetWCPages (void) const override	{ return m_nWCPages; }
@@ -66,15 +74,24 @@ public:
 	boolean WaitForVSync (void) override;
 
 private:
-	boolean Allocate (unsigned nWidth, unsigned nHeight);
 	unsigned GetColumns (void) const;
-	void DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark);
+	boolean Allocate (unsigned nWidth, unsigned nHeight);
+	void DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark,
+			     boolean bFilter);
 	u32 *Row (unsigned nBuffer, unsigned nY) const
 	{
 		return m_pBase + (nBuffer * m_nHeight + nY) * m_nPitchPx;
 	}
 	void DrawChar (unsigned nBuffer, unsigned nX, unsigned nY, char ch, u32 nFG, u32 nBG,
 		       unsigned nTextScale, const CCharGenerator &Font);
+	// the border
+	struct TTarget { u32 *pBase; unsigned nPitch, nW, nH; };	// where text goes
+	u32 BgPixel (unsigned x, unsigned y) const;		// framebuffer order
+	void FillBorder (unsigned nBuf);
+	void DrawInfoLines (unsigned nBuf);
+	// Area51 text, scale m_nU, hard shadow; nColor 0xRRGGBB; returns the next x
+	unsigned InfoWidth (const char *pText) const;
+	unsigned DrawInfoText (const TTarget &T, unsigned x, unsigned y, const char *pText, u32 nColor);
 
 private:
 	CBcmFrameBuffer *m_pFrameBuffer;
@@ -86,7 +103,7 @@ private:
 	u32	*m_pBase;
 	unsigned m_nBack;
 	boolean	 m_bGameMode;
-	boolean	 m_bRacing;		// shared with core 1 (DrawGameLine)
+	boolean	 m_bRacing;			// read by core 1
 
 	unsigned m_nTextScale;			// console text scale (1 or 2)
 	unsigned m_nScale;			// S
@@ -94,9 +111,21 @@ private:
 	unsigned m_nM;				// CPU draw scale
 	unsigned m_nFilter;
 	unsigned m_nGameX, m_nGameY;		// game rectangle in the framebuffer
-	unsigned m_nStatusY;
-	unsigned m_nStatusScale;
-	unsigned m_nTopY;
+	unsigned m_nU;				// text scale (2 screen pixels per font pixel)
+	boolean	 m_bSide;			// status and messages in the side columns
+	boolean	 m_bBands;			// room for the title and the buttons
+	unsigned m_nGap;			// text from the picture and the screen edge
+	unsigned m_nColTop, m_nColBot;		// the columns' text: between these lines
+
+	// the border
+	unsigned m_nBezel;			// BEZEL_GRID, BEZEL_INFO (0: black)
+	unsigned m_nBezelId;
+	boolean	 m_bBezelDrawn;			// in both buffers
+	TBezelInfo m_Info;
+	struct TRect { unsigned x0, y0, x1, y1; };	// x1, y1 excluded; empty: x1 = 0
+	TRect	 m_Text[2][2];			// [buffer][right column]: text drawn there
+	u32	 m_nTextSum[2][2];		// and what it says (0 = nothing)
+	u32	*m_pBlock;			// a column's text, prepared before the copy
 
 	u32 Native (u32 c) const		// RGB() (R low) -> framebuffer order
 	{

@@ -114,7 +114,7 @@ void CKernel::McTest (unsigned nSel)
 				snprintf (Text, sizeof Text, "MC TEST %u/4  %u/%u S", nPass + 1, f / 60,
 					  MCTEST_FRAMES / 60);
 				const CVideoOut::TTextSpan Span = {Text, nBadFrames ? UI_ERR : UI_WHITE};
-				m_Video.DrawBandText (TRUE, &Span, 1);
+				m_Video.DrawSideText (TRUE, &Span, 1);
 				m_Video.Flip ();
 			}
 		}
@@ -167,7 +167,7 @@ void CKernel::Benchmark (void)
 		snprintf (Text, sizeof Text, "BENCHMARK  %s %u/%u S", pPhase,
 			  nFrame / 60, nFrames / 60);
 		const CVideoOut::TTextSpan Span = {Text, UI_WHITE};
-		m_Video.DrawBandText (TRUE, &Span, 1);
+		m_Video.DrawSideText (TRUE, &Span, 1);
 		m_Video.Flip ();
 	};
 

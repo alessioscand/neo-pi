@@ -29,7 +29,7 @@ void FrameSetComposite (boolean bOn);
 boolean FrameIsComposite (void);
 void FrameSetRaced (boolean bOn);	// this frame is beam raced
 void FrameDraw (void);			// g_VideoBuf to the screen, if not there yet
-void FrameDrawPicture (u32 *pBuffer);	// a UI picture, through the same filter
+void FrameDrawPicture (u32 *pBuffer, boolean bFilter = TRUE);	// a UI picture, through the same filter (or none)
 
 unsigned FrameMcFailFrame (void);	// frame at which core 1 stopped answering
 

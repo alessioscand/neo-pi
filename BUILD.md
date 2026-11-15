@@ -60,7 +60,8 @@ Build host: Linux x86_64.
 
 ## Source files
 `src/` is neo-pi's own; `common/` has the files that are the same in m92-pi
-(nothing Neo Geo in them: what they need comes from `src/project.h`).
+and s16-pi (nothing Neo Geo in them: what they need comes from
+`src/project.h` and `src/theme.cpp`).
 
 - `src/project.h` - name, version, picture size, buttons, LED error codes
 - `src/kernel.h`, `src/kernel.cpp` - the kernel class; start-up, starting cores 1 and 2, the main flow, power off
@@ -74,10 +75,8 @@ Build host: Linux x86_64.
 - `src/racing.cpp` - beam racing state for the game loop
 - `src/report.cpp`, `src/bench.cpp` - the per-minute report in the log; BENCH and MCTEST
 - `src/mcline.cpp` - the multicore line drawing of `patches/geolith-mc.py`, as the kernel sees it
-- `src/screen.h` - `CScreen`, the only interface the kernel draws through; `src/video.cpp` is
-  the HDMI one (double-buffered framebuffer, HVS/CPU integer scaling, scanlines, text in the black bands).
-  A CRT output on the composite jack would be another `CScreen`, chosen in `kernel.h`
-- `src/ui.cpp` - menus and screens drawn at Neo Geo resolution; `src/fontdata.c` - menu font ("Matinee", ZX Origins by Damien Guard)
+- `src/theme.cpp` - neo-pi's look for the menus and the border: colours, fonts, logo, credits, the grid
+  (a lattice of diamonds)
 - `src/vfs.cpp`, `src/ziphelp.c`, `src/shim.c` - file access, zip/PNG (miniz), minimal libc for the core
 - `src/geo_disc_stub.c` - replaces the CD support
 - `common/smp.h` - work shared between cores: `SharedLoad` / `SharedStore`, `SharedAcquire` / `SharedRelease`, events, `Ticks`
@@ -89,6 +88,14 @@ Build host: Linux x86_64.
 - `common/fbmap.cpp` - maps the framebuffer as write-combining memory
 - `common/pacing.cpp` - frame phase and frame delay (without beam racing)
 - `common/stats.cpp` - timing statistics: histograms, averages, percentiles
+- `common/screen.h` - `CScreen`, the only interface the kernel draws through; `common/video.cpp` is
+  the HDMI one (double-buffered framebuffer, HVS (at most 2x) / CPU integer scaling, scanlines, the
+  border: black or the grid, with the game's title at 1080p; status line and messages beside the picture).
+  A CRT output on the composite jack would be another `CScreen`
+- `common/ui.cpp` - all the menus, 304x224 (the same layout in every project); `common/theme.h` - what
+  `src/theme.cpp` gives it
+- `common/fonts.h`, `common/font_*.c` - the ZX Origins fonts by Damien Guard (neo-pi links Matinee and Area51)
+- `common/gameinfo.cpp` - a table of per-game titles and buttons (neo-pi has none yet)
 - `src/Makefile.in`, `build.sh`, `make_release.sh`
 - `tools/resolve_profile.py` - turns `PROFILE.TXT` into time per function, using the kernel's .elf
 - `test/harness.c` - Linux test harness (same core and set-up): frames as PPM, audio as WAV

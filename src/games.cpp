@@ -146,6 +146,27 @@ void CKernel::ScanGames (void)
 			strncpy (G.Name, Info.fname, sizeof G.Name - 1);
 			G.Name[sizeof G.Name - 1] = '\0';
 		}
+		// maker and year, under the list and above the picture: "SNK 1992"
+		char Maker[18];
+		n = 0;
+		for (unsigned i = 0; i < 17 && Header[77 + i] != 0; i++)
+		{
+			char c = (char) Header[77 + i];
+			if (c >= 'a' && c <= 'z') c -= 32;
+			Maker[n++] = c >= 32 && c <= 126 ? c : ' ';
+		}
+		while (n > 0 && Maker[n-1] == ' ') n--;
+		Maker[n] = '\0';
+		const unsigned nYear = Header[28] | Header[29] << 8;
+		if (nYear >= 1980 && nYear < 2100)
+		{
+			snprintf (G.Info, sizeof G.Info, "%s %u", Maker, nYear);
+		}
+		else
+		{
+			snprintf (G.Info, sizeof G.Info, "%s", Maker);
+		}
+		G.nGame = -1;
 		m_nGames++;
 	}
 	f_closedir (&Dir);
