@@ -22,7 +22,9 @@
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
-// the text: Lander at 2 screen pixels per font pixel
+// the text: You Squared at 2 screen pixels per font pixel, made
+// proportional once (each glyph moved to the left edge, the next one a
+// pixel after it)
 #define TEXT_H		7			// font pixels: capitals and digits
 #define TEXT_PITCH	12			// between lines
 #define INFO_WHITE	0xECECECu
@@ -31,6 +33,36 @@ static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {
 #define SIDE_LINES	8
 #define SIDE_CHARS	48
 #define BLOCK_H		(SIDE_LINES * TEXT_PITCH * 2 + 4)	// a column's text, 2x
+
+static unsigned char s_InfoFont[96][8];		// You Squared, at the left edge
+static unsigned char s_InfoWidth[96];		// where the next glyph starts
+
+static void MakeInfoFont (void)
+{
+	for (unsigned c = 0; c < 96; c++)
+	{
+		const unsigned char *pGlyph = g_FontYouSquared[c];
+		unsigned char nAll = 0;			// every column the glyph uses
+		for (unsigned r = 0; r < 8; r++)
+		{
+			nAll |= pGlyph[r];
+		}
+		if (nAll == 0)				// the space
+		{
+			memset (s_InfoFont[c], 0, 8);
+			s_InfoWidth[c] = 3;
+			continue;
+		}
+		unsigned nLeft = 0, nRight = 7;
+		while (!(nAll & (0x80 >> nLeft))) nLeft++;
+		while (!(nAll & (0x80 >> nRight))) nRight--;
+		for (unsigned r = 0; r < 8; r++)
+		{
+			s_InfoFont[c][r] = (unsigned char) (pGlyph[r] << nLeft);
+		}
+		s_InfoWidth[c] = (unsigned char) (nRight - nLeft + 2);
+	}
+}
 
 CVideoOut::CVideoOut (void)
 :	m_pFrameBuffer (0),
@@ -71,6 +103,7 @@ CVideoOut::CVideoOut (void)
 	memset (&m_Info, 0, sizeof m_Info);
 	memset (m_Text, 0, sizeof m_Text);
 	memset (m_nTextSum, 0, sizeof m_nTextSum);
+	MakeInfoFont ();
 }
 
 CVideoOut::~CVideoOut (void)
@@ -216,7 +249,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nGameX = (m_nWidth - nGameW) / 2;
 	m_nGameY = (m_nHeight - nGameH) / 2;
 
-	// text beside the picture: Lander, 2 screen pixels per font pixel
+	// text beside the picture: You Squared, 2 screen pixels per font pixel
 	m_nU = m_nK >= 2 ? 1 : 2;
 	const unsigned U = m_nU, nTextH = TEXT_H * U;
 	// the title and the buttons above and below the picture: only in bands
@@ -584,7 +617,7 @@ unsigned CVideoOut::InfoWidth (const char *pText) const
 	for (const char *s = pText; *s; s++)
 	{
 		unsigned ch = (unsigned char) *s;
-		n += g_FontLanderWidth[(ch >= 32 && ch < 128 ? ch : '?') - 32];
+		n += s_InfoWidth[(ch >= 32 && ch < 128 ? ch : '?') - 32];
 	}
 	return n * m_nU;
 }
@@ -597,7 +630,7 @@ unsigned CVideoOut::DrawInfoText (const TTarget &T, unsigned x, unsigned y, cons
 	{
 		unsigned ch = (unsigned char) *s;
 		if (ch < 32 || ch >= 128) ch = '?';
-		const unsigned nAdv = g_FontLanderWidth[ch - 32] * U;
+		const unsigned nAdv = s_InfoWidth[ch - 32] * U;
 		if (x + nAdv + U > T.nW || y + 9 * U > T.nH)
 		{
 			break;
@@ -608,7 +641,7 @@ unsigned CVideoOut::DrawInfoText (const TTarget &T, unsigned x, unsigned y, cons
 			const unsigned o = pass == 0 ? U : 0;
 			for (unsigned r = 0; r < 8; r++)
 			{
-				const unsigned char nRow = g_FontLander[ch - 32][r];
+				const unsigned char nRow = s_InfoFont[ch - 32][r];
 				for (unsigned k = 0; nRow && k < 8; k++)
 				{
 					if (!(nRow & (0x80 >> k)))
@@ -631,30 +664,10 @@ unsigned CVideoOut::DrawInfoText (const TTarget &T, unsigned x, unsigned y, cons
 	return x;
 }
 
-// BEZEL_INFO at 1080p: title, maker and year above the picture; the buttons
-// and SELECT below it
-void CVideoOut::DrawInfoLines (unsigned nBuf)
+// "A attack   B jump   C magic"; the same name on the buttons next to each
+// other once: "A B C rotate". With pT == 0 only measures; returns the next x
+unsigned CVideoOut::DrawButtons (const TTarget *pT, unsigned x, unsigned y)
 {
-	const TTarget T = {Row (nBuf, 0), m_nPitchPx, m_nWidth, m_nHeight};
-	const unsigned U = m_nU, nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
-	// near the picture, inside the clear strip before the grid's first line
-	const unsigned nTop = m_nGameY - (TEXT_H + INFO_NEAR) * U;
-	const unsigned nBottom = m_nGameY + nGameH + INFO_NEAR * U;
-
-	unsigned x = m_nGameX;
-	if (m_Info.pTitle)
-	{
-		x = DrawInfoText (T, x, nTop, m_Info.pTitle, INFO_WHITE);
-	}
-	if (m_Info.pMaker && m_Info.pMaker[0])
-	{
-		x = DrawInfoText (T, x, nTop, "  ", INFO_GREY);
-		DrawInfoText (T, x, nTop, m_Info.pMaker, INFO_GREY);
-	}
-
-	// "A attack   B jump   C magic"; the same name on the buttons next to
-	// each other once: "A B C rotate"
-	x = m_nGameX;
 	boolean bFirst = TRUE;
 	for (unsigned i = 0; i < 6 && m_Info.pButtons[i]; )
 	{
@@ -670,13 +683,13 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 		}
 		if (!bFirst)
 		{
-			x = DrawInfoText (T, x, nBottom, "   ", INFO_GREY);
+			x = pT ? DrawInfoText (*pT, x, y, "   ", INFO_GREY) : x + InfoWidth ("   ");
 		}
 		bFirst = FALSE;
 		for (unsigned b = i; b < j; b++)
 		{
 			char Letter[3] = {(char) ('A' + b), ' ', '\0'};
-			x = DrawInfoText (T, x, nBottom, Letter, INFO_WHITE);
+			x = pT ? DrawInfoText (*pT, x, y, Letter, INFO_WHITE) : x + InfoWidth (Letter);
 		}
 		char Name[32];
 		unsigned n = 0;
@@ -685,13 +698,53 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 			Name[n++] = *s >= 'A' && *s <= 'Z' ? (char) (*s + 32) : *s;
 		}
 		Name[n] = '\0';
-		x = DrawInfoText (T, x, nBottom, Name, INFO_GREY);
+		x = pT ? DrawInfoText (*pT, x, y, Name, INFO_GREY) : x + InfoWidth (Name);
 		i = j;
 	}
-	unsigned xs = m_nGameX + nGameW - InfoWidth ("SELECT coin");
-	if (xs > x)
+	return x;
+}
+
+// BEZEL_INFO at 1080p: title, maker and year above the picture; the buttons
+// below it, both centred on the picture; SELECT coin at the right
+void CVideoOut::DrawInfoLines (unsigned nBuf)
+{
+	const TTarget T = {Row (nBuf, 0), m_nPitchPx, m_nWidth, m_nHeight};
+	const unsigned U = m_nU, nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
+	// near the picture, inside the clear strip before the grid's first line
+	const unsigned nTop = m_nGameY - (TEXT_H + INFO_NEAR) * U;
+	const unsigned nBottom = m_nGameY + nGameH + INFO_NEAR * U;
+
+	const boolean bMaker = m_Info.pMaker && m_Info.pMaker[0];
+	if (m_Info.pTitle)
 	{
-		xs = DrawInfoText (T, xs, nBottom, "SELECT", INFO_WHITE);
+		unsigned w = InfoWidth (m_Info.pTitle);
+		if (bMaker)
+		{
+			w += InfoWidth ("  ") + InfoWidth (m_Info.pMaker);
+		}
+		unsigned x = m_nGameX + (w < nGameW ? (nGameW - w) / 2 : 0);
+		x = DrawInfoText (T, x, nTop, m_Info.pTitle, INFO_WHITE);
+		if (bMaker)
+		{
+			x = DrawInfoText (T, x, nTop, "  ", INFO_GREY);
+			DrawInfoText (T, x, nTop, m_Info.pMaker, INFO_GREY);
+		}
+	}
+
+	// centred, but never nearer to SELECT coin than the gap between two
+	// buttons: then moved left as much as needed
+	const unsigned nSelect = m_nGameX + nGameW - InfoWidth ("SELECT coin");
+	const unsigned nGap = InfoWidth ("   ");
+	const unsigned w = DrawButtons (0, 0, nBottom);
+	unsigned x = m_nGameX + (w < nGameW ? (nGameW - w) / 2 : 0);
+	if (x + w + nGap > nSelect)
+	{
+		x = nSelect > m_nGameX + w + nGap ? nSelect - nGap - w : m_nGameX;
+	}
+	x = DrawButtons (&T, x, nBottom);
+	if (nSelect >= x + nGap)
+	{
+		const unsigned xs = DrawInfoText (T, nSelect, nBottom, "SELECT", INFO_WHITE);
 		DrawInfoText (T, xs, nBottom, " coin", INFO_GREY);
 	}
 }

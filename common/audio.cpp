@@ -7,12 +7,21 @@
  * by a few samples (linear interpolation, inaudible).
  */
 #include "audio.h"
+#include "project.h"
 
 #define SAMPLE_RATE	48000
 #define CHUNK_SIZE	(384 * 2)		// words per DMA chunk (multiple of 384): 384 stereo frames = 8 ms
 #define QUEUE_FRAMES	4800			// 100 ms queue capacity
-#define TARGET_FRAMES	1600			// keep ~2 video frames queued (~33 ms)
+// the queue level aimed at, and how far it may drift before each block is
+// stretched or shrunk: by default ~2 video frames (~33 ms); a project whose
+// frames are never late can ask for less in its project.h (less audio lag)
+#ifdef PROJECT_AUDIO_TARGET
+#define TARGET_FRAMES	PROJECT_AUDIO_TARGET
+#define BAND_FRAMES	PROJECT_AUDIO_BAND
+#else
+#define TARGET_FRAMES	1600
 #define BAND_FRAMES	400
+#endif
 
 CAudioOut::CAudioOut (void)
 :	m_pSound (0),

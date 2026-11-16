@@ -2,7 +2,8 @@
  * "You Squared" from the ZX Origins collection by Damien Guard
  * (https://damieng.com/typography/zx-origins/), free for use in games with
  * credit. 8x8, characters 0x20-0x7F, bit 7 = left pixel.
- * Menus of m92-pi and s16-pi. Character 0x7F is a degree sign.
+ * The menus of m92-pi and s16-pi, and in every project the text around the
+ * picture (made proportional in video.cpp). Character 0x7F is a degree sign.
  */
 #include "fonts.h"
 
