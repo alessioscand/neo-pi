@@ -1,6 +1,7 @@
 /*
  * The fonts, all from the ZX Origins collection by Damien Guard: each
- * project links the ones it uses (its theme says which)
+ * project links the ones it uses (its theme says which); You Squared always,
+ * for the text around the picture (video.cpp)
  */
 #ifndef COMMON_FONTS_H
 #define COMMON_FONTS_H

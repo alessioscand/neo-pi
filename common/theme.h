@@ -19,7 +19,7 @@ struct TUITheme
 	u32		 nBand;			// the selected line
 	u32		 nCursor;		// the triangle on it
 	u32		 nTitle;		// panel titles, LOADING, the bar
-	u32		 nValue;		// values, counters
+	u32		 nValue;		// values, the scroll arrows, the author
 	u32		 nDim;			// labels, names not selected
 	u32		 nPower;		// POWER OFF, CLEAR MEMORY
 
