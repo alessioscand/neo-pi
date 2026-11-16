@@ -87,7 +87,8 @@ public:
 	{
 		const char *pTitle;			// "GOLDEN AXE"
 		const char *pMaker;			// "SEGA 1989"
-		const char *pButtons[6];		// buttons A..F, 0 after the last
+		const char *pButtons[6];		// buttons A..F, 0 after the last,
+							// "" = not used
 	};
 	virtual void SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId) = 0;
 

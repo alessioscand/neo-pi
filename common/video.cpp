@@ -655,17 +655,24 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 	// "A attack   B jump   C magic"; the same name on the buttons next to
 	// each other once: "A B C rotate"
 	x = m_nGameX;
+	boolean bFirst = TRUE;
 	for (unsigned i = 0; i < 6 && m_Info.pButtons[i]; )
 	{
+		if (m_Info.pButtons[i][0] == '\0')	// "": a button the game does
+		{					// not use, no letter is drawn
+			i++;
+			continue;
+		}
 		unsigned j = i + 1;
 		while (j < 6 && m_Info.pButtons[j] && strcmp (m_Info.pButtons[j], m_Info.pButtons[i]) == 0)
 		{
 			j++;
 		}
-		if (i > 0)
+		if (!bFirst)
 		{
 			x = DrawInfoText (T, x, nBottom, "   ", INFO_GREY);
 		}
+		bFirst = FALSE;
 		for (unsigned b = i; b < j; b++)
 		{
 			char Letter[3] = {(char) ('A' + b), ' ', '\0'};

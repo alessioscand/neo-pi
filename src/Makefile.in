@@ -9,7 +9,7 @@ GEO_OBJS = m68kcpu.o m68kops.o z80.o ymfm_adpcm.o ymfm_opn.o ymfm_ssg.o \
 	   geo_mixer.o geo_neo.o geo_rtc.o geo_serial.o geo_vfs.o geo_ymfm.o \
 	   geo_z80.o miniz.o resample.o
 
-OBJS	= main.o kernel.o console.o games.o settings.o menus.o gameloop.o bench.o \
+OBJS	= main.o kernel.o console.o games.o gametable.o settings.o menus.o gameloop.o bench.o \
 	  report.o racing.o frame.o mcline.o \
 	  video.o ui.o theme.o font_matinee.o font_area51.o vfs.o ziphelp.o shim.o geo_disc_stub.o \
 	  audio.o input.o raster.o race.o profile.o fbmap.o composite.o tvcore.o \

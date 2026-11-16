@@ -2,6 +2,7 @@
  * neo-pi - settings: neopi.cfg, the video mode it asks for, pads.cfg
  */
 #include "kernel.h"
+#include "gametable.h"
 #include "frame.h"
 #include "pacing.h"
 #include "racing.h"
@@ -114,14 +115,16 @@ void CKernel::UpdateBezel (void)
 		m_Video.SetBezel (BEZEL_GRID, 0, 0);
 		return;
 	}
-	// the title and "SNK 1992" from the .neo header (games.cpp); the buttons
-	// are not known yet
+	// the title and "SNK 1992" from the .neo header, the buttons from the
+	// NGH number (games.cpp, gametable.cpp)
+	const TGameEntry &G = m_pGames[m_nLoaded];
 	CScreen::TBezelInfo Info;
-	Info.pTitle = m_pGames[m_nLoaded].Name;
-	Info.pMaker = m_pGames[m_nLoaded].Info;
+	Info.pTitle = G.Name;
+	Info.pMaker = G.Info;
+	const char *const *pNames = G.nGame >= 0 ? NeoButtons (G.nGame) : 0;
 	for (unsigned i = 0; i < 6; i++)
 	{
-		Info.pButtons[i] = 0;
+		Info.pButtons[i] = pNames && i < NEO_BUTTONS ? pNames[i] : 0;
 	}
 	m_Video.SetBezel (m_nBezel, &Info, 1 + (unsigned) m_nLoaded);
 }

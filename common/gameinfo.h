@@ -14,7 +14,8 @@ struct TGameInfo
 	const char *pRegion;			// under the list; "" = from the full name
 	const char *pYear;
 	const char *pMaker;
-	const char *pButtons[GAMEINFO_BUTTONS];	// buttons A..F, 0 after the last;
+	const char *pButtons[GAMEINFO_BUTTONS];	// buttons A..F, 0 after the last,
+						// "" = not used;
 						// all 0 = not known, nothing is shown
 };
 

@@ -12,6 +12,9 @@ the end of this file.
 
 NEO GEO is a trademark of SNK. The Neo Geo BIOS and the games are not included.
 
+The button names under the picture were checked against Arcade-History
+(arcade-history.com).
+
 ==============================================================================
 Geolith (emulator core) - BSD 3-Clause
 ==============================================================================

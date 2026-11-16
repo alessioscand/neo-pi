@@ -3,6 +3,7 @@
  * data (backup RAM, cartridge RAM, memory card)
  */
 #include "kernel.h"
+#include "gametable.h"
 #include "frame.h"
 #include <circle/new.h>
 
@@ -166,7 +167,10 @@ void CKernel::ScanGames (void)
 		{
 			snprintf (G.Info, sizeof G.Info, "%s", Maker);
 		}
-		G.nGame = -1;
+		// the NGH number picks the button names (gametable.cpp)
+		const unsigned nNGH =   Header[40]       | Header[41] << 8
+				      | Header[42] << 16 | (unsigned) Header[43] << 24;
+		G.nGame = NeoButtonsFind (nNGH);
 		m_nGames++;
 	}
 	f_closedir (&Dir);
