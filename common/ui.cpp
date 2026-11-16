@@ -383,8 +383,8 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 		}
 	}
 
-	// the bottom row, grey in the menus' font (apart from the titles): what
-	// the selected game is, and where it is in the list
+	// the bottom row, in the theme's colour and font for it: what the
+	// selected game is, and where it is in the list
 	Fill (17, 174, UI_W - 34, 1, T.nFrame2);
 	char Count[16];
 	{
@@ -400,7 +400,7 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 		*p = '\0';
 	}
 	const int nCountW = (int) strlen (Count) * 8;
-	Text (UI_W - 18 - nCountW, 178, Count, T.nDim, 1, FALSE);
+	Text (UI_W - 18 - nCountW, 178, Count, T.nListInfo, 1, T.bListInfoInListFont);
 	if (nCount)
 	{
 		char Info[sizeof pGames[0].Info];
@@ -408,7 +408,7 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 		Info[sizeof Info - 1] = '\0';
 		const size_t nRoom = (size_t) ((UI_W - 36 - nCountW) / 8) - 1;
 		if (strlen (Info) > nRoom) Info[nRoom] = '\0';
-		Text (18, 178, Info, T.nDim, 1, FALSE);
+		Text (18, 178, Info, T.nListInfo, 1, T.bListInfoInListFont);
 	}
 
 	static const TButtonHint Hints[2] = {{'A', "START GAME"}, {'D', "OPTIONS"}};

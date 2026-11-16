@@ -22,7 +22,7 @@
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
-// the text: You Squared at 2 screen pixels per font pixel, made
+// the text: the theme's pInfoFont at 2 screen pixels per font pixel, made
 // proportional once (each glyph moved to the left edge, the next one a
 // pixel after it)
 #define TEXT_H		7			// font pixels: capitals and digits
@@ -34,14 +34,14 @@ static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {
 #define SIDE_CHARS	48
 #define BLOCK_H		(SIDE_LINES * TEXT_PITCH * 2 + 4)	// a column's text, 2x
 
-static unsigned char s_InfoFont[96][8];		// You Squared, at the left edge
+static unsigned char s_InfoFont[96][8];		// pInfoFont, at the left edge
 static unsigned char s_InfoWidth[96];		// where the next glyph starts
 
 static void MakeInfoFont (void)
 {
 	for (unsigned c = 0; c < 96; c++)
 	{
-		const unsigned char *pGlyph = g_FontYouSquared[c];
+		const unsigned char *pGlyph = g_Theme.pInfoFont[c];
 		unsigned char nAll = 0;			// every column the glyph uses
 		for (unsigned r = 0; r < 8; r++)
 		{
@@ -249,7 +249,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nGameX = (m_nWidth - nGameW) / 2;
 	m_nGameY = (m_nHeight - nGameH) / 2;
 
-	// text beside the picture: You Squared, 2 screen pixels per font pixel
+	// text beside the picture: the theme's pInfoFont, 2 screen pixels per font pixel
 	m_nU = m_nK >= 2 ? 1 : 2;
 	const unsigned U = m_nU, nTextH = TEXT_H * U;
 	// the title and the buttons above and below the picture: only in bands
@@ -665,8 +665,8 @@ unsigned CVideoOut::DrawInfoText (const TTarget &T, unsigned x, unsigned y, cons
 }
 
 // "A attack   B jump   C magic"; the same name on the buttons next to each
-// other once: "A B C rotate". With pT == 0 only measures; returns the next x
-unsigned CVideoOut::DrawButtons (const TTarget *pT, unsigned x, unsigned y)
+// other once: "A B C rotate"; returns the next x
+unsigned CVideoOut::DrawButtons (const TTarget &T, unsigned x, unsigned y)
 {
 	boolean bFirst = TRUE;
 	for (unsigned i = 0; i < 6 && m_Info.pButtons[i]; )
@@ -683,13 +683,13 @@ unsigned CVideoOut::DrawButtons (const TTarget *pT, unsigned x, unsigned y)
 		}
 		if (!bFirst)
 		{
-			x = pT ? DrawInfoText (*pT, x, y, "   ", INFO_GREY) : x + InfoWidth ("   ");
+			x = DrawInfoText (T, x, y, "   ", INFO_GREY);
 		}
 		bFirst = FALSE;
 		for (unsigned b = i; b < j; b++)
 		{
 			char Letter[3] = {(char) ('A' + b), ' ', '\0'};
-			x = pT ? DrawInfoText (*pT, x, y, Letter, INFO_WHITE) : x + InfoWidth (Letter);
+			x = DrawInfoText (T, x, y, Letter, INFO_WHITE);
 		}
 		char Name[32];
 		unsigned n = 0;
@@ -698,14 +698,14 @@ unsigned CVideoOut::DrawButtons (const TTarget *pT, unsigned x, unsigned y)
 			Name[n++] = *s >= 'A' && *s <= 'Z' ? (char) (*s + 32) : *s;
 		}
 		Name[n] = '\0';
-		x = pT ? DrawInfoText (*pT, x, y, Name, INFO_GREY) : x + InfoWidth (Name);
+		x = DrawInfoText (T, x, y, Name, INFO_GREY);
 		i = j;
 	}
 	return x;
 }
 
-// BEZEL_INFO at 1080p: title, maker and year above the picture; the buttons
-// below it, both centred on the picture; SELECT coin at the right
+// BEZEL_INFO at 1080p: title, maker and year centred above the picture; the
+// buttons below it from its left edge, SELECT coin at its right edge
 void CVideoOut::DrawInfoLines (unsigned nBuf)
 {
 	const TTarget T = {Row (nBuf, 0), m_nPitchPx, m_nWidth, m_nHeight};
@@ -731,18 +731,10 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 		}
 	}
 
-	// centred, but never nearer to SELECT coin than the gap between two
-	// buttons: then moved left as much as needed
+	// SELECT coin only if it stays apart from the buttons (always, today)
+	const unsigned x = DrawButtons (T, m_nGameX, nBottom);
 	const unsigned nSelect = m_nGameX + nGameW - InfoWidth ("SELECT coin");
-	const unsigned nGap = InfoWidth ("   ");
-	const unsigned w = DrawButtons (0, 0, nBottom);
-	unsigned x = m_nGameX + (w < nGameW ? (nGameW - w) / 2 : 0);
-	if (x + w + nGap > nSelect)
-	{
-		x = nSelect > m_nGameX + w + nGap ? nSelect - nGap - w : m_nGameX;
-	}
-	x = DrawButtons (&T, x, nBottom);
-	if (nSelect >= x + nGap)
+	if (nSelect >= x + InfoWidth ("   "))
 	{
 		const unsigned xs = DrawInfoText (T, nSelect, nBottom, "SELECT", INFO_WHITE);
 		DrawInfoText (T, xs, nBottom, " coin", INFO_GREY);

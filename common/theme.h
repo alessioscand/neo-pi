@@ -27,6 +27,12 @@ struct TUITheme
 	const unsigned char (*pMenuFont)[8];
 	const unsigned char (*pListFont)[8];	// the game list's titles
 	boolean		 bListLower;		// it has lower case (else capitals)
+	const unsigned char (*pInfoFont)[8];	// around the picture: title,
+						// buttons, status line, messages
+
+	// the game list's bottom row (set and region or maker, the counter)
+	u32		 nListInfo;		// its colour
+	boolean		 bListInfoInListFont;	// in pListFont (else pMenuFont)
 
 	// the logo above the game list: one string per row, one character per
 	// pixel; pLogoKeys[i] is drawn in pLogoColors[i], anything else is clear

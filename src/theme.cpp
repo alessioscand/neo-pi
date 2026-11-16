@@ -49,6 +49,8 @@ const TUITheme g_Theme =
 	0x78C8FF, 0x78C8FF, 0x96A0AF,		// title, value, dim
 	0xFF5050,				// POWER OFF
 	g_FontMatinee, g_FontMatinee, TRUE,	// the list: the BIOS's font when it is loaded
+	g_FontYouSquared,			// around the picture
+	0x96A0AF, FALSE,			// the list's bottom row: dim, menu font
 	s_Logo, sizeof s_Logo / sizeof s_Logo[0], 2, s_LogoKeys, s_LogoColors,
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
 	"NEO GEO IS A TRADEMARK OF SNK.", "BIOS AND GAMES NOT INCLUDED."

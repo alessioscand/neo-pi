@@ -14,7 +14,7 @@
  * picture; with a game, its title above the picture and its buttons below
  * (only where the bands are tall enough: 1080p). Drawn once in both buffers
  * when it changes. The status line and the messages go in the side columns,
- * in the You Squared font with a hard shadow: drawn by the caller's core
+ * in the theme's font with a hard shadow: drawn by the caller's core
  * (core 0) only when they change, prepared apart and copied a finished row at
  * a time, only over the border, so the line drawing (beam racing) does not
  * change.
@@ -92,9 +92,9 @@ private:
 	u32 BgPixel (unsigned x, unsigned y) const;		// framebuffer order
 	void FillBorder (unsigned nBuf);
 	void DrawInfoLines (unsigned nBuf);
-	unsigned DrawButtons (const TTarget *pT, unsigned x, unsigned y);
-	// You Squared text, scale m_nU, hard shadow; nColor 0xRRGGBB; returns the
-	// next x
+	unsigned DrawButtons (const TTarget &T, unsigned x, unsigned y);
+	// the theme's pInfoFont, scale m_nU, hard shadow; nColor 0xRRGGBB;
+	// returns the next x
 	unsigned InfoWidth (const char *pText) const;
 	unsigned DrawInfoText (const TTarget &T, unsigned x, unsigned y, const char *pText, u32 nColor);
 
