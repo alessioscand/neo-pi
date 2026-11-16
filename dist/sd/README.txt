@@ -39,7 +39,8 @@ START-UP
     game starts at once. GAME LIST in the in-game menu still opens the
     list.
   - Game list: Up/Down to choose, Left/Right to jump by 8, A or Start to
-    play, D for OPTIONS.
+    play, D for OPTIONS. A long title scrolls. With no pad connected,
+    NO PAD on the left.
   - Benchmark: an empty file named neopi/BENCH (no extension) runs one on
     the selected game before normal play: 30 seconds of the game's demo,
     then 60 seconds measured. Do not touch anything. Results in
@@ -53,7 +54,7 @@ SETTING UP THE CONTROLS
 
   The first time a pad model is connected, the CONTROLS screen opens by
   itself. Press the button you want for each function, in this order: A,
-  B, C, D, START, SELECT/COIN. After the last one, the set-up is saved
+  B, C, D, SELECT/COIN, START. After the last one, the set-up is saved
   (SAVED).
 
   Directions need no set-up: the d-pad, hat and left stick always work.
