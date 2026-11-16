@@ -164,7 +164,7 @@ void CKernel::Benchmark (void)
 	auto Progress = [this] (const char *pPhase, unsigned nFrame, unsigned nFrames)
 	{
 		char Text[64];
-		snprintf (Text, sizeof Text, "BENCHMARK  %s %u/%u S", pPhase,
+		snprintf (Text, sizeof Text, "BENCH  %s %u/%u S", pPhase,
 			  nFrame / 60, nFrames / 60);
 		const CVideoOut::TTextSpan Span = {Text, UI_WHITE};
 		m_Video.DrawSideText (TRUE, &Span, 1);

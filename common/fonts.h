@@ -14,8 +14,8 @@ extern "C" {
 extern const unsigned char g_FontMatinee[96][8];	// font_matinee.c
 extern const unsigned char g_FontYouSquared[96][8];	// font_yousquared.c
 extern const unsigned char g_FontCyberwire[96][8];	// font_cyberwire.c
-extern const unsigned char g_FontArea51[96][8];		// font_area51.c, proportional:
-extern const unsigned char g_FontArea51Width[96];
+extern const unsigned char g_FontLander[96][8];		// font_lander.c, proportional:
+extern const unsigned char g_FontLanderWidth[96];
 
 #ifdef __cplusplus
 }

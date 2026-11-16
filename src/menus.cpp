@@ -97,7 +97,7 @@ unsigned CKernel::RunList (unsigned nSel)
 		}
 		nPrev = n;
 
-		const char *pMsg = m_pInput->GetPadCount () == 0 ? "CONNECT A USB GAMEPAD" : "";
+		const char *pMsg = m_pInput->GetPadCount () == 0 ? "NO PAD" : "";
 		nTicks = nSel == nShown ? nTicks + 1 : 0;
 		nShown = nSel;
 		m_pUI->DrawList (m_pGames, m_nGames, nSel, m_nLoaded >= 0, nTicks);
@@ -207,7 +207,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 					}
 					else if (m_pInput->GetPadCount () == 0)
 					{
-						pMsg = "CONNECT A USB GAMEPAD";
+						pMsg = "CONNECT A GAMEPAD";
 					}
 					nPrev = ~0u;
 				}

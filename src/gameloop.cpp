@@ -673,12 +673,14 @@ void CKernel::PlayDrawBands (void)
 	TPlay &P = m_Play;
 	if (m_bStatusOn && !P.bMenu && P.bStatusReady)
 	{
-		// "FPS 60", "LOAD 42%", "CPU 48°C", "RACE 3.2 MS", "1080P 4X CPU+HVS"
+		// "FPS 60", "LOAD 42%", "CPU 48°", "RCE 3.2" (beam racing: pad to
+		// picture, ms) or "DLY 3.2" (frame delay, ms), "1080P 4X", "CPU+HVS":
+		// short, so that at 720p every line fits the narrowest column
 		const CScreen::TTextSpan Spans[] =
 		{
 			{"FPS ", UI_GREY}, {P.StFps, P.nFpsColor}, {"\nLOAD ", UI_GREY}, {P.StLoad, P.nLoadColor},
 			{"\nCPU ", UI_GREY}, {P.StTemp, P.nTempColor},
-			{g_Race.bGame ? "\nRACE " : "\nDELAY ", UI_GREY}, {P.StDelay, UI_WHITE},
+			{g_Race.bGame ? "\nRCE " : "\nDLY ", UI_GREY}, {P.StDelay, UI_WHITE},
 			{"\n", UI_GREY}, {P.StRes, UI_GREY}, {P.StScale, UI_GREY}
 		};
 		m_Video.DrawSideText (FALSE, Spans, sizeof Spans / sizeof Spans[0]);
@@ -724,26 +726,27 @@ void CKernel::PlayStatusLine (unsigned nNow, unsigned *pNextDeadline)
 		snprintf (P.StFps, sizeof P.StFps, "%u.%u", nFPS100 / 100, (nFPS100 % 100) / 10);
 	P.nFpsColor = nFPS100 < 5990 ? UI_WARN : UI_WHITE;
 	unsigned nLoad = P.nWorkMax * 100 / 16667;
-	snprintf (P.StLoad, sizeof P.StLoad, "%u%%", nLoad);
+	// at most 99%: "100%" would not fit the 720p column (red from 96%)
+	snprintf (P.StLoad, sizeof P.StLoad, "%u%%", nLoad < 99 ? nLoad : 99);
 	P.nLoadColor = nLoad > 95 ? UI_ERR : (nLoad >= 75 ? UI_WARN : UI_OK);
 	if (P.nSeconds++ % 4 == 0)
 	{
 		P.nTemp = m_CPUThrottle.GetTemperature ();
 	}
-	snprintf (P.StTemp, sizeof P.StTemp, "%u" FONT_DEGREE "C", P.nTemp);
+	snprintf (P.StTemp, sizeof P.StTemp, "%u" FONT_DEGREE, P.nTemp);
 	P.nTempColor = P.nTemp > 75 ? UI_ERR : (P.nTemp > 65 ? UI_WARN : UI_WHITE);
 	snprintf (P.StRes, sizeof P.StRes, "%uP", m_Video.GetHeight ());
 	if (g_Race.bGame)
 	{
 		unsigned us = (unsigned) g_Race.pRaster->TicksToUs ((s64) g_Race.pRacer->GetPadToPicture ());
-		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u MS", us / 1000, (us % 1000) / 100);
+		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u", us / 1000, (us % 1000) / 100);
 	}
 	else
 	{
-		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u MS", g_Delay.nUs / 1000, (g_Delay.nUs % 1000) / 100);
+		snprintf (P.StDelay, sizeof P.StDelay, "%u.%u", g_Delay.nUs / 1000, (g_Delay.nUs % 1000) / 100);
 	}
 	unsigned k = m_Video.GetHVSFactor (), S = m_Video.GetScale ();
-	snprintf (P.StScale, sizeof P.StScale, " %uX %s", S,
+	snprintf (P.StScale, sizeof P.StScale, " %uX\n%s", S,	// the method on a line of its own
 		  k == S ? "HVS" : (k == 1 ? "CPU" : "CPU+HVS"));
 	P.bStatusReady = TRUE;
 

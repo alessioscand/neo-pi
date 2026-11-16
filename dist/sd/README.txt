@@ -8,9 +8,9 @@ WHAT'S NEW IN 1.2.0
     list, the list in the BIOS's own letters.
   - OPTIONS > BEZEL: what is around the picture while playing.
     GRID+INFO (default): the grid, and at 1080p the game's title, maker
-    and year above the picture (from the .neo file). GRID: the grid
-    only. INFO: the texts on black. OFF: black. The border is drawn
-    once, never during play.
+    and year above the picture (from the .neo file) and what its buttons
+    do below. GRID: the grid only. INFO: the texts on black. OFF:
+    black. The border is drawn once, never during play.
   - Status line (Select + C) and messages beside the picture, in the
     left and right columns, at 720p too. They are redrawn only when they
     change: no more flickering lines.
@@ -125,18 +125,23 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
 
 STATUS LINE (Select + C)
 
-  In the left column, at the bottom, one item per line:
+  In the left column, at the bottom:
 
     FPS 60
     LOAD 62%
-    CPU 39 C
-    DELAY 6.5 MS
-    1080P 4X CPU+HVS
+    CPU 39
+    RCE 1.4
+    1080P 4X
+    CPU+HVS
 
   - LOAD: how much of each frame is used (green; yellow from 75%; red
-    above 95%).
-  - DELAY: the frame delay in ms. With beam racing, RACE instead: the ms
-    from reading the pads to sending the top of the picture to the TV.
+    above 95%; shown up to 99%).
+  - CPU: the processor's temperature, in degrees C.
+  - RCE: with beam racing, the ms from reading the pads to sending the
+    top of the picture to the TV. Without it DLY instead: the frame
+    delay in ms.
+  - The video mode and how the picture is scaled: by the CPU, by the
+    video scaler (HVS) or by both.
 
 LOW INPUT LAG
 

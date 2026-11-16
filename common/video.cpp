@@ -22,7 +22,7 @@
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
-// the text: Area51 at 2 screen pixels per font pixel
+// the text: Lander at 2 screen pixels per font pixel
 #define TEXT_H		7			// font pixels: capitals and digits
 #define TEXT_PITCH	12			// between lines
 #define INFO_WHITE	0xECECECu
@@ -216,7 +216,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nGameX = (m_nWidth - nGameW) / 2;
 	m_nGameY = (m_nHeight - nGameH) / 2;
 
-	// text beside the picture: Area51, 2 screen pixels per font pixel
+	// text beside the picture: Lander, 2 screen pixels per font pixel
 	m_nU = m_nK >= 2 ? 1 : 2;
 	const unsigned U = m_nU, nTextH = TEXT_H * U;
 	// the title and the buttons above and below the picture: only in bands
@@ -584,7 +584,7 @@ unsigned CVideoOut::InfoWidth (const char *pText) const
 	for (const char *s = pText; *s; s++)
 	{
 		unsigned ch = (unsigned char) *s;
-		n += g_FontArea51Width[(ch >= 32 && ch < 128 ? ch : '?') - 32];
+		n += g_FontLanderWidth[(ch >= 32 && ch < 128 ? ch : '?') - 32];
 	}
 	return n * m_nU;
 }
@@ -597,7 +597,7 @@ unsigned CVideoOut::DrawInfoText (const TTarget &T, unsigned x, unsigned y, cons
 	{
 		unsigned ch = (unsigned char) *s;
 		if (ch < 32 || ch >= 128) ch = '?';
-		const unsigned nAdv = g_FontArea51Width[ch - 32] * U;
+		const unsigned nAdv = g_FontLanderWidth[ch - 32] * U;
 		if (x + nAdv + U > T.nW || y + 9 * U > T.nH)
 		{
 			break;
@@ -608,7 +608,7 @@ unsigned CVideoOut::DrawInfoText (const TTarget &T, unsigned x, unsigned y, cons
 			const unsigned o = pass == 0 ? U : 0;
 			for (unsigned r = 0; r < 8; r++)
 			{
-				const unsigned char nRow = g_FontArea51[ch - 32][r];
+				const unsigned char nRow = g_FontLander[ch - 32][r];
 				for (unsigned k = 0; nRow && k < 8; k++)
 				{
 					if (!(nRow & (0x80 >> k)))

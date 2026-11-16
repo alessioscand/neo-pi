@@ -94,8 +94,8 @@ public:
 
 	// Text beside the picture, '\n' starts a new line (a line too long for
 	// the column wraps at a space). Left column: lines right-aligned to the
-	// picture, the last one level with its bottom (status line, CONNECT A USB
-	// GAMEPAD); right column: left-aligned, the first one level with its top
+	// picture, the last one level with its bottom (status line, NO PAD);
+	// right column: left-aligned, the first one level with its top
 	// (messages). Where the columns are too narrow (a 4:3 display) the left
 	// column goes in the band below the picture and the right one in the band
 	// above, on one line. No spans = clear.
