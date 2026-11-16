@@ -17,7 +17,8 @@
 // the border: the theme's grid (ThemeGrid), the same as behind the menus.
 // Around a game it gives way to the background colour near the picture:
 // nothing within GRID_CLEAR game pixels, then a retro dither (4x4 Bayer)
-// up to GRID_FADE, where the grid is whole
+// up to GRID_FADE, where the grid is whole. With the theme's frame: nothing
+// inside it, the grid whole outside, its lines lit near the frame
 #define GRID_CLEAR	6
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
@@ -86,6 +87,8 @@ CVideoOut::CVideoOut (void)
 	m_bSide (FALSE),
 	m_bBands (FALSE),
 	m_nGap (0),
+	m_nSideGap (0),
+	m_nFrame (0),
 	m_nColTop (0),
 	m_nColBot (0),
 	m_nBezel (0),
@@ -258,7 +261,16 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	// 24 screen pixels
 	m_bBands = m_nGameY * m_nK >= 3 * TEXT_H * 2;
 	m_nGap = m_bBands ? (m_nGameY - nTextH) / 2 : (24 + m_nK - 1) / m_nK;
-	m_bSide = m_nGameX >= 2 * m_nGap + 40 * U;
+	// the theme's frame, if any (at most 2 game pixels short of the screen's
+	// top and bottom): the columns' text outside it; without one, the text
+	// nSideShift game pixels further out
+	const unsigned nSize = m_bBands ? 0 : 1;
+	m_nFrame = g_Theme.nFrame[nSize];
+	const int nRoom = (int) (m_nGameY / m_nM) - 2;
+	if (m_nFrame > nRoom) m_nFrame = nRoom > 0 ? nRoom : 0;
+	m_nSideGap = m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2
+				  : m_nGap + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
+	m_bSide = m_nGameX >= m_nSideGap + m_nGap + 40 * U;
 	if (!m_bSide)
 	{
 		m_bBands = FALSE;	// the bands hold the status line and the messages
@@ -549,14 +561,49 @@ u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 	GridAt (x, y, &gx, &gy);
 	int d = gx - GAME_W / 2;
 	if (gy - GAME_H / 2 > d) d = gy - GAME_H / 2;
-	if (d >= GRID_FADE)
+	u32 c;
+	if (m_nFrame > 0)
+	{
+		if (d < m_nFrame)
+		{
+			c = ThemeGround ();			// inside the frame: empty
+		}
+		else if (d == m_nFrame)
+		{
+			c = g_Theme.nFrameColour;		// the frame's line
+		}
+		else
+		{
+			// the grid, whole; a line near the frame lit: from the frame's
+			// colour back to its own, smoothstep (e / G) in integers
+			const int e = d - m_nFrame - 1, G = g_Theme.nFrameGlow;
+			c = ThemeGrid (gx, gy);
+			if (e >= G || c == ThemeGround ())
+			{
+				return GridPixel (x, y);
+			}
+			const int s = e * e * (3 * G - 2 * e), S = G * G * G;
+			const u32 f = g_Theme.nFrameColour;
+			u32 n = 0;
+			for (unsigned sh = 0; sh <= 16; sh += 8)
+			{
+				const int a = (f >> sh) & 0xFF, b = (c >> sh) & 0xFF;
+				n |= (u32) (a + (b - a) * s / S) << sh;
+			}
+			c = n;
+		}
+	}
+	else if (d >= GRID_FADE)
 	{
 		return GridPixel (x, y);
 	}
-	// smoothstep (d / FADE) against the dither's threshold, in integers
-	const int v = d * d * (3 * GRID_FADE - 2 * d);
-	const int t = (2 * s_Bayer[gy & 3][gx & 3] + 1) * (GRID_FADE * GRID_FADE * GRID_FADE / 32);
-	const u32 c = d < GRID_CLEAR || v <= t ? ThemeGround () : ThemeGrid (gx, gy);
+	else
+	{
+		// smoothstep (d / FADE) against the dither's threshold, in integers
+		const int v = d * d * (3 * GRID_FADE - 2 * d);
+		const int t = (2 * s_Bayer[gy & 3][gx & 3] + 1) * (GRID_FADE * GRID_FADE * GRID_FADE / 32);
+		c = d < GRID_CLEAR || v <= t ? ThemeGround () : ThemeGrid (gx, gy);
+	}
 	return Native (RGB ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF));
 }
 
@@ -810,7 +857,7 @@ void CVideoOut::DrawSideText (boolean bRight, const TTextSpan *pSpans, unsigned 
 
 	// too wide for the column: wrap at the last space that fits
 	const unsigned nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
-	const unsigned nMaxW = m_bSide ? m_nGameX - 2 * m_nGap : m_nWidth - 2 * m_nGap;
+	const unsigned nMaxW = m_bSide ? m_nGameX - m_nSideGap - m_nGap : m_nWidth - 2 * m_nGap;
 	for (unsigned l = 0; m_bSide && l < nLines && nLines < SIDE_LINES; l++)
 	{
 		if (InfoWidth (L[l]) <= nMaxW)
@@ -872,8 +919,8 @@ void CVideoOut::DrawSideText (boolean bRight, const TTextSpan *pSpans, unsigned 
 	{
 		const unsigned w = InfoWidth (L[l]);
 		if (!m_bSide)		nX[l] = w < m_nWidth ? (m_nWidth - w) / 2 : 0;
-		else if (bRight)	nX[l] = m_nGameX + nGameW + m_nGap;
-		else			nX[l] = m_nGameX - m_nGap > w ? m_nGameX - m_nGap - w : 0;
+		else if (bRight)	nX[l] = m_nGameX + nGameW + m_nSideGap;
+		else			nX[l] = m_nGameX - m_nSideGap > w ? m_nGameX - m_nSideGap - w : 0;
 		if (nX[l] < New.x0) New.x0 = nX[l];
 		if (nX[l] + w + U > New.x1) New.x1 = nX[l] + w + U;
 	}

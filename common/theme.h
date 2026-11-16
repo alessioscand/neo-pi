@@ -47,6 +47,18 @@ struct TUITheme
 	unsigned	 nCredits;
 	const char	*pTrademark1;
 	const char	*pTrademark2;
+
+	// around a game, optional: [0] with the bands (1080p), [1] without (720p)
+	// - nFrame: a frame line nFrame game pixels from the picture, holding the
+	//   title and the buttons (0: none, the grid's dither as usual); the grid
+	//   then whole, its lines lit near the frame: nFrameColour on it, back to
+	//   their own colour nFrameGlow game pixels away
+	// - nSideShift: without a frame, the side columns' text this many game
+	//   pixels further from the picture
+	int		 nFrame[2];
+	u32		 nFrameColour;
+	int		 nFrameGlow;
+	int		 nSideShift[2];
 };
 
 extern const TUITheme g_Theme;

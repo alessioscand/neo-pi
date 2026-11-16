@@ -120,6 +120,8 @@ private:
 	boolean	 m_bSide;			// status and messages in the side columns
 	boolean	 m_bBands;			// room for the title and the buttons
 	unsigned m_nGap;			// text from the picture and the screen edge
+	unsigned m_nSideGap;			// the columns' text from the picture
+	int	 m_nFrame;			// the theme's frame, game pixels (0: none)
 	unsigned m_nColTop, m_nColBot;		// the columns' text: between these lines
 
 	// the border

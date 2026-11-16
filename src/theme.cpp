@@ -53,7 +53,9 @@ const TUITheme g_Theme =
 	0x96A0AF, FALSE,			// the list's bottom row: dim, menu font
 	s_Logo, sizeof s_Logo / sizeof s_Logo[0], 2, s_LogoKeys, s_LogoColors,
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
-	"NEO GEO IS A TRADEMARK OF SNK.", "BIOS AND GAMES NOT INCLUDED."
+	"NEO GEO IS A TRADEMARK OF SNK.", "BIOS AND GAMES NOT INCLUDED.",
+	{10, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
+	{0, 0}
 };
 
 // the grid: a lattice of diamonds, a line every 16 pixels along both diagonals
