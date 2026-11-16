@@ -16,6 +16,22 @@ extern "C" {
 #include "geo_neo.h"
 }
 
+// a number kept in BCD (0x56 = 56), 0 if a nibble is not a decimal digit
+static unsigned BCDToNumber (unsigned nBCD)
+{
+	unsigned nNumber = 0;
+	for (int nShift = 28; nShift >= 0; nShift -= 4)
+	{
+		const unsigned nDigit = (nBCD >> nShift) & 0xF;
+		if (nDigit > 9)
+		{
+			return 0;
+		}
+		nNumber = nNumber * 10 + nDigit;
+	}
+	return nNumber;
+}
+
 static boolean HasNeoExtension (const char *pName)
 {
 	size_t n = strlen (pName);
@@ -167,10 +183,12 @@ void CKernel::ScanGames (void)
 		{
 			snprintf (G.Info, sizeof G.Info, "%s", Maker);
 		}
-		// the NGH number picks the button names (gametable.cpp)
-		const unsigned nNGH =   Header[40]       | Header[41] << 8
+		// the NGH number picks the button names (gametable.cpp); the
+		// header keeps it in BCD, one decimal digit a nibble: Art of
+		// Fighting 2, NGH-056, is 0x56
+		const unsigned nBCD =   Header[40]       | Header[41] << 8
 				      | Header[42] << 16 | (unsigned) Header[43] << 24;
-		G.nGame = NeoButtonsFind (nNGH);
+		G.nGame = NeoButtonsFind (BCDToNumber (nBCD));
 		m_nGames++;
 	}
 	f_closedir (&Dir);
