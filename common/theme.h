@@ -51,8 +51,8 @@ struct TUITheme
 	//   title and the buttons (0: none, the grid's dither as usual); the grid
 	//   then whole, its lines lit near the frame: nFrameColour on it, back to
 	//   their own colour nFrameGlow game pixels away
-	// - nSideShift: without a frame, the side columns' text this many game
-	//   pixels further from the picture
+	// - nSideShift: the side columns' text this many game pixels further
+	//   from the picture (or from the frame)
 	int		 nFrame[2];
 	u32		 nFrameColour;
 	int		 nFrameGlow;

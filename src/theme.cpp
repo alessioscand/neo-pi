@@ -54,7 +54,7 @@ const TUITheme g_Theme =
 	s_Logo, sizeof s_Logo / sizeof s_Logo[0], 2, s_LogoKeys, s_LogoColors,
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
 	{8, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
-	{0, 0},
+	{4, 4},					// the columns' text a little further out
 	10					// a fabric of diamonds, through the frame's corners
 };
 

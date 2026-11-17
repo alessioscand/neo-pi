@@ -267,14 +267,14 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_bBands = m_nGameY * m_nK >= 3 * TEXT_H * 2;
 	m_nGap = m_bBands ? (m_nGameY - nTextH) / 2 : (24 + m_nK - 1) / m_nK;
 	// the theme's frame, if any (at most 2 game pixels short of the screen's
-	// top and bottom): the columns' text outside it; without one, the text
+	// top and bottom): the columns' text outside it; either way the text
 	// nSideShift game pixels further out
 	const unsigned nSize = m_bBands ? 0 : 1;
 	m_nFrame = g_Theme.nFrame[nSize];
 	const int nRoom = (int) (m_nGameY / m_nM) - 2;
 	if (m_nFrame > nRoom) m_nFrame = nRoom > 0 ? nRoom : 0;
-	m_nSideGap = m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2
-				  : m_nGap + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
+	m_nSideGap = (m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2 : m_nGap)
+		   + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
 
 	// the frame's thin lines (t framebuffer pixels in the middle of their game
 	// pixel), from the screen's centre; with a fabric the grid counts from the
