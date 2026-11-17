@@ -83,6 +83,7 @@ private:
 	u32 GridPixel (unsigned x, unsigned y) const;		// framebuffer order
 	u32 FramePixel (unsigned x, unsigned y, int d) const;
 	u32 DitherPixel (unsigned x, unsigned y, int d, int gx, int gy) const;
+	u32 SquarePixel (unsigned x, unsigned y) const;
 	u32 BgPixel (unsigned x, unsigned y) const;		// framebuffer order
 	void FillBorder (unsigned nBuf);
 	void DrawInfoLines (unsigned nBuf);

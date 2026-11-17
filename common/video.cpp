@@ -17,8 +17,8 @@
 // The border: the theme's grid, as behind the menus, drawn once (never
 // during play), on points (BgPoint): framebuffer pixels, or game pixels with
 // bPixel. Around a game: the theme's frame (FramePixel: empty inside, the
-// grid lit near it), or none (DitherPixel: clear up to GRID_CLEAR, a Bayer
-// dither up to GRID_FADE).
+// grid lit near it), or none: whole squares (SquarePixel, nSquare) or a
+// Bayer dither (DitherPixel: clear up to GRID_CLEAR, fading to GRID_FADE).
 #define GRID_CLEAR	6
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
@@ -668,6 +668,29 @@ u32 CVideoOut::DitherPixel (unsigned x, unsigned y, int d, int gx, int gy) const
 	return ToFb (d < GRID_CLEAR || v <= t ? ThemeGround () : GridColour (x, y));
 }
 
+// around a game without a frame, at a background point: a line only on the
+// edge of a square that keeps a square's width from the picture
+u32 CVideoOut::SquarePixel (unsigned x, unsigned y) const
+{
+	const u32 c = GridColour (x, y);
+	if (c == ThemeGround ())
+	{
+		return ToFb (c);
+	}
+	const int M = (int) m_nBgM, P = g_Theme.nSquare * M, t = (M + 1) / 2;
+	const int X = (int) x - (int) (m_nWidth / 2), Y = (int) y - (int) (m_nHeight / 2);
+	const int cx = (X + P * 64) / P - 64, cy = (Y + P * 64) / P - 64;	// its square
+	const int nW = (GAME_W / 2 + g_Theme.nSquare) * M, nH = (GAME_H / 2 + g_Theme.nSquare) * M;
+	auto Free = [=] (int sx, int sy)
+	{
+		return (sx + 1) * P <= -nW || sx * P >= nW || (sy + 1) * P <= -nH || sy * P >= nH;
+	};
+	const boolean bV = (X + P * 64) % P < t, bH = (Y + P * 64) % P < t;
+	const boolean bOn =    (bV && (Free (cx, cy) || Free (cx - 1, cy)))
+			    || (bH && (Free (cx, cy) || Free (cx, cy - 1)));
+	return ToFb (bOn ? c : ThemeGround ());
+}
+
 u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 {
 	if (!(m_nBezel & BEZEL_GRID))
@@ -681,7 +704,9 @@ u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 	BgPoint (&x, &y);
 	int gx, gy;
 	const int d = GameDistance (x, y, &gx, &gy);
-	return m_nFrame > 0 ? FramePixel (x, y, d) : DitherPixel (x, y, d, gx, gy);
+	return   m_nFrame > 0 ? FramePixel (x, y, d)
+	       : g_Theme.nSquare > 0 ? SquarePixel (x, y)
+	       : DitherPixel (x, y, d, gx, gy);
 }
 
 // the whole border of a buffer (never the picture), then the game's info

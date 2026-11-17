@@ -57,6 +57,9 @@ struct TUITheme
 	int		 nFabric;
 	// lines a game pixel wide (FALSE: thin)
 	boolean		 bPixel;
+	// without a frame: whole squares of nSquare game pixels (lines from the
+	// screen's centre), a square's width clear around the picture (0: dither)
+	int		 nSquare;
 };
 
 extern const TUITheme g_Theme;
