@@ -510,21 +510,22 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 		Text (x0 + 22, y0 + 32 + (int) nSpace * nStep + 4, pMessage, nMessageColor);
 	}
 
-	// more rows out of view: a small arrow on the frame, in the middle of the
-	// top (above) or of the bottom (below)
+	// more rows out of view: small arrows in the message's colour at the
+	// right of its line, up then down, centred on the text (the longest
+	// message, 22 characters, ends before them)
 	for (int a = 0; a < 2; a++)
 	{
 		if (a == 0 ? !bMoreAbove : !bMoreBelow)
 		{
 			continue;
 		}
-		const int cx = UI_W / 2, cy = a == 0 ? yP : yP + nPanelH - 5;
+		const int cx = x1 - 14 - (a == 0 ? 12 : 0), cy = y0 + 32 + (int) nSpace * nStep + 5;
 		for (int pass = 0; pass < 2; pass++)		// shadow, then arrow
 		{
 			for (int r = 0; r < 5; r++)
 			{
 				const int hw = a == 0 ? r : 4 - r;
-				Fill (cx - hw + 1 - pass, cy + r + 1 - pass, 2 * hw + 1, 1, pass == 0 ? 0x000000u : T.nValue);
+				Fill (cx - hw + 1 - pass, cy + r + 1 - pass, 2 * hw + 1, 1, pass == 0 ? 0x000000u : nMessageColor);
 			}
 		}
 	}
