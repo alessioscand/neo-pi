@@ -1,16 +1,11 @@
 /*
- * Hiscores and battery RAM, kept on the card
+ * Hiscores and battery RAM on the card
  *
- * CHiscore does what MAME's hiscore plugin does (hiscore.dat): once the game
- * has set its table up in RAM, the table of the .hi file is put over it; the
- * table is written back when it changed. The .hi files are MAME's own format.
- *
- * CBatteryRam keeps the RAM a board keeps with its battery (as MAME's NVRAM:
- * settings, bookkeeping, the scores of the games that keep them there),
- * loaded when the game starts and written when it changed.
- *
- * The core is reached through a few functions (THiCore, TNvCore); the paths
- * are the caller's, and so is the log: each call says what happened.
+ * CHiscore: MAME's hiscore plugin (hiscore.dat, MAME's .hi files): the table
+ * is loaded once the game has set it up, saved when it changes.
+ * CBatteryRam: the board's battery RAM (as MAME's NVRAM), loaded at start,
+ * saved when it changes.
+ * The core through THiCore / TNvCore; paths and log are the caller's.
  */
 #ifndef HISCORE_H
 #define HISCORE_H

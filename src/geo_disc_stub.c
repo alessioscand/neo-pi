@@ -1,6 +1,5 @@
 /*
- * neo-pi - Neo Geo CD is out of scope: these stubs replace geo_disc.c and
- * geo_cue.c (CUE/FLAC parsing) so the cartridge core links without them.
+ * neo-pi - no Neo Geo CD: stubs for geo_disc.c and geo_cue.c
  */
 #include <stdint.h>
 #include "geo_disc.h"

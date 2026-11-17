@@ -12,13 +12,9 @@
 #define HINT_TEXT	0xD2D2D2u		// what a button does
 #define FOOTER_DIM	60			// % of nDim: the line under a panel
 #define MENU_GAP	7			// between the blocks of a screen (logo, panel, buttons)
-// panels: half their width and height a multiple of 10 (from the middle of
-// the screen, where they are centred), so that their edges fall on the grid's
-// lines or halfway between them, the same on every side; on a CRT the menus
-// stay in the title safe area (10% from each edge of the 320 x 240 picture:
-// here x 24-279, y 16-207), so the panels are at most 240 wide and, with
-// what is above and below them, 192 tall (CREDITS only: 280 wide, in the
-// action safe area, 5%)
+// panels: half width and height multiples of 10 (edges on the grid); within
+// a CRT's title safe area (10%: x 24-279, y 16-207): at most 240 wide, 192
+// tall with what is above and below (CREDITS: 280 wide, 5%)
 #define SAFE_H		192
 // what the panels hold, in lines (then PANEL_FIT); the panel menus and the
 // credits count theirs from their rows

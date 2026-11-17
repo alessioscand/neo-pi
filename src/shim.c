@@ -1,9 +1,6 @@
 /*
- * neo-pi - minimal C library shim for the Geolith core on Circle (bare metal)
- *
- * Circle provides memcpy/memset/strlen/malloc/... ; newlib provides the
- * headers, libm (sin) and setjmp/longjmp (extracted from libc.a at build
- * time). Everything else the core references is implemented or stubbed here.
+ * neo-pi - C library shim for Geolith: Circle has memcpy, malloc...; newlib
+ * the headers, libm and setjmp; the rest is here.
  */
 #include <stdarg.h>
 #include <stddef.h>

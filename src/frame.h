@@ -1,10 +1,6 @@
 /*
- * neo-pi - the emulated frame: its picture and sound, and where its lines go
- *
- * With multicore each line the video chip finishes goes straight to the screen
- * (with the scanlines) from core 1; with COMPOSITE it goes to core 2, which
- * filters it and puts it on screen. Single core, the whole frame is drawn after
- * geo_exec().
+ * neo-pi - the emulated frame: picture, sound, where its lines go (multicore:
+ * core 1 to the screen, COMPOSITE: core 2; single core: after geo_exec())
  */
 #ifndef FRAME_H
 #define FRAME_H

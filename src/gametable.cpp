@@ -1,8 +1,6 @@
 /*
- * neo-pi - the names of buttons A..D shown under the picture, by the NGH
- * number in the .neo header. Our own short names, written by hand game by
- * game and checked against Arcade-History. A game not here (mahjong, quiz
- * panels, unknown NGH, NGH 0) shows no buttons.
+ * neo-pi - buttons A..D by NGH number, written by hand (checked against
+ * Arcade-History); a game not here shows none
  */
 #include "gametable.h"
 

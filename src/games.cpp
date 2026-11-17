@@ -1,6 +1,5 @@
 /*
- * neo-pi - games: the list of .neo files, loading one with the BIOS, its save
- * data (backup RAM, cartridge RAM, memory card)
+ * neo-pi - games: the .neo list, loading with the BIOS, save data
  */
 #include "kernel.h"
 #include "gametable.h"
@@ -299,13 +298,9 @@ void CKernel::UnloadGame (void)
 	m_nLoaded = -1;
 }
 
-// 68000 and Z80 work RAM as at power-on (all zero). Geolith never clears them:
-// it expects one game per run, and its reset is the board's RESET button, which
-// keeps the RAM. Without this, a game loaded from the list starts with the RAM
-// of the previous one, and the Universe BIOS, finding its own data there, takes
-// it for a soft reset and keeps that game's active region instead of reading
-// its settings from the backup RAM (which is loaded per game and is right).
-// Also used by BIOS SETTINGS with UNIBIOS. The backup RAM is not touched.
+// 68000 and Z80 work RAM zeroed as at power-on (Geolith's reset keeps it, and
+// the Universe BIOS would take the last game's RAM for a soft reset). Also
+// for BIOS SETTINGS; the backup RAM is kept.
 void CKernel::ClearWorkRAM (void)
 {
 	memset ((void *) geo_m68k_ram_ptr (), 0, 0x10000);
@@ -385,10 +380,8 @@ boolean CKernel::LoadGame (unsigned nIndex)
 		m_pGame = 0;
 		return FALSE;
 	}
-	// Geolith trusts the sizes in the header and takes the ROMs one after the
-	// other from byte 4096: a truncated or damaged file would be read past its
-	// end (garbage on screen, or worse). Same layout as geo_neo_load(), so a
-	// file it reads correctly always passes
+	// Geolith trusts the header's sizes (ROMs from byte 4096): check them
+	// against the file, with geo_neo_load()'s layout
 	const u8 *h = (const u8 *) m_pGame;
 	u64 nNeed = 4096;
 	for (unsigned i = 4; i <= 24; i += 4)

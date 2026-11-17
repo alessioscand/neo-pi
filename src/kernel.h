@@ -1,10 +1,7 @@
 /*
- * neo-pi - kernel: game list, play with USB pads and HDMI audio, in-game menu
- * with save states, automatic diagnostics in LOG.TXT
- *
- * The class is implemented by area: kernel.cpp (start-up, power off),
- * console.cpp, games.cpp, settings.cpp, menus.cpp, gameloop.cpp, bench.cpp,
- * report.cpp, racing.cpp.
+ * neo-pi - kernel: list, play, in-game menu, diagnostics in LOG.TXT; one
+ * file per area (kernel, console, games, settings, menus, gameloop, bench,
+ * report, racing)
  */
 #ifndef KERNEL_H
 #define KERNEL_H

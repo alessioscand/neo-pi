@@ -1,12 +1,7 @@
 /*
- * neo-pi - the video chip's lines drawn on core 1 (patches/geolith-mc.py)
- *
- * Core 0 (68000, Z80, sound) queues each line; core 1 draws the queued lines in
- * order and passes each one on (to the screen with the scanlines, or to core 2
- * for COMPOSITE). Before anything the drawing reads changes, core 0 waits until
- * core 1 has drawn every queued line, so the picture is identical to the
- * single core one. A stuck core 1 is detected after 0.5 s: the game goes on
- * single core.
+ * neo-pi - the video lines drawn on core 1 (patches/geolith-mc.py): core 0
+ * queues them, and waits for them before changing what they read (the same
+ * picture as single core); core 1 stuck 0.5 s: single core.
  */
 #ifndef MCLINE_H
 #define MCLINE_H

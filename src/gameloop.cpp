@@ -1,7 +1,6 @@
 /*
- * neo-pi - the game loop: pads to the Neo Geo panels, one emulated frame per
- * screen frame (beam raced, or double buffered with a frame delay), the
- * in-game menu, the messages and the status line beside the picture
+ * neo-pi - the game loop: pads, one emulated frame per screen frame (beam
+ * raced, or double buffered with a frame delay), in-game menu, side text
  */
 #include "kernel.h"
 #include "frame.h"
@@ -71,10 +70,8 @@ void CKernel::SetupCoreOnce (void)
 
 // ---- the loop -----------------------------------------------------------------
 
-// Before a frame: with beam racing, wait for the moment the plan gives
-// against the HDMI scan-out (returns that moment); otherwise, while playing,
-// wait the frame delay after the vsync (returns 0). The time spent waiting
-// does not count as work: *pT0 moves on by it.
+// Before a frame: beam racing, wait for the planned moment (returned); else
+// the frame delay after the vsync (returns 0). The wait moves *pT0 on.
 static unsigned WaitForFrameStart (boolean bRace, boolean bPlaying, unsigned nLastVSync, unsigned *pT0)
 {
 	if (bRace)
@@ -305,10 +302,8 @@ void CKernel::PlayWaitRelease (void)
 	}
 }
 
-// The pads to the Neo Geo panels (s_Joy, s_StatA, s_StatB), and what Select
-// and the menu key ask for. Select + A: screenshot, + B: lazy finger, + C:
-// status line, + D: credits; held alone for one second: the menu; a short
-// press: a coin (MVS) or Select (AES).
+// Pads to the panels (s_Joy, s_StatA, s_StatB). Select + A screenshot, + B
+// lazy finger, + C status, + D credits; held 1 s: menu; tapped: coin / Select.
 void CKernel::PlayReadPanels (const u32 Pad[2], TPlayInput *pIn)
 {
 	TPlay &P = m_Play;
@@ -588,11 +583,8 @@ boolean CKernel::PlayMenu (const u32 Pad[2])
 		case GmBios:
 			if (m_nGameSystem == SYS_UNI)
 			{
-				// Universe BIOS: reset with A+B+C held on the splash
-				// screen, which opens its main menu. The work RAM is
-				// cleared first, as at power-on: otherwise, during the
-				// game's start-up, the BIOS sees its own data there,
-				// takes it as a soft reset and skips the splash screen
+				// Universe BIOS menu: reset with A+B+C held, work RAM
+				// cleared first (else the BIOS skips its splash screen)
 				ClearWorkRAM ();
 				geo_reset (1);
 				FrameRephase ();

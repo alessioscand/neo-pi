@@ -1,6 +1,5 @@
 /*
- * neo-pi - BENCH and MCTEST: the game's demo measured, and the multicore
- * picture compared with the single core one
+ * neo-pi - BENCH (the demo measured) and MCTEST (multicore vs single core)
  */
 #include "kernel.h"
 #include "frame.h"
@@ -19,11 +18,9 @@ static_assert (BENCH_FRAMES <= STATS_MAX_VALUES, "ComputeStats sorts at most STA
 #define BENCH_PROFILE_US 200		// profiler: one sample every 200 us
 #define BENCH_SLOW_US	16000		// frames from 16 ms on count as slow
 
-// Multicore picture check (neopi/MCTEST): 60 s of the game's demo, always from
-// the same starting state (a save state taken after loading), run 4 times:
-// 1 single core (only to start from the same leftovers), 2 single core
-// (reference), 3 and 4 with core 1 drawing the lines. Every line of every
-// frame of passes 3 and 4 must be identical to pass 2. Results in MCTEST.TXT.
+// MCTEST (neopi/MCTEST): 60 s of demo from one save state, 4 passes: 1 single
+// core (warm-up), 2 single core (reference), 3 and 4 multicore; every line of
+// 3 and 4 must match 2. Results in MCTEST.TXT.
 void CKernel::McTest (unsigned nSel)
 {
 	u32 *pRef = new u32[MCTEST_FRAMES * GAME_H];

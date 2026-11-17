@@ -1,16 +1,8 @@
 /*
- * The TV filter's core: a whole core that filters the picture one line at a
- * time.
- *
- * The core that finishes a line queues it here and goes on; the TV filter's
- * core runs the project's filter on it (PROJECT_TV_IN_BYTES in,
- * PROJECT_TV_OUT_W pixels out) and hands it to the output callback, which
- * puts it on screen and tells the beam racer. Nothing waits for a whole
- * frame: no added lag, beam racing still works. If that core does not run,
- * or stops answering, the lines are filtered by the caller instead.
- *
- * The project starts the core (CMultiCoreSupport) and calls TvWorkerRun ()
- * from it; the filter itself is the project's own.
+ * The TV filter on its own core, one line at a time: queued lines are
+ * filtered (PROJECT_TV_IN_BYTES in, PROJECT_TV_OUT_W out) and handed to the
+ * output callback; no added lag. Without that core the caller filters.
+ * The project starts the core and calls TvWorkerRun () from it.
  */
 #ifndef TVCORE_H
 #define TVCORE_H

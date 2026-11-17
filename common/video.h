@@ -1,23 +1,12 @@
 /*
  * HDMI output
  *
- * Console mode: framebuffer at the HDMI resolution (boot text, errors).
- * Game mode: integer scaling of the game's picture (project.h), split between
- * the CPU (draw scale m) and the hardware scaler HVS (factor k), S = m * k:
- *   - the framebuffer is (display / k), so the HVS enlarges it exactly k times
- *     with the same factor in both directions (square pixels, no stretching);
- *   - black borders are drawn by us inside the framebuffer;
- *   - if the display is not divisible by any useful k, k = 1 (CPU only).
- * Filters (applied while drawing, no extra buffering, no added lag):
- *   scanlines in three strengths (dark rows at 75%, 50% or 25%).
- * The border (BEZEL): black, or the theme's grid going on around the
- * picture; with a game, its title above the picture and its buttons below
- * (only where the bands are tall enough: 1080p). Drawn once in both buffers
- * when it changes. The status line and the messages go in the side columns,
- * in the theme's font with a hard shadow: drawn by the caller's core
- * (core 0) only when they change, prepared apart and copied a finished row at
- * a time, only over the border, so the line drawing (beam racing) does not
- * change.
+ * Console mode: the framebuffer at the HDMI resolution. Game mode: integer
+ * scaling S = m * k, m by the CPU, k by the HVS (square pixels; k = 1 if no
+ * useful factor). Scanlines (75%, 50%, 25%) while drawing, no added lag.
+ * The border (BEZEL): black or the theme's grid, with a game its title and
+ * buttons (1080p), drawn once. Status and messages in the side columns,
+ * drawn by core 0 only when they change, over the border only.
  */
 #ifndef COMMON_VIDEO_H
 #define COMMON_VIDEO_H

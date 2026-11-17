@@ -199,11 +199,9 @@ void CKernel::LoadConfig (void)
 	else if (strstr (Text, "bezel=grid"))		m_nBezel = BEZEL_GRID;
 	else if (strstr (Text, "bezel=text"))		m_nBezel = BEZEL_INFO;
 	else if (strstr (Text, "bezel=info"))		m_nBezel = BEZEL_INFO;
-	// (multicore and the scanlines on a Pi 3: decided after LoadConfig, also
-	// when neopi.cfg does not exist yet)
-	// USB pads are polled every 1 ms (like usbhid.jspoll=1 on Linux);
-	// usbpoll=500 / 250 = every 2 / 4 ms, for pads that misbehave at 1000 Hz;
-	// usbpoll=native keeps the interval requested by the device
+	// (multicore and Pi 3 scanlines: decided after LoadConfig)
+	// USB pads polled every 1 ms; usbpoll=500 / 250: 2 / 4 ms; usbpoll=native:
+	// the device's own interval
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
 	else if (strstr (Text, "usbpoll=500"))	g_nUSBInterruptPollMs = 2;
 	else if (strstr (Text, "usbpoll=250"))	g_nUSBInterruptPollMs = 4;

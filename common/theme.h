@@ -1,7 +1,6 @@
 /*
- * What makes the menus and the border one project's own: colours, fonts,
- * logo, credits and the background ("grid"). Each project defines them in
- * its src/theme.cpp; common/ui.cpp and common/video.cpp use them.
+ * A project's look (src/theme.cpp): colours, fonts, logo, credits and the
+ * background ("grid")
  */
 #ifndef COMMON_THEME_H
 #define COMMON_THEME_H
@@ -46,35 +45,25 @@ struct TUITheme
 	const char *const (*pCredits)[2];
 	unsigned	 nCredits;
 
-	// around a game, optional: [0] with the bands (1080p), [1] without (720p)
-	// - nFrame: a frame line nFrame game pixels from the picture, holding the
-	//   title and the buttons (0: none, the grid's dither as usual); the grid
-	//   then whole, its lines lit near the frame: nFrameColour on it, back to
-	//   their own colour nFrameGlow game pixels away
-	// - nSideShift: the side columns' text this many game pixels further
-	//   from the picture (or from the frame)
+	// around a game, [0] 1080p, [1] 720p: a frame nFrame game pixels out (0:
+	// none, the grid's dither), the grid lit near it (nFrameColour, back in
+	// nFrameGlow game pixels); the side text nSideShift game pixels further
 	int		 nFrame[2];
 	u32		 nFrameColour;
 	int		 nFrameGlow;
 	int		 nSideShift[2];
-	// the grid as a fabric (0: counted from the screen's centre): its step in
-	// game pixels, its lines through the frame's corners (ThemeGrid gets x, y
-	// from the bottom right one); the frame then a pixel wider at the left and
-	// the top if needed, so that all four corners are on the lattice
+	// a fabric: the grid's step in game pixels, through the frame's corners
+	// (0: from the screen's centre)
 	int		 nFabric;
-	// the background in game pixels (FALSE: thin lines at the framebuffer's
-	// pixels): its lines a game pixel wide, its steps by whole game pixels
+	// lines a game pixel wide (FALSE: thin)
 	boolean		 bPixel;
 };
 
 extern const TUITheme g_Theme;
 
-// The background (the menus' and the border's "grid"), 0xRRGGBB, at a
-// point x, y counted from the screen's centre (signed), with M points to a
-// game pixel (with bPixel the points are game pixels, M 1): thin lines, a
-// point or two wide, spaced in game pixels; nHalfW, nHalfH: half the screen, to leave out
-// what the screen's edge would cut; with nFabric, x and y from the frame's
-// bottom right corner instead; ThemeGround: its empty colour
+// The grid (0xRRGGBB) at point x, y from the screen's centre (with nFabric:
+// from the frame's bottom right corner), M points per game pixel; nHalfW,
+// nHalfH: half the screen. ThemeGround: its empty colour.
 u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH);
 u32 ThemeGround (void);
 

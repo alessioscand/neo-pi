@@ -41,11 +41,8 @@ static void AudioCallback (size_t nValues)
 	g_nAudioFrames = nValues / 2;		// the core counts int16 values (L+R)
 }
 
-// Light resampler (the default): the core hands over the raw
-// YM2610 output (about 56.3 kHz) and it is brought to 48 kHz by linear
-// interpolation, carrying the position and the last sample across frames.
-// Same rate ratio as Geolith's Speex path, a fraction of its cost (Speex at
-// quality 7 took about 15% of the frame time on a Pi 3).
+// Light resampler (default): the raw YM2610 (~56.3 kHz) to 48 kHz by linear
+// interpolation across frames; Speex q7 cost ~15% of a Pi 3 frame.
 #define YM_RATE		56319		// as in geo_mixer.c
 #define OUT_RATE	48000
 

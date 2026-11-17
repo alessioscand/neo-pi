@@ -1,9 +1,6 @@
 /*
- * The TV filter's core (see tvcore.h)
- *
- * One ring of lines, written by the producer only at the head and by the TV
- * filter's core only at the tail: release and acquire on the two counters,
- * dsb + sev to wake the other side from wfe.
+ * The TV filter's core (tvcore.h): a ring of lines, head written by the
+ * producer, tail by the filter's core; dsb + sev wake the other side.
  */
 #include "tvcore.h"
 #include "smp.h"

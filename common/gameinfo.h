@@ -1,6 +1,5 @@
 /*
- * What the list and the border show of each game: the project's table in
- * src/gametable.cpp, written by hand
+ * Each game's title, maker and buttons (src/gametable.cpp)
  */
 #ifndef COMMON_GAMEINFO_H
 #define COMMON_GAMEINFO_H

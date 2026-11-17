@@ -14,19 +14,11 @@
 
 #define MAX_LINE	(GAME_W * 8)		// longest scaled line we support
 
-// The border: the theme's grid (ThemeGrid, thin lines at the framebuffer's
-// pixels), the same as behind the menus; drawn once, never during play.
-// All of it is worked out on the background's points (BgPoint): the
-// framebuffer's pixels, or with the theme's bPixel the game's pixels, so the
-// same code draws thin lines or lines a game pixel wide.
-// Around a game, two styles:
-// - with the theme's frame (FramePixel): a thin line around the picture and
-//   its title and buttons, empty inside, the grid whole outside, its lines
-//   lit near the frame (nFrameGlow). With a fabric (nFabric) the grid's
-//   lines go through the frame's corners;
-// - without (DitherPixel): nothing within GRID_CLEAR game pixels of the
-//   picture, then a retro dither (4x4 Bayer) up to GRID_FADE, where the grid
-//   is whole
+// The border: the theme's grid, as behind the menus, drawn once (never
+// during play), on points (BgPoint): framebuffer pixels, or game pixels with
+// bPixel. Around a game: the theme's frame (FramePixel: empty inside, the
+// grid lit near it), or none (DitherPixel: clear up to GRID_CLEAR, a Bayer
+// dither up to GRID_FADE).
 #define GRID_CLEAR	6
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
@@ -263,15 +255,12 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	// text beside the picture: the theme's pInfoFont, 2 screen pixels per font pixel
 	m_nU = m_nK >= 2 ? 1 : 2;
 	const unsigned U = m_nU, nTextH = TEXT_H * U;
-	// the title and the buttons above and below the picture: only in bands
-	// at least 3 lines of text tall (1080p, not 720p); the text in the columns
-	// then keeps from the picture the distance the title has from it, else
-	// 24 screen pixels
+	// title and buttons only in bands 3 text lines tall (1080p); the side
+	// text as far from the picture as the title, else 24 screen pixels
 	m_bBands = m_nGameY * m_nK >= 3 * TEXT_H * 2;
 	m_nGap = m_bBands ? (m_nGameY - nTextH) / 2 : (24 + m_nK - 1) / m_nK;
-	// the theme's frame, if any (at most 2 game pixels short of the screen's
-	// top and bottom): the columns' text outside it; either way the text
-	// nSideShift game pixels further out
+	// the frame (up to 2 game pixels from the screen's edge): the side text
+	// outside it, then nSideShift game pixels further
 	const unsigned nSize = m_bBands ? 0 : 1;
 	m_nFrame = g_Theme.nFrame[nSize];
 	const int nRoom = (int) (m_nGameY / m_nM) - 2;
@@ -283,10 +272,8 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nBgK = g_Theme.bPixel ? m_nM : 1;
 	m_nBgM = m_nM / m_nBgK;
 
-	// the frame's lines (t points in the middle of their game pixel), from the
-	// screen's centre; with a fabric the grid counts from the bottom right
-	// corner, and the left and top lines go as far out as needed (a point or
-	// two) to be on the lattice too
+	// the frame's lines, t points thick, from the screen's centre; with a
+	// fabric the left and top ones move out onto the lattice
 	{
 		const int M = (int) m_nBgM, t = (M + 1) / 2;
 		m_nFrameR = GAME_W / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
@@ -588,13 +575,8 @@ static u32 Blend (u32 a, u32 b, int s, int S)
 	return n;
 }
 
-// How far a framebuffer pixel is from the picture, in game pixels (the larger
-// of the two directions; <= 0 inside it), and the game pixel it is in, for
-// the dither. Counted from the screen's centre, the same towards every side:
-// the centre falls between two framebuffer pixels, and the +1 makes the game
-// pixels (M framebuffer pixels) meet there
-// a framebuffer pixel's background point (itself, or with bPixel its game
-// pixel), still counted from the screen's top left
+// a framebuffer pixel's background point (itself, or its game pixel with
+// bPixel), from the screen's top left
 void CVideoOut::BgPoint (unsigned *pX, unsigned *pY) const
 {
 	if (m_nBgK > 1)
@@ -606,7 +588,8 @@ void CVideoOut::BgPoint (unsigned *pX, unsigned *pY) const
 	}
 }
 
-// at a background point x, y: how far from the picture, in game pixels
+// at a background point: how far from the picture in game pixels (<= 0
+// inside), and its game pixel (for the dither); the same on every side
 int CVideoOut::GameDistance (unsigned x, unsigned y, int *pGX, int *pGY) const
 {
 	const unsigned W2 = m_nWidth / 2, H2 = m_nHeight / 2;
@@ -618,10 +601,8 @@ int CVideoOut::GameDistance (unsigned x, unsigned y, int *pGX, int *pGY) const
 	return dx > dy ? dx : dy;
 }
 
-// the theme's grid at a background point: counted from the screen's middle
-// (or, with a fabric, from the frame's bottom right corner) without a mirror
-// (a mirror would double the pixel where a line crosses the middle), so one
-// pixel off the exact symmetry
+// the grid at a background point, from the centre (or the frame's corner);
+// not mirrored, so lines crossing the middle stay one pixel
 u32 CVideoOut::GridColour (unsigned x, unsigned y) const
 {
 	const int W2 = (int) (m_nWidth / 2), H2 = (int) (m_nHeight / 2);

@@ -1,6 +1,5 @@
 /*
- * neo-pi - the names of buttons A..D shown under the picture, by the NGH
- * number in the .neo header (the same for a game and its clones)
+ * neo-pi - buttons A..D by the .neo header's NGH number
  */
 #ifndef NEOPI_GAMETABLE_H
 #define NEOPI_GAMETABLE_H
