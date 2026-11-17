@@ -88,6 +88,7 @@ private:
 	// the border
 	struct TTarget { u32 *pBase; unsigned nPitch, nW, nH; };	// where text goes
 	void GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const;
+	u32 GridColour (unsigned x, unsigned y) const;		// 0xRRGGBB
 	u32 GridPixel (unsigned x, unsigned y) const;		// framebuffer order
 	u32 BgPixel (unsigned x, unsigned y) const;		// framebuffer order
 	void FillBorder (unsigned nBuf);

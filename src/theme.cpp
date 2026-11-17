@@ -58,11 +58,14 @@ const TUITheme g_Theme =
 	{0, 0}
 };
 
-// the grid: a lattice of diamonds, a line every 16 pixels along both diagonals
-u32 ThemeGrid (int x, int y)
+// the grid: a lattice of diamonds, a line every 16 game pixels along both
+// diagonals, one framebuffer pixel wide (two at 720p)
+u32 ThemeGrid (int x, int y, int M)
 {
-	// a lattice of diamonds, two diagonals crossing at the centre
-	return ((x + y) & 15) == 0 || ((x - y) & 15) == 0 ? 0x122344 : 0x060E1E;
+	const int P = 16 * M, t = (M + 1) / 2;
+	x += P * 64;
+	y += P * 64;
+	return (x + y) % P < t || (x - y + P * 128) % P < t ? 0x122344 : 0x060E1E;
 }
 
 u32 ThemeGround (void)
