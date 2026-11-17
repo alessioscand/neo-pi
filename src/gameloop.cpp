@@ -562,7 +562,7 @@ boolean CKernel::PlayMenu (const u32 Pad[2])
 			}
 			if (geo_state_load (Path))
 			{
-				FrameRephase ();	// states from 0.6.4 too
+				FrameRephase ();	// the frame starts at PHASE_LINE again
 				Log ("  save state: loaded", COLOR_TEXT);
 				P.bMenu = FALSE;
 			}

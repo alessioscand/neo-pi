@@ -187,18 +187,14 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
 	if (strstr (Text, "filter=COMPOSITE"))			m_nFilter = FILTER_COMPOSITE;
-	else if (strstr (Text, "filter=TV"))			m_nFilter = FILTER_SCAN_MEDIUM;	// removed in 0.6.0
 	else if (strstr (Text, "filter=SCANLINES_LIGHT"))	m_nFilter = FILTER_SCAN_LIGHT;
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
-	// (gridinfo and info: the names before 1.2.0's last test)
 	if (strstr (Text, "bezel=off"))			m_nBezel = 0;
 	else if (strstr (Text, "bezel=full"))		m_nBezel = BEZEL_GRID | BEZEL_INFO;
-	else if (strstr (Text, "bezel=gridinfo"))	m_nBezel = BEZEL_GRID | BEZEL_INFO;
 	else if (strstr (Text, "bezel=grid"))		m_nBezel = BEZEL_GRID;
 	else if (strstr (Text, "bezel=text"))		m_nBezel = BEZEL_INFO;
-	else if (strstr (Text, "bezel=info"))		m_nBezel = BEZEL_INFO;
 	// (multicore and Pi 3 scanlines: decided after LoadConfig)
 	// USB pads polled every 1 ms; usbpoll=500 / 250: 2 / 4 ms; usbpoll=native:
 	// the device's own interval
