@@ -20,6 +20,13 @@
 // what is above and below them, 192 tall (CREDITS only: 280 wide, in the
 // action safe area, 5%)
 #define SAFE_H		192
+// what the panels hold, in lines (then PANEL_FIT); the panel menus and the
+// credits count theirs from their rows
+#define LIST_H		147			// the game list
+#define BOX_H		71			// DrawBox
+#define LOADING_H	67			// DrawLoading (one line of title)
+#define MESSAGE_H	91			// DrawMessage
+#define MAPPING_H	177			// DrawMapping
 #define PANEL_STEP	20
 #define PANEL_FIT(n)	(((n) + PANEL_STEP - 1) / PANEL_STEP * PANEL_STEP)
 #define BUTTONS_H	13			// the row of button hints
@@ -98,8 +105,8 @@ const char *BezelName (unsigned nBezel, boolean bMenu)
 
 // ---- pieces ----------------------------------------------------------------
 
-// the whole picture: the screen's grid shows through (GRID_HOLE), the same
-// as in the border
+// the whole picture: the screen's own background shows through (GRID_HOLE):
+// the grid, as in the border (BEZEL GRID, FULL), or black (TEXT, OFF)
 void CUI::Background (void)
 {
 	for (int y = 0; y < GAME_H; y++)
@@ -358,7 +365,7 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 	// the list's rows below are counted from its top, y0
 	// (no logo on a CRT: SetLogo)
 	const int nLogoH = m_bLogo ? (int) (T.nLogoRows * T.nLogoScale) + MENU_GAP : 0;
-	const int nListH = 160;		// PANEL_FIT (147)
+	const int nListH = PANEL_FIT (LIST_H);
 	const int nTop = (UI_H - (nLogoH + nListH + MENU_GAP + BUTTONS_H)) / 2;
 	const int y0 = nTop + nLogoH;
 	if (m_bLogo)
@@ -452,9 +459,9 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 	const unsigned nSpace = nRows ? nRows : nItems;	// rows the panel is sized for
 	// long lists a bit tighter, and any list whose block would leave the
 	// title safe area
-	const int nFootH0 = pFooter && pFooter[0] ? 8 + MENU_GAP : 0;
+	const int nFootH = pFooter && pFooter[0] ? 8 + MENU_GAP : 0;
 	int nStep = nSpace > 8 ? 12 : 15;
-	if (PANEL_FIT (22 + (int) nSpace * nStep + 22 + 9) > SAFE_H - nFootH0 - MENU_GAP - BUTTONS_H)
+	if (PANEL_FIT (22 + (int) nSpace * nStep + 22 + 9) > SAFE_H - nFootH - MENU_GAP - BUTTONS_H)
 	{
 		nStep = 12;
 	}
@@ -462,7 +469,6 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 	const int nPanelH = PANEL_FIT (nInner + 9), nPad = (nPanelH - (nInner + 9)) / 2;
 	// panel, footer (if any) and buttons as one block in the middle,
 	// MENU_GAP apart
-	const int nFootH = pFooter && pFooter[0] ? 8 + MENU_GAP : 0;
 	int yP = (UI_H - (nPanelH + MENU_GAP + nFootH + BUTTONS_H)) / 2;
 	if (yP < 4) yP = 4;
 	const int y0 = yP + nPad;		// the rows, in the middle of the panel
@@ -541,9 +547,9 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 void CUI::DrawBox (boolean bOverGame, const char *pLine1, const char *pLine2, const TButtonHint *pHint)
 {
 	Backdrop (bOverGame);
-	const int y0 = (UI_H - 71) / 2;		// the content: 71 lines, in the middle
-	const int yP = (UI_H - PANEL_FIT (71)) / 2;
-	Panel (62, yP, UI_W - 63, yP + PANEL_FIT (71) - 1);
+	const int y0 = (UI_H - BOX_H) / 2;		// the content, in the middle
+	const int yP = (UI_H - PANEL_FIT (BOX_H)) / 2;
+	Panel (62, yP, UI_W - 63, yP + PANEL_FIT (BOX_H) - 1);
 	if (pLine2 && pLine2[0])
 	{
 		if (pLine1) CText (y0 + 12, pLine1, UI_WHITE);
@@ -603,9 +609,9 @@ void CUI::DrawLoading (const char *pName, unsigned nPercent)
 		Line2[nMax] = '\0';
 	}
 
-	// the content 67 lines tall in the middle (a second line: 6 more up and
+	// the content LOADING_H lines tall in the middle (a second line: 6 more up and
 	// down), the panel PANEL_FIT of it
-	const int dy = Line2[0] ? 6 : 0, y0 = (UI_H - 67) / 2, nPanelH = PANEL_FIT (67 + 2 * dy);
+	const int dy = Line2[0] ? 6 : 0, y0 = (UI_H - LOADING_H) / 2, nPanelH = PANEL_FIT (LOADING_H + 2 * dy);
 	const int yP = (UI_H - nPanelH) / 2;
 	Panel (32, yP, UI_W - 33, yP + nPanelH - 1);
 	CText (y0 + 14 - dy, "LOADING", T.nTitle);
@@ -623,9 +629,9 @@ void CUI::DrawLoading (const char *pName, unsigned nPercent)
 void CUI::DrawMessage (const char *pTitle, const char *pLine1, const char *pLine2)
 {
 	Background ();
-	const int y0 = (UI_H - 91) / 2;		// the content: 91 lines, in the middle
-	const int yP = (UI_H - PANEL_FIT (91)) / 2;
-	Panel (32, yP, UI_W - 33, yP + PANEL_FIT (91) - 1);
+	const int y0 = (UI_H - MESSAGE_H) / 2;		// the content, in the middle
+	const int yP = (UI_H - PANEL_FIT (MESSAGE_H)) / 2;
+	Panel (32, yP, UI_W - 33, yP + PANEL_FIT (MESSAGE_H) - 1);
 
 	// the lines centred in the panel: 22 px from the title to the first line
 	// below it, 16 px between the other two
@@ -651,9 +657,9 @@ void CUI::DrawMapping (boolean bOverGame, const char *pTitle, int nStep,
 	const TUITheme &T = g_Theme;
 	Backdrop (bOverGame);
 
-	const int x0 = 42, x1 = UI_W - 43, y0 = (UI_H - 177) / 2;	// 177 lines, in the middle
-	const int yP = (UI_H - PANEL_FIT (177)) / 2;
-	Panel (x0, yP, x1, yP + PANEL_FIT (177) - 1);
+	const int x0 = 42, x1 = UI_W - 43, y0 = (UI_H - MAPPING_H) / 2;	// the content, in the middle
+	const int yP = (UI_H - PANEL_FIT (MAPPING_H)) / 2;
+	Panel (x0, yP, x1, yP + PANEL_FIT (MAPPING_H) - 1);
 	CText (y0 + 10, pTitle, T.nTitle);
 	Separator (x0, x1, y0 + 22);
 

@@ -14,12 +14,16 @@
 
 #define MAX_LINE	(GAME_W * 8)		// longest scaled line we support
 
-// the border: the theme's grid (ThemeGrid, thin lines at the framebuffer's
-// pixels), the same as behind the menus.
-// Around a game it gives way to the background colour near the picture:
-// nothing within GRID_CLEAR game pixels, then a retro dither (4x4 Bayer)
-// up to GRID_FADE, where the grid is whole. With the theme's frame: nothing
-// inside it, the grid whole outside, its lines lit near the frame
+// The border: the theme's grid (ThemeGrid, thin lines at the framebuffer's
+// pixels), the same as behind the menus; drawn once, never during play.
+// Around a game, two styles:
+// - with the theme's frame (FramePixel): a thin line around the picture and
+//   its title and buttons, empty inside, the grid whole outside, its lines
+//   lit near the frame (nFrameGlow). With a fabric (nFabric) the grid's
+//   lines go through the frame's corners;
+// - without (DitherPixel): nothing within GRID_CLEAR game pixels of the
+//   picture, then a retro dither (4x4 Bayer) up to GRID_FADE, where the grid
+//   is whole
 #define GRID_CLEAR	6
 #define GRID_FADE	32
 static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
@@ -31,7 +35,7 @@ static const u8 s_Bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {
 #define TEXT_PITCH	12			// between lines
 #define INFO_WHITE	0xECECECu
 #define INFO_GREY	0x808A8Fu
-#define INFO_NEAR	6			// title and buttons: from the picture
+#define INFO_NEAR	6			// title and buttons: from the picture (no frame)
 #define SIDE_LINES	8
 #define SIDE_CHARS	48
 #define BLOCK_H		(SIDE_LINES * TEXT_PITCH * 2 + 4)	// a column's text, 2x
@@ -559,22 +563,44 @@ void CVideoOut::DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32
 
 // ---------------------------------------------------------------- the border
 
-// The grid at a framebuffer pixel. It is counted in game pixels from the
-// screen's centre, the same towards every side, so that it is symmetric
-// around the picture: the centre falls between two framebuffer pixels, and
-// the +1 makes the game pixels (M framebuffer pixels) meet there
-void CVideoOut::GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const
+// 0xRRGGBB in the framebuffer's order
+u32 CVideoOut::ToFb (u32 c) const
+{
+	return Native (RGB ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF));
+}
+
+// from a to b, s / S of the way (per channel, in integers)
+static u32 Blend (u32 a, u32 b, int s, int S)
+{
+	u32 n = 0;
+	for (unsigned sh = 0; sh <= 16; sh += 8)
+	{
+		const int ca = (a >> sh) & 0xFF, cb = (b >> sh) & 0xFF;
+		n |= (u32) (ca + (cb - ca) * s / S) << sh;
+	}
+	return n;
+}
+
+// How far a framebuffer pixel is from the picture, in game pixels (the larger
+// of the two directions; <= 0 inside it), and the game pixel it is in, for
+// the dither. Counted from the screen's centre, the same towards every side:
+// the centre falls between two framebuffer pixels, and the +1 makes the game
+// pixels (M framebuffer pixels) meet there
+int CVideoOut::GameDistance (unsigned x, unsigned y, int *pGX, int *pGY) const
 {
 	const unsigned W2 = m_nWidth / 2, H2 = m_nHeight / 2;
 	const unsigned cx = x >= W2 ? x - W2 : W2 - 1 - x;
 	const unsigned cy = y >= H2 ? y - H2 : H2 - 1 - y;
 	*pGX = (int) ((cx + 1) / m_nM);
 	*pGY = (int) ((cy + 1) / m_nM);
+	const int dx = *pGX - GAME_W / 2, dy = *pGY - GAME_H / 2;
+	return dx > dy ? dx : dy;
 }
 
 // the theme's grid at a framebuffer pixel: counted from the screen's middle
-// without a mirror (a mirror would double the pixel where a line crosses the
-// middle), so one pixel off the exact symmetry
+// (or, with a fabric, from the frame's bottom right corner) without a mirror
+// (a mirror would double the pixel where a line crosses the middle), so one
+// pixel off the exact symmetry
 u32 CVideoOut::GridColour (unsigned x, unsigned y) const
 {
 	const int W2 = (int) (m_nWidth / 2), H2 = (int) (m_nHeight / 2);
@@ -583,8 +609,57 @@ u32 CVideoOut::GridColour (unsigned x, unsigned y) const
 
 u32 CVideoOut::GridPixel (unsigned x, unsigned y) const
 {
+	return ToFb (GridColour (x, y));
+}
+
+// around a game with the theme's frame; d: GameDistance
+u32 CVideoOut::FramePixel (unsigned x, unsigned y, int d) const
+{
+	// the frame's lines, t framebuffer pixels thick (from the screen's centre)
+	const int X = (int) x - (int) (m_nWidth / 2), Y = (int) y - (int) (m_nHeight / 2);
+	const int t = ((int) m_nM + 1) / 2;
+	const boolean bInX = X > -m_nFrameL - t && X < m_nFrameR + t;
+	const boolean bInY = Y > -m_nFrameT - t && Y < m_nFrameB + t;
+	const boolean bLine =    (bInY && ((X >= m_nFrameR && X < m_nFrameR + t) || (X <= -m_nFrameL && X > -m_nFrameL - t)))
+			      || (bInX && ((Y >= m_nFrameB && Y < m_nFrameB + t) || (Y <= -m_nFrameT && Y > -m_nFrameT - t)));
+	if (bLine)
+	{
+		return ToFb (g_Theme.nFrameColour);
+	}
+	if (X > -m_nFrameL && X < m_nFrameR && Y > -m_nFrameT && Y < m_nFrameB)
+	{
+		return ToFb (ThemeGround ());		// inside the frame: empty
+	}
 	const u32 c = GridColour (x, y);
-	return Native (RGB ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF));
+	if (c == ThemeGround ())
+	{
+		return ToFb (c);
+	}
+	if (d <= m_nFrame)
+	{
+		return ToFb (g_Theme.nFrameColour);	// up to the line: lit
+	}
+	// further out, from the frame's colour back to the line's own:
+	// smoothstep (e / G) in integers
+	const int e = d - m_nFrame - 1, G = g_Theme.nFrameGlow;
+	if (e >= G)
+	{
+		return ToFb (c);
+	}
+	return ToFb (Blend (g_Theme.nFrameColour, c, e * e * (3 * G - 2 * e), G * G * G));
+}
+
+// around a game without a frame; d: GameDistance, gx, gy: its game pixel
+u32 CVideoOut::DitherPixel (unsigned x, unsigned y, int d, int gx, int gy) const
+{
+	if (d >= GRID_FADE)
+	{
+		return GridPixel (x, y);
+	}
+	// smoothstep (d / FADE) against the dither's threshold, in integers
+	const int v = d * d * (3 * GRID_FADE - 2 * d);
+	const int t = (2 * s_Bayer[gy & 3][gx & 3] + 1) * (GRID_FADE * GRID_FADE * GRID_FADE / 32);
+	return ToFb (d < GRID_CLEAR || v <= t ? ThemeGround () : GridColour (x, y));
 }
 
 u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
@@ -597,67 +672,9 @@ u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 	{
 		return GridPixel (x, y);			// no game: the grid, whole
 	}
-	// around a game: how far from the picture, in game pixels
 	int gx, gy;
-	GridAt (x, y, &gx, &gy);
-	int d = gx - GAME_W / 2;
-	if (gy - GAME_H / 2 > d) d = gy - GAME_H / 2;
-	u32 c;
-	if (m_nFrame > 0)
-	{
-		// where the frame's lines are (framebuffer pixels from the centre)
-		const int X = (int) x - (int) (m_nWidth / 2), Y = (int) y - (int) (m_nHeight / 2);
-		const int t = ((int) m_nM + 1) / 2;
-		const boolean bInX = X > -m_nFrameL - t && X < m_nFrameR + t;
-		const boolean bInY = Y > -m_nFrameT - t && Y < m_nFrameB + t;
-		const boolean bLine =    (bInY && ((X >= m_nFrameR && X < m_nFrameR + t) || (X <= -m_nFrameL && X > -m_nFrameL - t)))
-				      || (bInX && ((Y >= m_nFrameB && Y < m_nFrameB + t) || (Y <= -m_nFrameT && Y > -m_nFrameT - t)));
-		if (bLine)
-		{
-			c = g_Theme.nFrameColour;		// the frame: a thin line
-		}
-		else if (X > -m_nFrameL && X < m_nFrameR && Y > -m_nFrameT && Y < m_nFrameB)
-		{
-			c = ThemeGround ();			// inside the frame: empty
-		}
-		else if (d <= m_nFrame)
-		{
-			// just outside the line: the grid's lines go on up to it, lit
-			c = GridColour (x, y) != ThemeGround () ? g_Theme.nFrameColour : ThemeGround ();
-		}
-		else
-		{
-			// the grid, whole; a line near the frame lit: from the frame's
-			// colour back to its own, smoothstep (e / G) in integers
-			const int e = d - m_nFrame - 1, G = g_Theme.nFrameGlow;
-			c = GridColour (x, y);
-			if (e >= G || c == ThemeGround ())
-			{
-				return GridPixel (x, y);
-			}
-			const int s = e * e * (3 * G - 2 * e), S = G * G * G;
-			const u32 f = g_Theme.nFrameColour;
-			u32 n = 0;
-			for (unsigned sh = 0; sh <= 16; sh += 8)
-			{
-				const int a = (f >> sh) & 0xFF, b = (c >> sh) & 0xFF;
-				n |= (u32) (a + (b - a) * s / S) << sh;
-			}
-			c = n;
-		}
-	}
-	else if (d >= GRID_FADE)
-	{
-		return GridPixel (x, y);
-	}
-	else
-	{
-		// smoothstep (d / FADE) against the dither's threshold, in integers
-		const int v = d * d * (3 * GRID_FADE - 2 * d);
-		const int t = (2 * s_Bayer[gy & 3][gx & 3] + 1) * (GRID_FADE * GRID_FADE * GRID_FADE / 32);
-		c = d < GRID_CLEAR || v <= t ? ThemeGround () : GridColour (x, y);
-	}
-	return Native (RGB ((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF));
+	const int d = GameDistance (x, y, &gx, &gy);
+	return m_nFrame > 0 ? FramePixel (x, y, d) : DitherPixel (x, y, d, gx, gy);
 }
 
 // the whole border of a buffer (never the picture), then the game's info

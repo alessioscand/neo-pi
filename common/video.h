@@ -87,9 +87,12 @@ private:
 		       unsigned nTextScale, const CCharGenerator &Font);
 	// the border
 	struct TTarget { u32 *pBase; unsigned nPitch, nW, nH; };	// where text goes
-	void GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const;
+	int GameDistance (unsigned x, unsigned y, int *pGX, int *pGY) const;
+	u32 ToFb (u32 c) const;					// 0xRRGGBB -> framebuffer
 	u32 GridColour (unsigned x, unsigned y) const;		// 0xRRGGBB
 	u32 GridPixel (unsigned x, unsigned y) const;		// framebuffer order
+	u32 FramePixel (unsigned x, unsigned y, int d) const;
+	u32 DitherPixel (unsigned x, unsigned y, int d, int gx, int gy) const;
 	u32 BgPixel (unsigned x, unsigned y) const;		// framebuffer order
 	void FillBorder (unsigned nBuf);
 	void DrawInfoLines (unsigned nBuf);
