@@ -73,8 +73,9 @@ and s16-pi (nothing Neo Geo in them: what they need comes from
 - `src/frame.cpp` - the emulated frame: picture and sound buffers, where the lines go, audio resampling
   (linear, 56.3 kHz to 48 kHz; `resampler=speex` uses Geolith's Speex path)
 - `src/racing.cpp` - beam racing state for the game loop
-- `src/report.cpp`, `src/bench.cpp` - the per-minute report in the log; BENCH and MCTEST
+- `src/bench.cpp` - BENCH and MCTEST
 - `src/mcline.cpp` - the multicore line drawing of `patches/geolith-mc.py`, as the kernel sees it
+- `src/gametable.cpp` - each game's buttons by NGH number, written by hand
 - `src/theme.cpp` - neo-pi's look for the menus and the border: colours, fonts, logo, credits, the grid
   (a lattice of diamonds)
 - `src/vfs.cpp`, `src/ziphelp.c`, `src/shim.c` - file access, zip/PNG (miniz), minimal libc for the core
@@ -95,7 +96,9 @@ and s16-pi (nothing Neo Geo in them: what they need comes from
 - `common/ui.cpp` - all the menus, 304x224 (the same layout in every project); `common/theme.h` - what
   `src/theme.cpp` gives it
 - `common/fonts.h`, `common/font_*.c` - the ZX Origins fonts by Damien Guard (neo-pi links Matinee and Lander)
-- `common/gameinfo.cpp` - a table of per-game titles and buttons (neo-pi has none yet)
+- `common/gameinfo.cpp` - the per-game table of m92-pi and s16-pi (not linked in neo-pi: titles come from the .neo file)
+- `common/report.cpp` - the per-minute report in the log
+- `common/hiscore.cpp` - hiscores and battery RAM (not linked in neo-pi)
 - `src/Makefile.in`, `build.sh`, `make_release.sh`
 - `tools/resolve_profile.py` - turns `PROFILE.TXT` into time per function, using the kernel's .elf
 - `test/harness.c` - Linux test harness (same core and set-up): frames as PPM, audio as WAV
