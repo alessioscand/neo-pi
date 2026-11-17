@@ -172,7 +172,7 @@ private:
 	void Benchmark (void);
 	void McTest (unsigned nSel);
 
-	// report.cpp, racing.cpp
+	// common/report.cpp, racing.cpp
 	void ResetGameStats (void);
 	void ReportWindow (boolean bFinal);
 	void SetupBeamRacing (void);
