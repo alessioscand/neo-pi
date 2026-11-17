@@ -25,7 +25,7 @@ static const char *const s_Logo[] =
 };
 
 static const char s_LogoKeys[] = "NPW.";
-static const u32 s_LogoColors[] = {0xF0C81E, 0x4678FF, 0xF8F8F8, 0x000000};	// yellow = button B, blue a little brighter than D
+static const u32 s_LogoColors[] = {0xF0C81E, 0x4678FF, 0xD2D2D2, 0x000000};	// yellow = button B, blue a little brighter than D, grey = the buttons' text
 
 static const char *const s_Credits[][2] =
 {
@@ -50,7 +50,7 @@ const TUITheme g_Theme =
 	0xFF5050,				// POWER OFF
 	g_FontMatinee, g_FontMatinee, TRUE,	// the list: the BIOS's font when it is loaded
 	g_FontYouSquared,			// around the picture
-	0x96A0AF, FALSE,			// the list's bottom row: dim, menu font
+	0x5A6478, FALSE,			// the list's bottom row: outline, menu font
 	s_Logo, sizeof s_Logo / sizeof s_Logo[0], 2, s_LogoKeys, s_LogoColors,
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
 	"NEO GEO IS A TRADEMARK OF SNK.", "BIOS AND GAMES NOT INCLUDED.",
@@ -60,8 +60,10 @@ const TUITheme g_Theme =
 
 // the grid: a lattice of diamonds, a line every 16 game pixels along both
 // diagonals, one framebuffer pixel wide (two at 720p)
-u32 ThemeGrid (int x, int y, int M)
+u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH)
 {
+	(void) nHalfW;				// no dots: nothing to leave out at the edges
+	(void) nHalfH;
 	const int P = 16 * M, t = (M + 1) / 2;
 	x += P * 64;
 	y += P * 64;

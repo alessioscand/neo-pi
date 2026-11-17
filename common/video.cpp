@@ -544,7 +544,8 @@ void CVideoOut::GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const
 // middle), so one pixel off the exact symmetry
 u32 CVideoOut::GridColour (unsigned x, unsigned y) const
 {
-	return ThemeGrid ((int) x - (int) (m_nWidth / 2), (int) y - (int) (m_nHeight / 2), (int) m_nM);
+	const int W2 = (int) (m_nWidth / 2), H2 = (int) (m_nHeight / 2);
+	return ThemeGrid ((int) x - W2, (int) y - H2, (int) m_nM, W2, H2);
 }
 
 u32 CVideoOut::GridPixel (unsigned x, unsigned y) const

@@ -66,8 +66,9 @@ extern const TUITheme g_Theme;
 // The background (the menus' and the border's "grid"), 0xRRGGBB, at a
 // framebuffer pixel x, y counted from the screen's centre (signed), with M
 // framebuffer pixels to a game pixel: thin lines, a few framebuffer pixels
-// wide, spaced in game pixels; ThemeGround: its empty colour
-u32 ThemeGrid (int x, int y, int M);
+// wide, spaced in game pixels; nHalfW, nHalfH: half the screen, to leave out
+// what the screen's edge would cut; ThemeGround: its empty colour
+u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH);
 u32 ThemeGround (void);
 
 #endif

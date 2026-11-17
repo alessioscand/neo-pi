@@ -98,7 +98,7 @@ private:
 	void Fill (int x, int y, int w, int h, u32 c);
 	void Background (void);
 	void Backdrop (boolean bOverGame);
-	void Logo (void);
+	void Logo (int y);
 	void Panel (int x0, int y0, int x1, int y1);
 	void Separator (int x0, int x1, int y);
 	void Text (int x, int y, const char *s, u32 c, unsigned nTall = 1, boolean bList = FALSE);
