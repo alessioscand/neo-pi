@@ -30,8 +30,9 @@
 // a pixel of the menus where the screen's grid shows (DrawGame, no filter)
 #define GRID_HOLE	0x00010203u
 
-#define BEZEL_GRID	1	// the background (theme.h); else black
+#define BEZEL_GRID	1	// the background (theme.h), behind the menus too; else black
 #define BEZEL_INFO	2	// the game's title and buttons (where there is room)
+				// OPTIONS > BEZEL: OFF, TEXT (INFO), GRID, FULL (both)
 
 // Logical colours (R in the low byte); the screen converts them if the
 // framebuffer stores red in the high byte (Pi 4)

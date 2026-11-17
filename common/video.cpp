@@ -475,14 +475,26 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 		memcpy (pRow, pSrcLine, nGameW * 4);
 		if (!bFilter)
 		{
-			// the menus: where they show the grid, the screen's own, offset
-			// by half a game pixel, which the UI cannot draw
+			// the menus: where they show the background, the screen's own
+			// grid (BEZEL GRID or FULL), which the UI cannot draw; else black
 			const u32 *pGrid = m_pGridPic + (y * M + s) * nGameW;
+			const boolean bGrid = (m_nBezel & BEZEL_GRID) != 0;
 			for (unsigned x = 0; x < GAME_W; x++)
 			{
-				if (pSrc[x] == GRID_HOLE)
+				if (pSrc[x] != GRID_HOLE)
+				{
+					continue;
+				}
+				if (bGrid)
 				{
 					memcpy (pRow + x * M, pGrid + x * M, M * 4);
+				}
+				else
+				{
+					for (unsigned i = 0; i < M; i++)
+					{
+						pRow[x * M + i] = 0xFF000000u;
+					}
 				}
 			}
 		}

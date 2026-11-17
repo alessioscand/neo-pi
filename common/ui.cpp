@@ -79,9 +79,9 @@ const char *BezelName (unsigned nBezel, boolean bMenu)
 {
 	switch (nBezel)
 	{
-	case BEZEL_INFO:		return bMenu ? "INFO" : "info";
+	case BEZEL_INFO:		return bMenu ? "TEXT" : "text";
 	case BEZEL_GRID:		return bMenu ? "GRID" : "grid";
-	case BEZEL_GRID | BEZEL_INFO:	return bMenu ? "GRID+INFO" : "gridinfo";
+	case BEZEL_GRID | BEZEL_INFO:	return bMenu ? "FULL" : "full";
 	default:			return bMenu ? "OFF" : "off";
 	}
 }

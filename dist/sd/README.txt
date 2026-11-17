@@ -6,11 +6,12 @@ WHAT'S NEW IN 1.2.0
   - New look, shared with s16-pi and m92-pi: dark grid of diamonds
     behind the menus, panels with a thick frame, the logo above the game
     list, the list in the BIOS's own letters.
-  - OPTIONS > BEZEL: what is around the picture while playing.
-    GRID+INFO (default): the grid, and at 1080p the game's title, maker
-    and year above the picture (from the .neo file) and what its buttons
-    do below. GRID: the grid only. INFO: the texts on black. OFF:
-    black. The border is drawn once, never during play.
+  - OPTIONS > BEZEL: the background. FULL (default): the grid, and
+    while playing at 1080p the game's title, maker and year above the
+    picture (from the .neo file) and what its buttons do below. GRID:
+    the grid only. TEXT: the texts on black. OFF: black. With TEXT and
+    OFF the menus are on black too. The border is drawn once, never
+    during play.
   - Status line (Select + C) and messages beside the picture, in the
     left and right columns, at 720p too. They are redrawn only when they
     change: no more flickering lines.
@@ -117,9 +118,8 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
                 added lag. On a Pi 3 the scanlines and COMPOSITE need
                 multicore: with multicore=off this item shows MULTICORE
                 OFF.
-  BEZEL         Around the picture while playing: GRID+INFO, GRID, INFO
-                or OFF (see WHAT'S NEW). In neopi.cfg: bezel=gridinfo,
-                grid, info or off.
+  BEZEL         The background: FULL, GRID, TEXT or OFF (see WHAT'S
+                NEW). In neopi.cfg: bezel=full, grid, text or off.
   CONTROLS      Set up a pad (with several pads, press a button on the one
                 to set up).
   POWER OFF     As in the in-game menu.
