@@ -69,12 +69,13 @@ public:
 
 	TCardResult Start (const TNvCore *pCore, const char *pPath);	// CardLoaded / CardBlank
 	TCardResult Save (void);	// CardSaved / CardFailed when it changed
-	void Clear (void);		// as taking the battery out: RAM at zero, file deleted
+	void Clear (void);		// back to the board's own contents, file deleted
 
 private:
 	const TNvCore *m_pCore;
 	size_t m_nSize;
 	u8 *m_pCard;			// what the file holds (or will)
+	u8 *m_pBlank;			// the core's contents before the file (zeros, a factory EEPROM)
 	char m_Path[160];
 };
 

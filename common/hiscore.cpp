@@ -149,7 +149,8 @@ TCardResult CHiscore::Save (void)
 CBatteryRam::CBatteryRam (void)
 :	m_pCore (0),
 	m_nSize (0),
-	m_pCard (0)
+	m_pCard (0),
+	m_pBlank (0)
 {
 	m_Path[0] = '\0';
 }
@@ -157,19 +158,24 @@ CBatteryRam::CBatteryRam (void)
 CBatteryRam::~CBatteryRam (void)
 {
 	delete [] m_pCard;
+	delete [] m_pBlank;
 }
 
 TCardResult CBatteryRam::Start (const TNvCore *pCore, const char *pPath)
 {
 	delete [] m_pCard;
-	m_pCard = 0;
+	delete [] m_pBlank;
+	m_pCard = m_pBlank = 0;
 	m_pCore = pCore;
 	m_nSize = pCore->pSize ();
-	if (m_nSize == 0 || (m_pCard = new u8[m_nSize]) == 0)
+	if (   m_nSize == 0
+	    || (m_pCard = new u8[m_nSize]) == 0
+	    || (m_pBlank = new u8[m_nSize]) == 0)
 	{
 		m_nSize = 0;
 		return CardNothing;
 	}
+	memcpy (m_pBlank, pCore->pData (), m_nSize);
 	strncpy (m_Path, pPath, sizeof m_Path - 1);
 	m_Path[sizeof m_Path - 1] = '\0';
 	if (ReadFile (m_Path, m_pCard, m_nSize) == m_nSize)
@@ -201,7 +207,7 @@ void CBatteryRam::Clear (void)
 	{
 		return;
 	}
-	memset (m_pCore->pData (), 0, m_nSize);
-	memset (m_pCard, 0, m_nSize);
+	memcpy (m_pCore->pData (), m_pBlank, m_nSize);
+	memcpy (m_pCard, m_pBlank, m_nSize);
 	f_unlink (m_Path);
 }
