@@ -238,7 +238,7 @@ partner Claude, standing on the shoulders of giants:
 | Sound | ymfm by Aaron Giles (C port by Rupert Carmichael) |
 | Resampler (optional) | speexdsp by Jean-Marc Valin |
 | Zip and PNG | miniz by Rich Geldreich |
-| Fonts | "Matinee" (menus) and "You Squared" (text around the picture) from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
+| Fonts | "Matinee" (menus) and "Lander" (text around the picture) from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
 | NTSC filter | by Shay Green (blargg) |
 
 

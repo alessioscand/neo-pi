@@ -94,7 +94,7 @@ and s16-pi (nothing Neo Geo in them: what they need comes from
   A CRT output on the composite jack would be another `CScreen`
 - `common/ui.cpp` - all the menus, 304x224 (the same layout in every project); `common/theme.h` - what
   `src/theme.cpp` gives it
-- `common/fonts.h`, `common/font_*.c` - the ZX Origins fonts by Damien Guard (neo-pi links Matinee and You Squared)
+- `common/fonts.h`, `common/font_*.c` - the ZX Origins fonts by Damien Guard (neo-pi links Matinee and Lander)
 - `common/gameinfo.cpp` - a table of per-game titles and buttons (neo-pi has none yet)
 - `src/Makefile.in`, `build.sh`, `make_release.sh`
 - `tools/resolve_profile.py` - turns `PROFILE.TXT` into time per function, using the kernel's .elf
