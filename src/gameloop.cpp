@@ -123,6 +123,7 @@ void CKernel::RunGame (void)
 		g_Race.pRacer->Restart ();
 		g_Race.pRacer->ResetStats ();
 	}
+	m_bVideoChanged = FALSE;
 	{
 		unsigned nOld;
 		m_pInput->TakeChange (&nOld);	// a press from the list does not count

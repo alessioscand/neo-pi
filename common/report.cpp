@@ -18,9 +18,19 @@ void CKernel::ResetGameStats (void)
 	DelayRestart ();
 	if (g_Race.pRacer)
 	{
-		g_Race.pRacer->Restart ();
+		if (m_bVideoChanged)		// OPTIONS changed the drawing
+		{
+			g_Race.pRacer->SetGeometry (m_Video.GetGameY (), m_Video.GetCPUScale (), m_Video.GetHVSFactor ());
+			g_Race.pRacer->Restart ();
+		}
+		else
+		{
+			g_Race.pRacer->Resume ();
+		}
 		g_Race.pRacer->ResetStats ();
 	}
+	m_bVideoChanged = FALSE;
+	m_Audio.Refill ();
 }
 
 void CKernel::ReportWindow (boolean bFinal)

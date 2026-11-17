@@ -96,6 +96,7 @@ void CKernel::ApplyVideoMode (void)
 		  FilterName (m_Video.GetFilter ()), m_bHVS ? "" : " (scaler=cpu)");
 	Log (Line, COLOR_TEXT);
 	UpdateBezel ();
+	m_bVideoChanged = TRUE;
 	snprintf (Line, sizeof Line, "Video: pixel order %s (%u), red in the %s byte%s",
 		  m_Video.GetPixelOrder () ? "RGB" : "BGR", m_Video.GetPixelOrder (),
 		  m_Video.IsRedLow () ? "low" : "high", "");

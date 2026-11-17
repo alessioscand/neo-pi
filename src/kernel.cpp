@@ -50,6 +50,7 @@ CKernel::CKernel (void)
 	m_bVideoOK (FALSE),
 	m_bSDOK (FALSE),
 	m_bQuiet (TRUE),		// black screen while booting; text only on errors
+	m_bVideoChanged (FALSE),
 	m_nLines (0),
 	m_nRepeat (0),
 	m_pBIOS (0),
@@ -202,6 +203,8 @@ TShutdownMode CKernel::Run (void)
 
 	// from here on the screen belongs to the UI
 	ApplyVideoMode ();
+	m_pUI->DrawEmpty ();			// the background now, before the list
+	ShowUIFrame (FALSE);
 	SetupBeamRacing ();
 	SaveLog ();
 	m_bQuiet = TRUE;

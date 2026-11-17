@@ -55,6 +55,24 @@ boolean CAudioOut::Initialize (CInterruptSystem *pInterrupt)
 	return TRUE;
 }
 
+// after a pause (no sound was written): the queue back to TARGET with
+// silence, so the first frames find it full
+void CAudioOut::Refill (void)
+{
+	if (!m_bOK)
+	{
+		return;
+	}
+	static const s16 Zero[2 * 256] = {0};
+	unsigned nQueued = m_pSound->GetQueueFramesAvail ();
+	while (nQueued < TARGET_FRAMES)
+	{
+		const unsigned n = TARGET_FRAMES - nQueued < 256 ? TARGET_FRAMES - nQueued : 256;
+		m_pSound->Write (Zero, n * 4);
+		nQueued += n;
+	}
+}
+
 void CAudioOut::WriteFrame (const s16 *pSamples, unsigned nFrames)
 {
 	if (!m_bOK || nFrames == 0 || nFrames > 1800)

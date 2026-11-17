@@ -570,6 +570,11 @@ void CUI::DrawBlack (void)
 	m_bGrid = FALSE;
 }
 
+void CUI::DrawEmpty (void)
+{
+	Background ();
+}
+
 void CUI::DrawLoading (const char *pName, unsigned nPercent)
 {
 	const TUITheme &T = g_Theme;

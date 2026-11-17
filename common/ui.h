@@ -87,6 +87,7 @@ public:
 	void DrawCredits (const char *pVersion);	// over the paused game
 	void DrawMessage (const char *pTitle, const char *pLine1, const char *pLine2);
 	void DrawBlack (void);
+	void DrawEmpty (void);			// the background alone (start-up)
 
 	static u32 Dim (u32 c, unsigned nPercent);
 

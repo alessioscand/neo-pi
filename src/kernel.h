@@ -202,6 +202,7 @@ private:
 	boolean			m_bVideoOK;
 	boolean			m_bSDOK;
 	boolean			m_bQuiet;	// UI/emulation running: console not drawn
+	boolean			m_bVideoChanged;	// ApplyVideoMode since the beam racer last restarted
 
 	// console lines
 	char			m_Lines[MaxLines][MaxLineLen];
