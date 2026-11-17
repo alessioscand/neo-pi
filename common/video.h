@@ -123,6 +123,9 @@ private:
 	unsigned m_nGap;			// text from the picture and the screen edge
 	unsigned m_nSideGap;			// the columns' text from the picture
 	int	 m_nFrame;			// the theme's frame, game pixels (0: none)
+	int	 m_nFrameR, m_nFrameB;		// its lines, framebuffer pixels from the
+	int	 m_nFrameL, m_nFrameT;		// screen's centre (left, top: minus)
+	int	 m_nGridX0, m_nGridY0;		// where ThemeGrid counts from
 	unsigned m_nColTop, m_nColBot;		// the columns' text: between these lines
 
 	// the border

@@ -271,6 +271,27 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	if (m_nFrame > nRoom) m_nFrame = nRoom > 0 ? nRoom : 0;
 	m_nSideGap = m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2
 				  : m_nGap + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
+
+	// the frame's thin lines (t framebuffer pixels in the middle of their game
+	// pixel), from the screen's centre; with a fabric the grid counts from the
+	// bottom right corner, and the left and top lines go as far out as needed
+	// (a pixel or two) to be on the lattice too
+	{
+		const int M = (int) m_nM, t = (M + 1) / 2;
+		m_nFrameR = GAME_W / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
+		m_nFrameB = GAME_H / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
+		m_nFrameL = m_nFrameR + 1;		// the mirror image
+		m_nFrameT = m_nFrameB + 1;
+		m_nGridX0 = m_nGridY0 = 0;
+		if (m_nFrame > 0 && g_Theme.nFabric > 0)
+		{
+			const int P = g_Theme.nFabric * M;
+			while ((m_nFrameL + m_nFrameR) % P != 0) m_nFrameL++;
+			while ((m_nFrameT + m_nFrameB) % P != 0) m_nFrameT++;
+			m_nGridX0 = m_nFrameR;
+			m_nGridY0 = m_nFrameB;
+		}
+	}
 	m_bSide = m_nGameX >= m_nSideGap + m_nGap + 40 * U;
 	if (!m_bSide)
 	{
@@ -557,7 +578,7 @@ void CVideoOut::GridAt (unsigned x, unsigned y, int *pGX, int *pGY) const
 u32 CVideoOut::GridColour (unsigned x, unsigned y) const
 {
 	const int W2 = (int) (m_nWidth / 2), H2 = (int) (m_nHeight / 2);
-	return ThemeGrid ((int) x - W2, (int) y - H2, (int) m_nM, W2, H2);
+	return ThemeGrid ((int) x - W2 - m_nGridX0, (int) y - H2 - m_nGridY0, (int) m_nM, W2, H2);
 }
 
 u32 CVideoOut::GridPixel (unsigned x, unsigned y) const
@@ -584,25 +605,25 @@ u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 	u32 c;
 	if (m_nFrame > 0)
 	{
-		if (d < m_nFrame)
+		// where the frame's lines are (framebuffer pixels from the centre)
+		const int X = (int) x - (int) (m_nWidth / 2), Y = (int) y - (int) (m_nHeight / 2);
+		const int t = ((int) m_nM + 1) / 2;
+		const boolean bInX = X > -m_nFrameL - t && X < m_nFrameR + t;
+		const boolean bInY = Y > -m_nFrameT - t && Y < m_nFrameB + t;
+		const boolean bLine =    (bInY && ((X >= m_nFrameR && X < m_nFrameR + t) || (X <= -m_nFrameL && X > -m_nFrameL - t)))
+				      || (bInX && ((Y >= m_nFrameB && Y < m_nFrameB + t) || (Y <= -m_nFrameT && Y > -m_nFrameT - t)));
+		if (bLine)
+		{
+			c = g_Theme.nFrameColour;		// the frame: a thin line
+		}
+		else if (X > -m_nFrameL && X < m_nFrameR && Y > -m_nFrameT && Y < m_nFrameB)
 		{
 			c = ThemeGround ();			// inside the frame: empty
 		}
-		else if (d == m_nFrame)
+		else if (d <= m_nFrame)
 		{
-			// the frame: a thin line, t framebuffer pixels in the middle
-			// of its game pixel
-			const unsigned W2 = m_nWidth / 2, H2 = m_nHeight / 2;
-			const int cx = (int) (x >= W2 ? x - W2 : W2 - 1 - x) + 1;
-			const int cy = (int) (y >= H2 ? y - H2 : H2 - 1 - y) + 1;
-			const int M = (int) m_nM, t = (M + 1) / 2;
-			int f = cx - GAME_W / 2 * M;
-			if (cy - GAME_H / 2 * M > f) f = cy - GAME_H / 2 * M;
-			f -= m_nFrame * M + (M - t) / 2;
-			// outside the thin line the grid's lines go on up to it, lit
-			c = f >= 0 && f < t ? g_Theme.nFrameColour
-			  : f >= t && GridColour (x, y) != ThemeGround () ? g_Theme.nFrameColour
-			  : ThemeGround ();
+			// just outside the line: the grid's lines go on up to it, lit
+			c = GridColour (x, y) != ThemeGround () ? g_Theme.nFrameColour : ThemeGround ();
 		}
 		else
 		{
@@ -789,9 +810,19 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 {
 	const TTarget T = {Row (nBuf, 0), m_nPitchPx, m_nWidth, m_nHeight};
 	const unsigned U = m_nU, nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
-	// near the picture, inside the clear strip before the grid's first line
-	const unsigned nTop = m_nGameY - (TEXT_H + INFO_NEAR) * U;
-	const unsigned nBottom = m_nGameY + nGameH + INFO_NEAR * U;
+	// near the picture, inside the clear strip before the grid's first line;
+	// with a frame, the text and its shadow in the middle of the strip
+	unsigned nNear = INFO_NEAR * U, nNearTop = INFO_NEAR * U;
+	if (m_nFrame > 0)
+	{
+		const int M = (int) m_nM, t = (M + 1) / 2;
+		const int nStrip = m_nFrame * M + (M - t) / 2, nText = (int) ((TEXT_H + 1) * U);
+		const int nGap = nStrip > nText ? (nStrip - nText) / 2 : 0;
+		nNear = (unsigned) nGap;			// below: the text first, then its shadow
+		nNearTop = (unsigned) (nStrip - nGap - (int) (TEXT_H * U));
+	}
+	const unsigned nTop = m_nGameY - TEXT_H * U - nNearTop;
+	const unsigned nBottom = m_nGameY + nGameH + nNear;
 
 	const boolean bMaker = m_Info.pMaker && m_Info.pMaker[0];
 	if (m_Info.pTitle)

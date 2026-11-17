@@ -59,6 +59,11 @@ struct TUITheme
 	u32		 nFrameColour;
 	int		 nFrameGlow;
 	int		 nSideShift[2];
+	// the grid as a fabric (0: counted from the screen's centre): its step in
+	// game pixels, its lines through the frame's corners (ThemeGrid gets x, y
+	// from the bottom right one); the frame then a pixel wider at the left and
+	// the top if needed, so that all four corners are on the lattice
+	int		 nFabric;
 };
 
 extern const TUITheme g_Theme;
@@ -67,7 +72,8 @@ extern const TUITheme g_Theme;
 // framebuffer pixel x, y counted from the screen's centre (signed), with M
 // framebuffer pixels to a game pixel: thin lines, a few framebuffer pixels
 // wide, spaced in game pixels; nHalfW, nHalfH: half the screen, to leave out
-// what the screen's edge would cut; ThemeGround: its empty colour
+// what the screen's edge would cut; with nFabric, x and y from the frame's
+// bottom right corner instead; ThemeGround: its empty colour
 u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH);
 u32 ThemeGround (void);
 
