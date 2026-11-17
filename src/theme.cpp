@@ -25,7 +25,7 @@ static const char *const s_Logo[] =
 };
 
 static const char s_LogoKeys[] = "NPW.";
-static const u32 s_LogoColors[] = {0xF0C81E, 0x4678FF, 0xD2D2D2, 0x000000};	// yellow = button B, blue a little brighter than D, grey = the buttons' text
+static const u32 s_LogoColors[] = {0xF0C81E, 0x4678FF, 0xC8D2E1, 0x000000};	// yellow = button B, blue a little brighter than D, grey = the panels' frame
 
 static const char *const s_Credits[][2] =
 {
@@ -53,7 +53,6 @@ const TUITheme g_Theme =
 	0x5A6478, FALSE,			// the list's bottom row: outline, menu font
 	s_Logo, sizeof s_Logo / sizeof s_Logo[0], 2, s_LogoKeys, s_LogoColors,
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
-	"NEO GEO IS A TRADEMARK OF SNK.", "BIOS AND GAMES NOT INCLUDED.",
 	{8, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
 	{0, 0},
 	10					// a fabric of diamonds, through the frame's corners

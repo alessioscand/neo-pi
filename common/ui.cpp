@@ -14,11 +14,15 @@
 #define MENU_GAP	7			// between the blocks of a screen (logo, panel, buttons)
 // panels: half their width and height a multiple of 10 (from the middle of
 // the screen, where they are centred), so that their edges fall on the grid's
-// lines or halfway between them, the same on every side
+// lines or halfway between them, the same on every side; on a CRT the menus
+// stay in the title safe area (10% from each edge of the 320 x 240 picture:
+// here x 24-279, y 16-207), so the panels are at most 240 wide and, with
+// what is above and below them, 192 tall (CREDITS only: 280 wide, in the
+// action safe area, 5%)
+#define SAFE_H		192
 #define PANEL_STEP	20
 #define PANEL_FIT(n)	(((n) + PANEL_STEP - 1) / PANEL_STEP * PANEL_STEP)
 #define BUTTONS_H	13			// the row of button hints
-#define TRADEMARK	0x828796u
 
 // "..." in one character (UI_ELLIPSIS)
 static const u8 s_Ellipsis[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x92, 0x00};
@@ -27,6 +31,7 @@ CUI::CUI (void)
 :	m_pListFont (g_Theme.pListFont),
 	m_bListLower (g_Theme.bListLower),
 	m_bGrid (FALSE),
+	m_bLogo (TRUE),
 	m_nClipX0 (0),
 	m_nClipX1 (UI_W)
 {
@@ -351,18 +356,23 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 
 	// logo, list and buttons as one block in the middle, MENU_GAP apart;
 	// the list's rows below are counted from its top, y0
-	const int nLogoH = (int) (T.nLogoRows * T.nLogoScale), nListH = 160;		// PANEL_FIT (147)
-	const int nTop = (UI_H - (nLogoH + MENU_GAP + nListH + MENU_GAP + BUTTONS_H)) / 2;
-	const int y0 = nTop + nLogoH + MENU_GAP;
-	Logo (nTop);
-	Panel (12, y0, UI_W - 13, y0 + nListH - 1);
-	Fill (17, y0 + 67, UI_W - 34, 23, T.nBand);
-	Fill (17, y0 + 67, UI_W - 34, 1, T.nFrame2);
-	Fill (17, y0 + 89, UI_W - 34, 1, T.nFrame2);
+	// (no logo on a CRT: SetLogo)
+	const int nLogoH = m_bLogo ? (int) (T.nLogoRows * T.nLogoScale) + MENU_GAP : 0;
+	const int nListH = 160;		// PANEL_FIT (147)
+	const int nTop = (UI_H - (nLogoH + nListH + MENU_GAP + BUTTONS_H)) / 2;
+	const int y0 = nTop + nLogoH;
+	if (m_bLogo)
+	{
+		Logo (nTop);
+	}
+	Panel (32, y0, UI_W - 33, y0 + nListH - 1);
+	Fill (37, y0 + 67, UI_W - 74, 23, T.nBand);
+	Fill (37, y0 + 67, UI_W - 74, 1, T.nFrame2);
+	Fill (37, y0 + 89, UI_W - 74, 1, T.nFrame2);
 
 	// the selected title, twice as tall (a long one scrolls in the band),
 	// 4 above and below it, fading away
-	const int nChars = 34, nListW = nChars * 8, nListX = (UI_W - nListW) / 2;
+	const int nChars = 28, nListW = nChars * 8, nListX = (UI_W - nListW) / 2;
 	for (int k = -4; k <= 4; k++)
 	{
 		const int i = (int) nSel + k;
@@ -398,7 +408,7 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 
 	// the bottom row, in the theme's colour and font for it: what the
 	// selected game is, and where it is in the list
-	Fill (17, y0 + 143, UI_W - 34, 1, T.nFrame2);
+	Fill (37, y0 + 143, UI_W - 74, 1, T.nFrame2);
 	char Count[16];
 	{
 		unsigned a = nSel + 1, b = nCount;
@@ -413,15 +423,15 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 		*p = '\0';
 	}
 	const int nCountW = (int) strlen (Count) * 8;
-	Text (UI_W - 18 - nCountW, y0 + 147, Count, T.nListInfo, 1, T.bListInfoInListFont);
+	Text (UI_W - 38 - nCountW, y0 + 147, Count, T.nListInfo, 1, T.bListInfoInListFont);
 	if (nCount)
 	{
 		char Info[sizeof pGames[0].Info];
 		strncpy (Info, pGames[nSel].Info, sizeof Info - 1);
 		Info[sizeof Info - 1] = '\0';
-		const size_t nRoom = (size_t) ((UI_W - 36 - nCountW) / 8) - 1;
+		const size_t nRoom = (size_t) ((UI_W - 76 - nCountW) / 8) - 1;
 		if (strlen (Info) > nRoom) Info[nRoom] = '\0';
-		Text (18, y0 + 147, Info, T.nListInfo, 1, T.bListInfoInListFont);
+		Text (38, y0 + 147, Info, T.nListInfo, 1, T.bListInfoInListFont);
 	}
 
 	static const TButtonHint Hints[2] = {{'A', "START GAME"}, {'D', "OPTIONS"}};
@@ -440,7 +450,14 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 	Backdrop (bOverGame);
 
 	const unsigned nSpace = nRows ? nRows : nItems;	// rows the panel is sized for
-	const int nStep = nSpace > 8 ? 12 : 15;		// long lists a bit tighter
+	// long lists a bit tighter, and any list whose block would leave the
+	// title safe area
+	const int nFootH0 = pFooter && pFooter[0] ? 8 + MENU_GAP : 0;
+	int nStep = nSpace > 8 ? 12 : 15;
+	if (PANEL_FIT (22 + (int) nSpace * nStep + 22 + 9) > SAFE_H - nFootH0 - MENU_GAP - BUTTONS_H)
+	{
+		nStep = 12;
+	}
 	const int nInner = 22 + (int) nSpace * nStep + 22;	// title + rows + message line
 	const int nPanelH = PANEL_FIT (nInner + 9), nPad = (nPanelH - (nInner + 9)) / 2;
 	// panel, footer (if any) and buttons as one block in the middle,
@@ -450,7 +467,7 @@ void CUI::DrawPanelMenu (boolean bOverGame, const char *pTitle,
 	if (yP < 4) yP = 4;
 	const int y0 = yP + nPad;		// the rows, in the middle of the panel
 	const int nFootY = yP + nPanelH + MENU_GAP;
-	const int x0 = bWide ? 12 : 42, x1 = bWide ? UI_W - 13 : UI_W - 43;
+	const int x0 = bWide ? 32 : 42, x1 = bWide ? UI_W - 33 : UI_W - 43;
 	Panel (x0, yP, x1, yP + nPanelH - 1);
 
 	// 25 characters fit in the panel: a longer title is cut at a word
@@ -608,7 +625,7 @@ void CUI::DrawMessage (const char *pTitle, const char *pLine1, const char *pLine
 	Background ();
 	const int y0 = (UI_H - 91) / 2;		// the content: 91 lines, in the middle
 	const int yP = (UI_H - PANEL_FIT (91)) / 2;
-	Panel (12, yP, UI_W - 13, yP + PANEL_FIT (91) - 1);
+	Panel (32, yP, UI_W - 33, yP + PANEL_FIT (91) - 1);
 
 	// the lines centred in the panel: 22 px from the title to the first line
 	// below it, 16 px between the other two
@@ -634,9 +651,9 @@ void CUI::DrawMapping (boolean bOverGame, const char *pTitle, int nStep,
 	const TUITheme &T = g_Theme;
 	Backdrop (bOverGame);
 
-	const int x0 = 42, x1 = UI_W - 43, y0 = (UI_H - 185) / 2;	// 185 lines, in the middle
-	const int yP = (UI_H - PANEL_FIT (185)) / 2;
-	Panel (x0, yP, x1, yP + PANEL_FIT (185) - 1);
+	const int x0 = 42, x1 = UI_W - 43, y0 = (UI_H - 177) / 2;	// 177 lines, in the middle
+	const int yP = (UI_H - PANEL_FIT (177)) / 2;
+	Panel (x0, yP, x1, yP + PANEL_FIT (177) - 1);
 	CText (y0 + 10, pTitle, T.nTitle);
 	Separator (x0, x1, y0 + 22);
 
@@ -647,10 +664,10 @@ void CUI::DrawMapping (boolean bOverGame, const char *pTitle, int nStep,
 	static const char cButton[8] = {'A', 'B', 'C', 'D', 0, 0, 'E', 'F'};
 #if PROJECT_BUTTONS == 6
 	static const int SlotOfRow[] = {0, 1, 2, 3, 6, 7, 5, 4};
-	const int nRowY = y0 + 54, nPitch = 14, nPressY = y0 + 30;
+	const int nRowY = y0 + 52, nPitch = 13, nPressY = y0 + 30;
 #else
 	static const int SlotOfRow[] = {0, 1, 2, 3, 5, 4};
-	const int nRowY = y0 + 64, nPitch = 16, nPressY = y0 + 34;
+	const int nRowY = y0 + 60, nPitch = 15, nPressY = y0 + 32;
 #endif
 	const int nSlots = (int) (sizeof SlotOfRow / sizeof SlotOfRow[0]);
 
@@ -693,7 +710,7 @@ void CUI::DrawMapping (boolean bOverGame, const char *pTitle, int nStep,
 
 	if (pFooter && pFooter[0])
 	{
-		CText (y0 + 170, pFooter, Dim (T.nDim, FOOTER_DIM));
+		CText (y0 + 163, pFooter, Dim (T.nDim, FOOTER_DIM));
 	}
 }
 
@@ -704,10 +721,13 @@ void CUI::DrawCredits (const char *pVersion)
 	const TUITheme &T = g_Theme;
 	memcpy (m_Buf, m_Snapshot, sizeof m_Buf);
 
-	// the panel (188 lines) and the button as one block in the middle
-	const int nPanelH = PANEL_FIT (188);
+	// the panel (its content: the title, the project, the credits and 8
+	// lines below them) and the button as one block in the middle
+	const unsigned nCredits = T.nCredits < 10 ? T.nCredits : 10;
+	const int nContent = 67 + 9 * (int) nCredits + 8;
+	const int nPanelH = PANEL_FIT (nContent);
 	const int yP = (UI_H - (nPanelH + MENU_GAP + BUTTONS_H)) / 2;
-	const int x0 = 12, x1 = UI_W - 13, y0 = yP + (nPanelH - 188) / 2;
+	const int x0 = 12, x1 = UI_W - 13, y0 = yP + (nPanelH - nContent) / 2;
 	Panel (x0, yP, x1, yP + nPanelH - 1);
 	CText (y0 + 10, "CREDITS", T.nTitle);
 	Separator (x0, x1, y0 + 22);
@@ -721,15 +741,12 @@ void CUI::DrawCredits (const char *pVersion)
 	CText (y0 + 48, "BY A.SCANDEREBECH", T.nValue);
 	Separator (x0, x1, y0 + 62);
 
-	for (unsigned i = 0; i < T.nCredits && i < 10; i++)
+	for (unsigned i = 0; i < nCredits; i++)
 	{
 		const int y = y0 + 67 + (int) i * 9;
 		Text (x0 + 12, y, T.pCredits[i][0], Dim (T.nDim, 80));
 		Text (x0 + 12 + 7 * 8, y, T.pCredits[i][1], 0xEBEBEB);
 	}
-	Separator (x0, x1, y0 + 157);
-	CText (y0 + 162, T.pTrademark1, TRADEMARK);
-	CText (y0 + 173, T.pTrademark2, TRADEMARK);
 
 	static const TButtonHint Close = {'B', "CLOSE"};
 	Buttons (yP + nPanelH + MENU_GAP, &Close, 1);

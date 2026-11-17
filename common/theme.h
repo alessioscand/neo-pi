@@ -42,11 +42,9 @@ struct TUITheme
 	const char	*pLogoKeys;
 	const u32	*pLogoColors;
 
-	// credits: up to 10 rows "WHAT", "WHO", then two lines at the bottom
+	// credits: up to 10 rows "WHAT", "WHO" (the trademarks: README, LICENSES)
 	const char *const (*pCredits)[2];
 	unsigned	 nCredits;
-	const char	*pTrademark1;
-	const char	*pTrademark2;
 
 	// around a game, optional: [0] with the bands (1080p), [1] without (720p)
 	// - nFrame: a frame line nFrame game pixels from the picture, holding the
