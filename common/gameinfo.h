@@ -10,7 +10,7 @@ struct TGameInfo
 {
 	const char *pSet;			// the game's name on the card (MAME's set)
 	const char *pTitle;			// short title: "Undercover Cops"
-	const char *pRegion;			// under the list; "" = from the full name
+	const char *pRegion;			// under the list
 	const char *pYear;
 	const char *pMaker;
 	const char *pButtons[GAMEINFO_BUTTONS];	// buttons A..F, 0 after the last,
