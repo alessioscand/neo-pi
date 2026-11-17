@@ -55,12 +55,12 @@ const TUITheme g_Theme =
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
 	{8, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
 	{4, 4},					// the columns' text a little further out
-	10					// a fabric of diamonds, through the frame's corners
+	10,					// a fabric of diamonds, through the frame's corners
+	FALSE					// thin lines (TRUE: a game pixel wide)
 };
 
 // the grid: a fabric of diamonds, a line every nFabric game pixels along both
-// diagonals through the frame's corners, one framebuffer pixel wide (two at
-// 720p)
+// diagonals through the frame's corners, a point wide (two at 720p if thin)
 u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH)
 {
 	(void) nHalfW;				// no dots: nothing to leave out at the edges

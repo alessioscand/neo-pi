@@ -16,6 +16,9 @@
 
 // The border: the theme's grid (ThemeGrid, thin lines at the framebuffer's
 // pixels), the same as behind the menus; drawn once, never during play.
+// All of it is worked out on the background's points (BgPoint): the
+// framebuffer's pixels, or with the theme's bPixel the game's pixels, so the
+// same code draws thin lines or lines a game pixel wide.
 // Around a game, two styles:
 // - with the theme's frame (FramePixel): a thin line around the picture and
 //   its title and buttons, empty inside, the grid whole outside, its lines
@@ -276,12 +279,16 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nSideGap = (m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2 : m_nGap)
 		   + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
 
-	// the frame's thin lines (t framebuffer pixels in the middle of their game
-	// pixel), from the screen's centre; with a fabric the grid counts from the
-	// bottom right corner, and the left and top lines go as far out as needed
-	// (a pixel or two) to be on the lattice too
+	// the background's points: the framebuffer's pixels, or the game's
+	m_nBgK = g_Theme.bPixel ? m_nM : 1;
+	m_nBgM = m_nM / m_nBgK;
+
+	// the frame's lines (t points in the middle of their game pixel), from the
+	// screen's centre; with a fabric the grid counts from the bottom right
+	// corner, and the left and top lines go as far out as needed (a point or
+	// two) to be on the lattice too
 	{
-		const int M = (int) m_nM, t = (M + 1) / 2;
+		const int M = (int) m_nBgM, t = (M + 1) / 2;
 		m_nFrameR = GAME_W / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
 		m_nFrameB = GAME_H / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
 		m_nFrameL = m_nFrameR + 1;		// the mirror image
@@ -586,38 +593,55 @@ static u32 Blend (u32 a, u32 b, int s, int S)
 // the dither. Counted from the screen's centre, the same towards every side:
 // the centre falls between two framebuffer pixels, and the +1 makes the game
 // pixels (M framebuffer pixels) meet there
+// a framebuffer pixel's background point (itself, or with bPixel its game
+// pixel), still counted from the screen's top left
+void CVideoOut::BgPoint (unsigned *pX, unsigned *pY) const
+{
+	if (m_nBgK > 1)
+	{
+		const int K = (int) m_nBgK, W2 = (int) (m_nWidth / 2), H2 = (int) (m_nHeight / 2);
+		const int X = (int) *pX - W2, Y = (int) *pY - H2;	// rounded down
+		*pX = (unsigned) (W2 + (X >= 0 ? X / K : -((K - 1 - X) / K)));
+		*pY = (unsigned) (H2 + (Y >= 0 ? Y / K : -((K - 1 - Y) / K)));
+	}
+}
+
+// at a background point x, y: how far from the picture, in game pixels
 int CVideoOut::GameDistance (unsigned x, unsigned y, int *pGX, int *pGY) const
 {
 	const unsigned W2 = m_nWidth / 2, H2 = m_nHeight / 2;
 	const unsigned cx = x >= W2 ? x - W2 : W2 - 1 - x;
 	const unsigned cy = y >= H2 ? y - H2 : H2 - 1 - y;
-	*pGX = (int) ((cx + 1) / m_nM);
-	*pGY = (int) ((cy + 1) / m_nM);
+	*pGX = (int) ((cx + 1) / m_nBgM);
+	*pGY = (int) ((cy + 1) / m_nBgM);
 	const int dx = *pGX - GAME_W / 2, dy = *pGY - GAME_H / 2;
 	return dx > dy ? dx : dy;
 }
 
-// the theme's grid at a framebuffer pixel: counted from the screen's middle
+// the theme's grid at a background point: counted from the screen's middle
 // (or, with a fabric, from the frame's bottom right corner) without a mirror
 // (a mirror would double the pixel where a line crosses the middle), so one
 // pixel off the exact symmetry
 u32 CVideoOut::GridColour (unsigned x, unsigned y) const
 {
 	const int W2 = (int) (m_nWidth / 2), H2 = (int) (m_nHeight / 2);
-	return ThemeGrid ((int) x - W2 - m_nGridX0, (int) y - H2 - m_nGridY0, (int) m_nM, W2, H2);
+	return ThemeGrid ((int) x - W2 - m_nGridX0, (int) y - H2 - m_nGridY0, (int) m_nBgM,
+			  W2 / (int) m_nBgK, H2 / (int) m_nBgK);
 }
 
+// the same at a framebuffer pixel
 u32 CVideoOut::GridPixel (unsigned x, unsigned y) const
 {
+	BgPoint (&x, &y);
 	return ToFb (GridColour (x, y));
 }
 
-// around a game with the theme's frame; d: GameDistance
+// around a game with the theme's frame, at a background point; d: GameDistance
 u32 CVideoOut::FramePixel (unsigned x, unsigned y, int d) const
 {
-	// the frame's lines, t framebuffer pixels thick (from the screen's centre)
+	// the frame's lines, t points thick (from the screen's centre)
 	const int X = (int) x - (int) (m_nWidth / 2), Y = (int) y - (int) (m_nHeight / 2);
-	const int t = ((int) m_nM + 1) / 2;
+	const int t = ((int) m_nBgM + 1) / 2;
 	const boolean bInX = X > -m_nFrameL - t && X < m_nFrameR + t;
 	const boolean bInY = Y > -m_nFrameT - t && Y < m_nFrameB + t;
 	const boolean bLine =    (bInY && ((X >= m_nFrameR && X < m_nFrameR + t) || (X <= -m_nFrameL && X > -m_nFrameL - t)))
@@ -649,12 +673,13 @@ u32 CVideoOut::FramePixel (unsigned x, unsigned y, int d) const
 	return ToFb (Blend (g_Theme.nFrameColour, c, e * e * (3 * G - 2 * e), G * G * G));
 }
 
-// around a game without a frame; d: GameDistance, gx, gy: its game pixel
+// around a game without a frame, at a background point; d: GameDistance,
+// gx, gy: its game pixel
 u32 CVideoOut::DitherPixel (unsigned x, unsigned y, int d, int gx, int gy) const
 {
 	if (d >= GRID_FADE)
 	{
-		return GridPixel (x, y);
+		return ToFb (GridColour (x, y));
 	}
 	// smoothstep (d / FADE) against the dither's threshold, in integers
 	const int v = d * d * (3 * GRID_FADE - 2 * d);
@@ -672,6 +697,7 @@ u32 CVideoOut::BgPixel (unsigned x, unsigned y) const
 	{
 		return GridPixel (x, y);			// no game: the grid, whole
 	}
+	BgPoint (&x, &y);
 	int gx, gy;
 	const int d = GameDistance (x, y, &gx, &gy);
 	return m_nFrame > 0 ? FramePixel (x, y, d) : DitherPixel (x, y, d, gx, gy);
@@ -832,8 +858,9 @@ void CVideoOut::DrawInfoLines (unsigned nBuf)
 	unsigned nNear = INFO_NEAR * U, nNearTop = INFO_NEAR * U;
 	if (m_nFrame > 0)
 	{
-		const int M = (int) m_nM, t = (M + 1) / 2;
-		const int nStrip = m_nFrame * M + (M - t) / 2, nText = (int) ((TEXT_H + 1) * U);
+		// from the picture's last row to the frame's line, framebuffer pixels
+		const int nStrip = m_nFrameB * (int) m_nBgK - (GAME_H / 2 * (int) m_nM - 1);
+		const int nText = (int) ((TEXT_H + 1) * U);
 		const int nGap = nStrip > nText ? (nStrip - nText) / 2 : 0;
 		nNear = (unsigned) nGap;			// below: the text first, then its shadow
 		nNearTop = (unsigned) (nStrip - nGap - (int) (TEXT_H * U));

@@ -62,14 +62,17 @@ struct TUITheme
 	// from the bottom right one); the frame then a pixel wider at the left and
 	// the top if needed, so that all four corners are on the lattice
 	int		 nFabric;
+	// the background in game pixels (FALSE: thin lines at the framebuffer's
+	// pixels): its lines a game pixel wide, its steps by whole game pixels
+	boolean		 bPixel;
 };
 
 extern const TUITheme g_Theme;
 
 // The background (the menus' and the border's "grid"), 0xRRGGBB, at a
-// framebuffer pixel x, y counted from the screen's centre (signed), with M
-// framebuffer pixels to a game pixel: thin lines, a few framebuffer pixels
-// wide, spaced in game pixels; nHalfW, nHalfH: half the screen, to leave out
+// point x, y counted from the screen's centre (signed), with M points to a
+// game pixel (with bPixel the points are game pixels, M 1): thin lines, a
+// point or two wide, spaced in game pixels; nHalfW, nHalfH: half the screen, to leave out
 // what the screen's edge would cut; with nFabric, x and y from the frame's
 // bottom right corner instead; ThemeGround: its empty colour
 u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH);
