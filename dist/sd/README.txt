@@ -3,25 +3,16 @@ neo-pi 1.2.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
 
 WHAT'S NEW IN 1.2.0
 
-  - New look, shared with s16-pi and m92-pi: dark fabric of diamonds
-    behind the menus, panels with a thick frame, the logo above the game
-    list, the list in the BIOS's own letters.
-  - OPTIONS > BEZEL: the background. FULL (default): the grid, and
-    while playing at 1080p the game's title, maker and year above the
-    picture (from the .neo file) and what its buttons do below. GRID:
-    the grid only. TEXT: the texts on black. OFF: black. With TEXT and
-    OFF the menus are on black too. The border is drawn once, never
-    during play.
-  - Status line (Select + C) and messages beside the picture, in the
-    left and right columns, at 720p too. They are redrawn only when they
-    change: no more flickering lines.
-  - At 1080p the picture is scaled 2x by the CPU and 2x by the video
-    scaler, so that the texts around it are sharp.
-  - POWER OFF: only the countdown box, over the paused game.
-  - CONTROLS: to skip a function, press a button already assigned: it
-    stays unassigned (shown as -).
-  - To update a card, copy the new files over the old ones: BIOS, games,
-    saves, settings and pads.cfg in neopi are kept and work as before.
+  - A new look, built around a bezel that frames the game with a dark,
+    Japanese-inspired woven texture. At 1080p, it also shows the game's
+    title, developer and year above the picture, with a custom button
+    layout below for around 140 games. Prefer the bare game screen?
+    OPTIONS > BEZEL lets you strip it all away, right down to black.
+  - The status line and the messages sit beside the picture, never over
+    the game, at 720p too, and they no longer flicker.
+  - When setting up a pad, a function you do not need can be skipped.
+  - Under-the-hood improvements, bug fixes and updates shared with
+    its siblings s16-pi, m92-pi and nes-pi.
 
 SET-UP
 
@@ -32,6 +23,9 @@ SET-UP
      format (made with TerraOnion's NeoBuilder) in the neopi folder.
   4. Connect a USB gamepad and the display (on a Pi 4, HDMI 0, next to the
      power socket). Insert the card and switch on.
+
+  To update a card, copy the new files over the old ones: BIOS, games,
+  saves, settings and pads.cfg in neopi are kept and work as before.
 
 START-UP
 
@@ -52,6 +46,9 @@ START-UP
     Results in neopi/MCTEST.TXT. Delete MCTEST to start normally.
 
 SETTING UP THE CONTROLS
+
+  Although wireless gamepads are supported, wired ones are preferable for
+  maximum responsiveness.
 
   The first time a pad model is connected, the CONTROLS screen opens by
   itself. Press the button you want for each function, in this order: A,
@@ -118,10 +115,17 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
                 added lag. On a Pi 3 the scanlines and COMPOSITE need
                 multicore: with multicore=off this item shows MULTICORE
                 OFF.
-  BEZEL         The background: FULL, GRID, TEXT or OFF (see WHAT'S
-                NEW). In neopi.cfg: bezel=full, grid, text or off.
+  BEZEL         The space around the picture:
+                OFF    black
+                TEXT   game information and basic controls on black
+                       (at 1080p)
+                GRID   the woven background and a frame
+                FULL   the complete bezel, with game information above
+                       the picture and button assignments below (at
+                       1080p)
   CONTROLS      Set up a pad (with several pads, press a button on the one
-                to set up).
+                to set up). To skip a function, press a button already
+                assigned.
   POWER OFF     As in the in-game menu.
 
 STATUS LINE (Select + C)
