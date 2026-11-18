@@ -1,111 +1,63 @@
 # neo-pi
 
-A streamlined, bare-metal NEO·GEO emulator for Raspberry Pi 3 & 4, with
-highly responsive input.
+A streamlined, bare-metal NEO·GEO emulator for Raspberry Pi 3 & 4, with highly responsive input.
 
-Website:
-[alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
+Website: [alessioscand.github.io/neo-pi](https://alessioscand.github.io/neo-pi/)
 
 **neo-pi** is a human-led, vibe-coded experiment by Alessio Scanderebech.  
-If you like neo-pi, [nes-pi](https://alessioscand.github.io/nes-pi/) or
-[m92-pi](https://alessioscand.github.io/m92-pi/), please consider
-supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
+If you like neo-pi, [s16-pi](https://alessioscand.github.io/s16-pi/), [m92-pi](https://alessioscand.github.io/m92-pi/) or [nes-pi](https://alessioscand.github.io/nes-pi/), please consider supporting me: [paypal.me/alescandy](https://paypal.me/alescandy)
 
 ## Why neo-pi
 
-I discovered the NEO·GEO in the arcades as a kid, and I've been fascinated
-by it ever since. I started collecting NEO·GEO CD games in the early 2000s,
-briefly moved to AES, and eventually settled on MVS. I still own an MV1-FZ
-board and several cartridges, but rarely get to enjoy them due to the space
-and setup they require.
+I discovered the NEO·GEO in the arcades as a kid, and I've been fascinated by it ever since. I started collecting NEO·GEO CD games in the early 2000s, briefly moved to AES, and eventually settled on MVS. I still own an MV1-FZ board and several cartridges, but rarely get to enjoy them due to the space and setup they require.
 
-Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've
-dreamed of creating a focused, compact NEO·GEO experience on the Raspberry
-Pi, as close to the original hardware as possible, but with all the
-conveniences of modern emulation (LCD displays with visual filters, save
-states, turbo buttons) but prioritizing the responsiveness of the controls.
-I've tried countless times to strip existing retro-gaming distros down to
-their bare essentials, and thanks to today's vibe-coding tools, I've finally
-been able to bring my original vision to life. Still, neo-pi isn't just
-code: it's design, choices and compromises, and those still take time and
-care. So let's look at how it's made, the old-fashioned way.
+Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've dreamed of creating a focused, compact NEO·GEO experience on the Raspberry Pi, as close to the original hardware as possible, but with all the conveniences of modern emulation (LCD displays with visual filters, save states, turbo buttons) but prioritizing the responsiveness of the controls. I've tried countless times to strip existing retro-gaming distros down to their bare essentials, and thanks to today's vibe-coding tools, I've finally been able to bring my original vision to life. Still, neo-pi isn't just code: it's design, choices and compromises, and those still take time and care. So let's look at how it's made, the old-fashioned way.
 
 ## The choices behind it
 
-**Bare metal.** Nothing sits between the game and the screen: no operating
-system on the Pi's CPU and no graphics stack adding latency. neo-pi IS the
-kernel itself: it runs directly on the Pi's hardware, boots in seconds and
-talks to the hardware directly, down to the video scaler's registers.
-**Circle** provides the essential drivers (USB, SD, HDMI, audio), so bare
-metal doesn't mean starting from scratch.
+**Bare metal.** Nothing sits between the game and the screen: no operating system on the Pi's CPU and no graphics stack adding latency. neo-pi IS the kernel itself: it runs directly on the Pi's hardware, boots in seconds and talks to the hardware directly, down to the video scaler's registers. **Circle** provides the essential drivers (USB, SD, HDMI, audio), so bare metal doesn't mean starting from scratch.
 
-**Geolith.** This accurate NEO·GEO emulator is a real gem, written in plain,
-portable C that doesn't assume an OS: it renders into a buffer it is given,
-talks to the outside world through a few callbacks, and loads the BIOS and
-games straight from memory. That made it a natural fit for Circle.
+**Geolith.** This accurate NEO·GEO emulator is a real gem, written in plain, portable C that doesn't assume an OS: it renders into a buffer it is given, talks to the outside world through a few callbacks, and loads the BIOS and games straight from memory. That made it a natural fit for Circle.
 
-**Scanline-based rendering.** Above all, Geolith draws the picture the way
-the real NEO·GEO does: one line at a time, as the emulated video chip
-reaches it. Each line is drawn always at the same moment and never touched
-again, so it can be handed over as soon as it's done. This opened up a
-whole range of possibilities. The lines can be drawn on a second CPU core
-while the first runs the game. And since each line is ready while the frame
-is still being emulated, it can be sent to the screen just before the HDMI
-output reaches it: *beam racing!* So the pads are read only a couple of
-milliseconds before the picture appears, as they would be on the original
-hardware with a CRT.
+**Scanline-based rendering.** Above all, Geolith draws the picture the way the real NEO·GEO does: one line at a time, as the emulated video chip reaches it. This opened up a whole range of possibilities. The lines can be drawn on a second CPU core while the first runs the game. And since each line is ready while the frame is still being emulated, it can be sent to the screen just before the HDMI output reaches it: *beam racing!* So the pads are read only a couple of milliseconds before the picture appears, almost as they would be on the original hardware with a CRT.
 
-**Custom audio resampler.** The NEO·GEO's sound chip runs at about 56 kHz,
-while HDMI wants 48 kHz. Instead of a heavy general-purpose converter,
-neo-pi uses a small one written just for it: same clean sound, a fraction
-of the work (on a Pi 3, Geolith's standard Speex resampler took about 15%
-of every frame).
+**Custom audio resampler.** The NEO·GEO's sound chip runs at about 56 kHz, while HDMI wants 48 kHz. Rather than relying on a general-purpose converter, neo-pi uses a lightweight, purpose-built alternative: same clean sound, a fraction of the work (on a Pi 3, Geolith's standard Speex resampler took about 15% of every frame).
 
-**User experience.** The rest was a matter of choices. Display options are
-cut to the bone: integer scaling is always on, and the only filters are
-scanlines and an NTSC composite look, so you just play, with nothing to
-tweak and nothing to distract you. Save states are limited to one slot per
-game: enough to soften the gameplay (think of the notoriously brutal bosses
-of some King of Fighters games) while keeping that edge-of-your-seat tension
-that only arcade games can give you.
+**User experience.** The rest came down to a few deliberate choices. Display options are kept to a minimum: integer scaling is always on, and the only available filters are scanlines and an NTSC composite look. No tweaking, no distractions — just play.
+
+Save states are limited to a single slot per game. Enough to take the edge off the challenge (think of some of the notoriously brutal bosses in The King of Fighters), without losing the tension that makes arcade games so exciting.
+
+**One family.** neo-pi has siblings: [s16-pi](https://alessioscand.github.io/s16-pi/) (Sega System 16), [m92-pi](https://alessioscand.github.io/m92-pi/) (Irem M92) and [nes-pi](https://alessioscand.github.io/nes-pi/) (Nintendo NES). They are all built on the same codebase, so improvements to one benefit them all.
 
 ## Features
 
 **Gameplay**
 
-- Accurate emulation, built on the
-  [Geolith](https://gitlab.com/jgemu/geolith) core: MVS (arcade), AES
-  (home console) and the Universe BIOS, all four BIOS regions
-- Responsive controls: pads are read every millisecond and, thanks to
-  beam racing, a couple of milliseconds before the picture appears, almost
-  as on the original hardware with a CRT
-- *Lazy finger* (turbo buttons): Select + B toggles it; while on, holding
-  A, B, C or D fires repeatedly
-- CPU speed: NORMAL runs the 68000 as on the hardware; TURBO runs it
-  twice as fast, for fewer slowdowns where the original slows down. On a
-  Pi 3, TURBO may slow down the heaviest games instead
+- Accurate emulation, built on the [Geolith](https://gitlab.com/jgemu/geolith) core: MVS (arcade), AES (home console) and the Universe BIOS, all four BIOS regions
+- Responsive controls: pads are read every millisecond and, thanks to beam racing, a couple of milliseconds before the picture appears, almost as on the original hardware with a CRT
+- *Lazy finger* (turbo buttons): Select + B toggles it; while on, holding A, B, C or D fires repeatedly
+- CPU speed: NORMAL runs the 68000 as on the hardware; TURBO runs it twice as fast, for fewer slowdowns where the original slows down. On a Pi 3, TURBO may slow down the heaviest games instead
 - Save states: one slot per game
 
 **Picture**
 
-- Integer scaling with square pixels at 1080p or 720p, done by the Pi's
-  hardware scaler
-- Optional scanlines (light, medium, strong), drawn within the same frame:
-  no added lag
-- Blargg's NTSC filter, the picture of a composite cable on a TV
-  of the time, filtered line by line on a core of its own: no added lag
+- Integer scaling with square pixels at 1080p or 720p, handled by the Pi's hardware scaler.
+
+- Optional scanlines in three strengths: light, medium and strong. They're drawn as part of the frame, with no additional lag.
+
+- Blargg's NTSC filter, recreating the look of a composite video connection on an old TV. Each line is processed on a separate core, without slowing down the game.
+
+- Bezel: the *NEOfabric*, a dark, Japanese-inspired woven texture framing the picture. At 1080p, it also shows the game's title, developer and release year above the picture, with a carefully laid-out button reference below, covering 144 games. OPTIONS offers four levels: FULL, GRID, TEXT and OFF, for those who prefer a cleaner, no-frills look.
 
 **Convenience**
 
-- MV-1 mode: with only one game on the SD card, neo-pi skips the
-  list and boots straight into it, like an arcade board
-- Screenshots (PNG) and an optional status line (FPS, load, input lag,
-  temperature, video mode)
+- MV-1 mode: with only one game on the SD card, neo-pi skips the list and boots straight into it, like a real arcade board
+- Screenshots (PNG) and an optional status line beside the picture (FPS, load, input lag, temperature, video mode)
 - Safe power off that saves memory cards, MVS settings and the log
 
 **Planned:**
 
-- CRT TVs: composite video from the Pi's 3.5 mm AV jack
+- CRT TVs: composite video from the Pi's 3.5 mm AV jack. The menus already fit the safe area of a TV picture.
 
 
 ## Requirements
@@ -113,27 +65,20 @@ that only arcade games can give you.
 - Raspberry Pi 4 (the Pi 400 should work too) or Raspberry Pi 3
 - A micro SD card formatted FAT32
 - A USB gamepad and an HDMI TV or monitor
-- Your own NEO·GEO BIOS (`neogeo.zip`) and games in `.neo` format.
-  **They are not included and are never distributed with neo-pi.**
+- Your own NEO·GEO BIOS (`neogeo.zip`) and games in `.neo` format. **They are not included and are never distributed with neo-pi.**
 
 
 ## Getting started
 
-1. Download the SD card package from the
-   [Releases](../../releases) page.
+1. Download the SD card package from the [Releases](../../releases) page.
 2. Copy everything in it to the root of the card.
-3. Put `neogeo.zip` (MAME/FBNeo BIOS set) and your games in `.neo` format
-   (made with TerraOnion's NeoBuilder) in the `neopi` folder.
-4. Connect a pad and the TV (HDMI 0 on RPi4, next to the power socket) and
-   switch on.
+3. Put `neogeo.zip` (MAME/FBNeo BIOS set) and your games in `.neo` format (made with TerraOnion's NeoBuilder) in the `neopi` folder.
+4. Connect a pad and the TV (HDMI 0 on RPi4, next to the power socket) and switch on.
 
 
 ## Controls
 
-Although wireless gamepads are supported, wired ones are preferable for
-maximum responsiveness. The first time a pad model is connected, neo-pi asks
-you to press the buttons you want as A, B, C, D, Start and Select. The
-d-pad, hat and left stick always work. Second pad connected is Player 2.
+Although wireless gamepads are supported, wired ones are preferable for maximum responsiveness. The first time a pad model is connected, neo-pi asks you to press the buttons you want as A, B, C, D, Start and Select. The d-pad, hat and left stick always work. Second pad connected is Player 2.
 
 | In game | |
 |---|---|
@@ -144,9 +89,7 @@ d-pad, hat and left stick always work. Second pad connected is Player 2.
 | Select + C | Status line on/off |
 | Select + D | Credits |
 
-**With the Universe BIOS** (OPTIONS > SYSTEM > UNIBIOS, needs
-`uni-bios_4_0.rom` in `neogeo.zip`), neo-pi's own controls stay the same,
-so a few of its combinations take a different route:
+**With the Universe BIOS** (OPTIONS > SYSTEM > UNIBIOS, needs `uni-bios_4_0.rom` in `neogeo.zip`), neo-pi's own controls stay the same, so a few of its combinations take a different route:
 
 | Universe BIOS | On neo-pi |
 |---|---|
@@ -155,40 +98,22 @@ so a few of its combinations take a different route:
 | In-game menu (Start+Coin, Start+Select) | Not available: Select belongs to neo-pi (coin, menu, shortcuts); use Start+A+B+C |
 | Memory card manager (A+B+C+D at start-up), test mode (B+C+D) | Press them while its splash screen is shown |
 
-The region is set in the Universe BIOS menu, and its settings are kept
-for each game, separate from the MVS BIOS ones: switching SYSTEM back and
-forth never mixes them.
+The region is set in the Universe BIOS menu, and its settings are kept for each game, separate from the MVS BIOS ones: switching SYSTEM back and forth never mixes them.
 
-In the menus the buttons are shown on screen.
-Always switch off with POWER OFF (in-game menu or options) before
-unplugging: it saves memory cards and settings.
+In the menus the buttons are shown on screen. Always switch off with POWER OFF (in-game menu or options) before unplugging: it saves memory cards and settings.
 
 
 ## Tinkerer's corner
 
-Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states,
-MVS memory, Universe BIOS settings, memory cards), `shots/` (screenshots),
-`neopi.cfg` (options), `pads.cfg` (controls for each pad model), `LAST.TXT`
-(last game played), `LOG.TXT` (diagnostics).
+Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states, MVS memory, Universe BIOS settings, memory cards), `shots/` (screenshots), `neopi.cfg` (options), `pads.cfg` (controls for each pad model), `LAST.TXT` (last game played), `LOG.TXT` (diagnostics).
 
-**Reading the status line.** Select + C shows FPS, LOAD, the CPU
-temperature (in degrees C), RCE (or DLY) and the video mode.
+**Reading the status line.** Select + C shows FPS, LOAD, the CPU temperature (in degrees C), RCE (or DLY) and the video mode.
 
-- **LOAD** is how much of a frame the busiest moment of the last second
-  needed: it is shown up to 99% and turns red above 95%, where frames
-  may start to be lost.
-- **RCE** (beam racing) is the time, in ms, from reading the pads to the top of the
-  picture leaving the Pi: this is neo-pi's share of the lag, the only part
-  that depends on the emulator. On an original NEO·GEO the same step takes
-  about 2 ms, so an RCE of 2-4 ms means neo-pi adds next to nothing. The
-  pad itself, the TV (use its game mode) and the game's own reaction time
-  come on top, as they would with any system.
-- **DLY** replaces RCE when *beam racing* is off: it is the frame delay,
-  how long after the vsync the pads are read.
+- **LOAD** is how much of a frame the busiest moment of the last second needed: it turns red above 95%, where frames may start to be lost.
+- **RCE** (beam racing) is the time, in ms, from reading the pads to the top of the picture leaving the Pi: this is neo-pi's share of the lag, the only part that depends on the emulator. On an original NEO·GEO the same step takes about 2 ms, so an RCE of 2-4 ms means neo-pi adds next to nothing. The pad itself, the TV (use its game mode) and the game's own reaction time come on top, as they would with any system.
+- **DLY** replaces RCE when *beam racing* is off: it is the *frame delay*, or how long after the vsync the pads are read.
 
-**Testing options.** The defaults are what neo-pi is designed and tuned
-for: the lines below are only meant for testing and comparisons, not for
-everyday play. Add them to `neopi/neopi.cfg`, one per line:
+**Testing options.** The defaults are what neo-pi is designed and tuned for: the lines below are only meant for testing and comparisons, not for everyday play. Add them to `neopi/neopi.cfg`, one per line:
 
 | Option | |
 |---|---|
@@ -202,32 +127,20 @@ everyday play. Add them to `neopi/neopi.cfg`, one per line:
 | `resampler=speex` | Geolith's standard Speex resampler (heavier) |
 | `scaler=cpu` | scale with the CPU instead of the hardware scaler (slower) |
 
-An empty `neopi/BENCH` file runs a built-in benchmark on the selected game
-(results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file
-checks that one core and two cores give the same picture, line by line.
+An empty `neopi/BENCH` file runs a built-in benchmark on the selected game (results in `BENCH.TXT` and `PROFILE.TXT`); an empty `neopi/MCTEST` file checks that one core and two cores give the same picture, line by line.
 
-**If something goes wrong.** The green LED blinks a number of times,
-repeatedly: 2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game,
-6 = emulator, 7 = memory. With no picture at all, put a `#` in front of
-`hdmi_group` and `hdmi_mode` in `config.txt`. To report a problem,
-`neopi/LOG.TXT` is all that is needed; for performance, add an empty
-`neopi/BENCH` file and send `BENCH.TXT` and `PROFILE.TXT` too.
+**If something goes wrong.** The green LED blinks a number of times, repeatedly: 2 = HDMI, 3 = SD card, 4 = BIOS, 5 = no `.neo` game, 6 = emulator, 7 = memory. With no picture at all, put a `#` in front of `hdmi_group` and `hdmi_mode` in `config.txt`. To report a problem, `neopi/LOG.TXT` is all that is needed; for performance, add an empty `neopi/BENCH` file and send `BENCH.TXT` and `PROFILE.TXT` too.
 
-**Heat.** If games start to slow down after a while, it is usually heat: a
-heatsink is recommended. The status line (Select + C) shows the
-temperature; the Pi 3 B+ lowers its CPU clock above 60 °C, the Pi 4 from
-about 80 °C.
+**Heat.** If games start to slow down after a while, it is usually heat: a heatsink is recommended. The status line (Select + C) shows the temperature; the Pi 3 B+ lowers its CPU clock above 60 °C, the Pi 4 from about 80 °C.
 
 ## Building from source
 
-See [BUILD.md](BUILD.md). neo-pi is built with the xPack AArch64 GCC
-toolchain on top of the Circle bare-metal library and the Geolith core.
+See [BUILD.md](BUILD.md). neo-pi is built with the xPack AArch64 GCC toolchain on top of the Circle bare-metal library and the Geolith core.
 
 
 ## Credits
 
-neo-pi is written by Alessio Scanderebech and his much-maligned programming
-partner Claude, standing on the shoulders of giants:
+neo-pi was cobbled together by Alessio Scanderebech and his much-maligned programming partner Claude, standing on the shoulders of giants:
 
 | Component | Thanks to |
 |---|---|
@@ -244,12 +157,6 @@ partner Claude, standing on the shoulders of giants:
 
 ## License
 
-neo-pi is free software, released under the
-[GNU General Public License v3](LICENSE) or any later version, as required
-by Circle (GPLv3). The third-party components keep their own licences
-(BSD 3-Clause, LGPL and others); the full texts are in
-[`dist/sd/LICENSES.txt`](dist/sd/LICENSES.txt).
+neo-pi is free software, released under the [GNU General Public License v3](LICENSE) or any later version, as required by Circle (GPLv3). The third-party components keep their own licences (BSD 3-Clause, LGPL and others); the full texts are in [`dist/sd/LICENSES.txt`](dist/sd/LICENSES.txt).
 
-NEO·GEO is a trademark of SNK. neo-pi is an independent project, not
-affiliated with or endorsed by SNK, and contains no BIOS, games or other
-SNK material.
+NEO·GEO is a trademark of SNK. neo-pi is an independent project, not affiliated with or endorsed by SNK, and contains no BIOS, games or other SNK material.
