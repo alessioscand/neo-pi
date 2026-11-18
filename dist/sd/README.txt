@@ -3,7 +3,7 @@ neo-pi 1.2.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
 
 WHAT'S NEW IN 1.2.0
 
-  - New look, shared with s16-pi and m92-pi: dark grid of diamonds
+  - New look, shared with s16-pi and m92-pi: dark fabric of diamonds
     behind the menus, panels with a thick frame, the logo above the game
     list, the list in the BIOS's own letters.
   - OPTIONS > BEZEL: the background. FULL (default): the grid, and

@@ -77,7 +77,7 @@ and s16-pi (nothing Neo Geo in them: what they need comes from
 - `src/mcline.cpp` - the multicore line drawing of `patches/geolith-mc.py`, as the kernel sees it
 - `src/gametable.cpp` - each game's buttons by NGH number, written by hand
 - `src/theme.cpp` - neo-pi's look for the menus and the border: colours, fonts, logo, credits, the grid
-  (a lattice of diamonds)
+  (a lattice of diamonds on two scales)
 - `src/vfs.cpp`, `src/ziphelp.c`, `src/shim.c` - file access, zip/PNG (miniz), minimal libc for the core
 - `src/geo_disc_stub.c` - replaces the CD support
 - `common/smp.h` - work shared between cores: `SharedLoad` / `SharedStore`, `SharedAcquire` / `SharedRelease`, events, `Ticks`

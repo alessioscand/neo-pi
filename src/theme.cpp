@@ -55,13 +55,14 @@ const TUITheme g_Theme =
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
 	{8, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
 	{4, 4},					// the columns' text a little further out
-	10,					// a fabric of diamonds, through the frame's corners
+	40,					// a fabric of diamonds, through the frame's corners
 	FALSE,					// thin lines (TRUE: a game pixel wide)
 	0					// no frame: the dither
 };
 
-// the grid: a fabric of diamonds, a line every nFabric game pixels along both
-// diagonals through the frame's corners, a point wide (two at 720p if thin)
+// the grid: a fabric of diamonds on two scales, a line every nFabric game
+// pixels along both diagonals through the frame's corners and a darker one
+// every quarter of that, a point wide (two at 720p if thin)
 u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH)
 {
 	(void) nHalfW;				// no dots: nothing to leave out at the edges
@@ -69,7 +70,10 @@ u32 ThemeGrid (int x, int y, int M, int nHalfW, int nHalfH)
 	const int P = g_Theme.nFabric * M, t = (M + 1) / 2;
 	x += P * 64;
 	y += P * 64;
-	return (x + y) % P < t || (x - y + P * 128) % P < t ? 0x122344 : 0x060E1E;
+	if ((x + y) % P < t || (x - y + P * 128) % P < t)
+		return 0x122344;
+	const int Q = P / 4;
+	return (x + y) % Q < t || (x - y + P * 128) % Q < t ? 0x0D1B36 : 0x060E1E;
 }
 
 u32 ThemeGround (void)
