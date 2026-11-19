@@ -184,7 +184,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 			case SmFilter:
 				if (m_bFilterAllowed)
 				{
-					m_nFilter = (m_nFilter + FILTER_COUNT + (unsigned) nDir) % FILTER_COUNT;
+					m_nFilter = FilterStep (m_nFilter, nDir);
 					ApplyVideoMode ();
 				}
 				else if (nNew & BTN_A)
@@ -240,7 +240,9 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		Items[SmRegion].pValue = m_nSystem == SYS_UNI ? "SET IN UNIBIOS" : RegionName (m_nRegion);
 		Items[SmRegion].bDisabled = m_nSystem == SYS_UNI;
 		Items[SmCpu].pValue = m_nCpuSpeed == CPU_TURBO ? "TURBO" : "NORMAL";
-		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE"};
+		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE",
+								     "FAKELOTTES", "CRT-BLURPI", "CRT-EASYMODE", "CRT-APERTURE", "CRT-HYLLIAN",
+								     "CRT-1TAP", "NTSC-SIMPLE"};
 		// not allowed only on a Pi 3 with multicore=off
 		// ("MULTICORE ONLY" does not fit next to SCANLINES)
 		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "MULTICORE OFF";

@@ -12,7 +12,7 @@ GEO_OBJS = m68kcpu.o m68kops.o z80.o ymfm_adpcm.o ymfm_opn.o ymfm_ssg.o \
 OBJS	= main.o kernel.o console.o games.o gametable.o settings.o menus.o gameloop.o bench.o \
 	  report.o racing.o frame.o mcline.o \
 	  video.o ui.o theme.o font_matinee.o font_lander.o vfs.o ziphelp.o shim.o geo_disc_stub.o \
-	  audio.o input.o raster.o race.o profile.o fbmap.o composite.o tvcore.o \
+	  audio.o input.o raster.o race.o profile.o fbmap.o composite.o tvcore.o crtfx.o \
 	  stats.o pacing.o \
 	  $(GEO_OBJS) libc_a-setjmp.o
 
@@ -41,5 +41,10 @@ include $(CIRCLEHOME)/Rules.mk
 # (GEO_OPTIMIZE=-O2 in the environment builds the previous way, for comparison)
 GEO_OPTIMIZE ?= -O3
 $(GEO_OBJS): OPTIMIZE = $(GEO_OPTIMIZE)
+
+
+
+# TEST shaders: per screen pixel
+crtfx.o: OPTIMIZE = -O3 -ffast-math
 
 -include $(DEPS)

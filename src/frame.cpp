@@ -1,6 +1,7 @@
 /*
  * neo-pi - the emulated frame (see frame.h)
  */
+#include "crtfx.h"
 #include "frame.h"
 #include "mcline.h"
 #include "pacing.h"
@@ -117,7 +118,15 @@ static void LineDone (unsigned nScanline)
 		s_pVideo->DrawGameLine (g_VideoBuf, nRow, s_Line, s_Dark);
 		if (SharedLoad (s_bRaced))
 		{
-			RaceRowDone (nRow);
+			if (CrtFxLag ())	// TEST: one line behind
+			{
+				if (nRow > 0) RaceRowDone (nRow - 1);
+				if (nRow == GAME_H - 1) RaceRowDone (nRow);
+			}
+			else
+			{
+				RaceRowDone (nRow);
+			}
 		}
 	}
 }

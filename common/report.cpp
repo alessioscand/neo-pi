@@ -1,6 +1,7 @@
 /*
  * The per-minute report in LOG.TXT (CKernel: the project's kernel.h)
  */
+#include "crtfx.h"
 #include "kernel.h"
 #include "frame.h"
 #include "mcline.h"
@@ -66,6 +67,18 @@ void CKernel::ReportWindow (boolean bFinal)
 		  pm, g_Stats.nMissedVSync, qmin, qmax, und, adj,
 		  m_CPUThrottle.GetClockRate () / 1000000, m_CPUThrottle.GetTemperature ());
 	Log (Line, COLOR_TEXT);
+	if (CrtFxActive ())	// TEST
+	{
+		unsigned nSum, nMax, nCalls;
+		CrtFxTakeStats (&nSum, &nMax, &nCalls);
+		unsigned nAvg = nCalls ? nSum * 10 / nCalls : 0;
+		unsigned nFrames = nCalls / GAME_H ? nCalls / GAME_H : 1;
+		unsigned f = nSum / nFrames;
+		snprintf (Line, sizeof Line, "   SHADER %s: per line %u.%u us avg, %u us max | per frame %u.%u ms",
+			  FilterShort (m_Video.GetFilter ()), nAvg / 10, nAvg % 10, nMax,
+			  f / 1000, (f % 1000) / 100);
+		Log (Line, COLOR_TEXT);
+	}
 	if (m_Video.GetFilter () == FILTER_COMPOSITE)
 	{
 		unsigned nFilterUs, nDrawUs, nLines;

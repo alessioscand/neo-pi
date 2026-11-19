@@ -5,6 +5,7 @@
 #include "fonts.h"
 #include "theme.h"
 #include "fbmap.h"
+#include "crtfx.h"
 #include <circle/bcmpropertytags.h>
 #include <circle/font.h>
 #include <circle/util.h>
@@ -227,7 +228,8 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 		{
 			if (   m_nScale % k == 0
 			    && m_nDispW % k == 0 && m_nDispH % k == 0
-			    && (m_nFilter == FILTER_NONE || m_nScale / k >= 2))
+			    && (m_nFilter == FILTER_NONE || m_nScale / k >= 2)
+			    && (!FILTER_IS_CRT (m_nFilter) || m_nScale / k >= 4))	// TEST: CPU at 4x at least
 			{
 				m_nK = k;
 				break;
@@ -247,6 +249,9 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 			return FALSE;
 		}
 	}
+
+	CrtFxSetup (FILTER_IS_CRT (m_nFilter) ? m_nFilter - FILTER_FAKELOTTES + CRTFX_FAKELOTTES : CRTFX_NONE,
+		    m_nM, m_bRLow);	// TEST
 
 	unsigned nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
 	m_nGameX = (m_nWidth - nGameW) / 2;
@@ -271,6 +276,11 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	// the background's points: the framebuffer's pixels, or the game's
 	m_nBgK = g_Theme.bPixel ? m_nM : 1;
 	m_nBgM = m_nM / m_nBgK;
+	if (m_nBgK == 1 && m_nK == 1 && m_nM % 2 == 0 && FILTER_IS_CRT (m_nFilter))
+	{
+		m_nBgK = 2;			// TEST: the bezel as with the HVS at 2x
+		m_nBgM = m_nM / 2;
+	}
 
 	// the frame's lines, t points thick, from the screen's centre; with a
 	// fabric the left and top ones move out onto the lattice
@@ -409,6 +419,13 @@ void CVideoOut::DrawText (unsigned nBuffer, unsigned nCol, unsigned nRow, const 
 	}
 }
 
+struct TCrtCtx { u32 *pBase; unsigned nPitch; };
+static u32 *CrtRow (void *pCtx, unsigned nRow)
+{
+	TCrtCtx *p = (TCrtCtx *) pCtx;
+	return p->pBase + nRow * p->nPitch;
+}
+
 void CVideoOut::DrawGame (const u32 *pSource, boolean bFilter)
 {
 	for (unsigned y = 0; y < GAME_H; y++)
@@ -426,7 +443,15 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 	// scanlines: bottom rows of each group darker (2 of 4 at 4x, 1 of 2 or 3)
 	// (COMPOSITE: none; the game lines come through DrawNtscLine, this draws
 	// the menus over the paused game)
-	const unsigned nDarkRows = bFilter && m_nFilter != FILTER_NONE && m_nFilter != FILTER_COMPOSITE
+	if (bFilter && FILTER_IS_CRT (m_nFilter) && CrtFxActive ())
+	{
+		TCrtCtx Ctx = {Row (nBuffer, m_nGameY) + m_nGameX, (unsigned) (Row (nBuffer, 1) - Row (nBuffer, 0))};
+		CrtFxLine (pSource, y, CrtRow, &Ctx);
+		FbFlush ();
+		return;
+	}
+
+	const unsigned nDarkRows = bFilter && m_nFilter >= FILTER_SCAN_LIGHT && m_nFilter <= FILTER_SCAN_STRONG
 				   ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
 
 	// expand one source line horizontally into cached memory, converting

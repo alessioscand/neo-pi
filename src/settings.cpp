@@ -32,6 +32,13 @@ const char *CKernel::FilterShort (unsigned nFilter)
 	case FILTER_SCAN_MEDIUM: return "SCAN-M";
 	case FILTER_SCAN_STRONG: return "SCAN-S";
 	case FILTER_COMPOSITE:	 return "COMP";
+	case FILTER_FAKELOTTES:	 return "FLOT";
+	case FILTER_BLURPI:	 return "BLURPI";
+	case FILTER_EASYMODE:	 return "EASY";
+	case FILTER_APERTURE:	 return "APERT";
+	case FILTER_HYLLIAN:	 return "HYLL";
+	case FILTER_ONETAP:	 return "1TAP";
+	case FILTER_NTSCSIMPLE:	 return "NTSCS";
 	default:		 return "NOFLT";
 	}
 }
@@ -44,6 +51,13 @@ const char *CKernel::FilterName (unsigned nFilter)
 	case FILTER_SCAN_MEDIUM: return "SCANLINES";
 	case FILTER_SCAN_STRONG: return "SCANLINES_STRONG";
 	case FILTER_COMPOSITE:	 return "COMPOSITE";
+	case FILTER_FAKELOTTES:	 return "FAKELOTTES";
+	case FILTER_BLURPI:	 return "BLURPI";
+	case FILTER_EASYMODE:	 return "EASYMODE";
+	case FILTER_APERTURE:	 return "APERTURE";
+	case FILTER_HYLLIAN:	 return "HYLLIAN";
+	case FILTER_ONETAP:	 return "1TAP";
+	case FILTER_NTSCSIMPLE:	 return "NTSC_SIMPLE";
 	default:		 return "NONE";
 	}
 }
@@ -188,6 +202,13 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
 	if (strstr (Text, "filter=COMPOSITE"))			m_nFilter = FILTER_COMPOSITE;
+	else if (strstr (Text, "filter=FAKELOTTES"))		m_nFilter = FILTER_FAKELOTTES;
+	else if (strstr (Text, "filter=BLURPI"))		m_nFilter = FILTER_BLURPI;
+	else if (strstr (Text, "filter=EASYMODE"))		m_nFilter = FILTER_EASYMODE;
+	else if (strstr (Text, "filter=APERTURE"))		m_nFilter = FILTER_APERTURE;
+	else if (strstr (Text, "filter=HYLLIAN"))		m_nFilter = FILTER_HYLLIAN;
+	else if (strstr (Text, "filter=1TAP"))			m_nFilter = FILTER_ONETAP;
+	else if (strstr (Text, "filter=NTSC_SIMPLE"))		m_nFilter = FILTER_NTSCSIMPLE;
 	else if (strstr (Text, "filter=SCANLINES_LIGHT"))	m_nFilter = FILTER_SCAN_LIGHT;
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;

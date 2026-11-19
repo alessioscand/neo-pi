@@ -185,6 +185,15 @@ void CKernel::RunGame (void)
 				ResetGameStats ();
 				continue;
 			}
+			if (In.nFilterStep && m_bFilterAllowed)	// TEST: between two frames
+			{
+				m_Video.SetRacing (FALSE);
+				m_nFilter = FilterStep (m_nFilter, In.nFilterStep);
+				ApplyVideoMode ();
+				m_Play.nClearToast = m_nClearStatus = 2;
+				g_Stats.bSkipFrame = TRUE;
+				continue;
+			}
 			if (In.bOpenMenu)
 			{
 				PlayOpenMenu ();
@@ -309,6 +318,7 @@ void CKernel::PlayReadPanels (const u32 Pad[2], TPlayInput *pIn)
 {
 	TPlay &P = m_Play;
 	pIn->bOpenMenu = pIn->bOpenCredits = pIn->bScreenshot = FALSE;
+	pIn->nFilterStep = 0;
 	u32 Eff[2] = {0, 0};
 	for (unsigned p = 0; p < 2; p++)
 	{
@@ -328,9 +338,13 @@ void CKernel::PlayReadPanels (const u32 Pad[2], TPlayInput *pIn)
 
 		if (n & BTN_SELECT)
 		{
-			if (nNew & (BTN_A | BTN_B | BTN_C | BTN_D))
+			if (nNew & (BTN_A | BTN_B | BTN_C | BTN_D | BTN_LEFT | BTN_RIGHT))
 			{
 				P.bSelectCombo[p] = TRUE;
+			}
+			if (nNew & (BTN_LEFT | BTN_RIGHT))	// TEST: next / previous filter
+			{
+				pIn->nFilterStep = (nNew & BTN_RIGHT) ? 1 : -1;
 			}
 			if (nNew & BTN_A)
 			{
@@ -684,11 +698,15 @@ void CKernel::PlayDrawBands (void)
 		m_Video.DrawSideText (FALSE, 0, 0);
 		m_nClearStatus--;
 	}
-	if (P.nToast && !P.bMenu)
+	if (!P.bMenu)		// TEST: the filter's name when there is no message
 	{
-		const CScreen::TTextSpan Span = {P.Toast, UI_WHITE};
+		static const char *Names[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE",
+			"FAKELOTTES", "BLURPI", "EASYMODE", "APERTURE", "HYLLIAN", "1TAP", "NTSC\nSIMPLE"};	// 10 chars at 720p
+		char Label[40];
+		snprintf (Label, sizeof Label, "TV FILTER\n%s", Names[m_nFilter]);
+		const CScreen::TTextSpan Span = {P.nToast ? P.Toast : Label, UI_WHITE};
 		m_Video.DrawSideText (TRUE, &Span, 1);
-		P.nToast--;
+		if (P.nToast) P.nToast--;
 		P.nClearToast = 2;
 	}
 	else if (P.nClearToast)

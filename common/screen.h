@@ -21,7 +21,29 @@
 #define FILTER_SCAN_MEDIUM 2	// dark rows at 50%
 #define FILTER_SCAN_STRONG 3	// dark rows at 25%
 #define FILTER_COMPOSITE   4	// blargg's NTSC filter (tvcore.h), no dark rows
-#define FILTER_COUNT	5
+#define FILTER_FAKELOTTES  5	// TEST: CPU ports of libretro shaders (crtfx.h)
+#define FILTER_BLURPI	   6
+#define FILTER_EASYMODE	   7
+#define FILTER_APERTURE	   8
+#define FILTER_HYLLIAN	   9
+#define FILTER_ONETAP	   10
+#define FILTER_NTSCSIMPLE  11
+#define FILTER_COUNT	12
+#define FILTER_IS_CRT(f)   ((f) >= FILTER_FAKELOTTES && (f) <= FILTER_NTSCSIMPLE)
+
+// TEST: the order of the menu and of Select + left / right
+static inline unsigned FilterStep (unsigned f, int nDir)
+{
+	static const unsigned char Order[FILTER_COUNT] =
+	{
+		FILTER_NONE, FILTER_SCAN_MEDIUM, FILTER_HYLLIAN, FILTER_ONETAP, FILTER_EASYMODE, FILTER_APERTURE,
+		FILTER_COMPOSITE, FILTER_NTSCSIMPLE,
+		FILTER_SCAN_LIGHT, FILTER_SCAN_STRONG, FILTER_FAKELOTTES, FILTER_BLURPI
+	};
+	unsigned i = 0;
+	while (i < FILTER_COUNT && Order[i] != f) i++;
+	return Order[(i + FILTER_COUNT + (unsigned) nDir) % FILTER_COUNT];
+}
 
 // What is around the picture: with a game, OPTIONS > BEZEL; with none, the grid
 // a pixel of the menus where the screen's grid shows (DrawGame, no filter)
