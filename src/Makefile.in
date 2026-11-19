@@ -42,9 +42,7 @@ include $(CIRCLEHOME)/Rules.mk
 GEO_OPTIMIZE ?= -O3
 $(GEO_OBJS): OPTIMIZE = $(GEO_OPTIMIZE)
 
-
-
-# TEST shaders: per screen pixel
+# TV FILTER RGB and CRT: per screen pixel, vectorized
 crtfx.o: OPTIMIZE = -O3 -ffast-math
 
 -include $(DEPS)

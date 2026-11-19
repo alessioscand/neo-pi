@@ -184,7 +184,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 			case SmFilter:
 				if (m_bFilterAllowed)
 				{
-					m_nFilter = FilterStep (m_nFilter, nDir);
+					m_nFilter = (m_nFilter + FILTER_COUNT + (unsigned) nDir) % FILTER_COUNT;
 					ApplyVideoMode ();
 				}
 				else if (nNew & BTN_A)
@@ -228,7 +228,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 			break;
 		}
 
-		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "SCANLINES", "BEZEL", "CONTROLS", "POWER OFF"};
+		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "TV FILTER", "BEZEL", "CONTROLS", "POWER OFF"};
 		TMenuItem Items[SmCount];
 		for (unsigned i = 0; i < SmCount; i++)
 		{
@@ -240,12 +240,9 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		Items[SmRegion].pValue = m_nSystem == SYS_UNI ? "SET IN UNIBIOS" : RegionName (m_nRegion);
 		Items[SmRegion].bDisabled = m_nSystem == SYS_UNI;
 		Items[SmCpu].pValue = m_nCpuSpeed == CPU_TURBO ? "TURBO" : "NORMAL";
-		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE",
-								     "FAKELOTTES", "CRT-BLURPI", "CRT-EASYMODE", "CRT-APERTURE", "HYLLIAN+",
-								     "CRT-1TAP", "NTSC-SIMPLE",
-								     "CRT-PI", "ZFAST", "HYLLIAN"};
+		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "FAST", "RGB", "CRT", "COMPOSITE"};
 		// not allowed only on a Pi 3 with multicore=off
-		// ("MULTICORE ONLY" does not fit next to SCANLINES)
+		// ("MULTICORE ONLY" does not fit next to TV FILTER)
 		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "MULTICORE OFF";
 		Items[SmFilter].bDisabled = !m_bFilterAllowed;
 		Items[SmBezel].pValue = BezelName (m_nBezel, TRUE);

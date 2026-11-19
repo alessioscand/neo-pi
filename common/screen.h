@@ -16,38 +16,14 @@
 #define GAME_W           PROJECT_WIDTH
 #define GAME_H           PROJECT_HEIGHT
 
+// TV FILTER, in the menu's order
 #define FILTER_NONE	0
-#define FILTER_SCAN_LIGHT  1	// dark rows at 75%
-#define FILTER_SCAN_MEDIUM 2	// dark rows at 50%
-#define FILTER_SCAN_STRONG 3	// dark rows at 25%
-#define FILTER_COMPOSITE   4	// blargg's NTSC filter (tvcore.h), no dark rows
-#define FILTER_FAKELOTTES  5	// TEST: CPU ports of libretro shaders (crtfx.h)
-#define FILTER_BLURPI	   6
-#define FILTER_EASYMODE	   7
-#define FILTER_APERTURE	   8
-#define FILTER_HYLLIAN	   9
-#define FILTER_ONETAP	   10
-#define FILTER_NTSCSIMPLE  11
-#define FILTER_CRTPI	   12
-#define FILTER_ZFAST	   13
-#define FILTER_HYLLORIG	   14
-#define FILTER_COUNT	15
-#define FILTER_IS_CRT(f)   ((f) >= FILTER_FAKELOTTES && (f) <= FILTER_HYLLORIG)
-
-// TEST: the order of the menu and of Select + left / right
-static inline unsigned FilterStep (unsigned f, int nDir)
-{
-	static const unsigned char Order[] =
-	{
-		FILTER_NONE, FILTER_SCAN_MEDIUM, FILTER_ZFAST, FILTER_HYLLORIG, FILTER_HYLLIAN, FILTER_CRTPI,
-		FILTER_COMPOSITE
-	};
-	const unsigned n = sizeof Order;
-	unsigned i = 0;
-	while (i < n && Order[i] != f) i++;
-	if (i == n) i = 0;
-	return Order[(i + n + (unsigned) nDir) % n];
-}
+#define FILTER_FAST	1	// the bottom half of each game line's rows at 50%
+#define FILTER_RGB	2	// crt-hyllian-fast (crtfx.h)
+#define FILTER_CRT	3	// crt-pi (crtfx.h)
+#define FILTER_COMPOSITE 4	// blargg's NTSC filter (tvcore.h)
+#define FILTER_COUNT	5
+#define FILTER_IS_SHADER(f) ((f) == FILTER_RGB || (f) == FILTER_CRT)
 
 // What is around the picture: with a game, OPTIONS > BEZEL; with none, the grid
 // a pixel of the menus where the screen's grid shows (DrawGame, no filter)

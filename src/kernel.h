@@ -154,7 +154,6 @@ private:
 	struct TPlayInput
 	{
 		boolean bOpenMenu, bOpenCredits, bScreenshot;
-		int nFilterStep;		// TEST: Select + left / right
 	};
 	void SetupCoreOnce (void);
 	void RunGame (void);

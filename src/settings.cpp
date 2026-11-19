@@ -28,20 +28,10 @@ const char *CKernel::FilterShort (unsigned nFilter)
 {
 	switch (nFilter)
 	{
-	case FILTER_SCAN_LIGHT:	 return "SCAN-L";
-	case FILTER_SCAN_MEDIUM: return "SCAN-M";
-	case FILTER_SCAN_STRONG: return "SCAN-S";
+	case FILTER_FAST:	 return "FAST";
+	case FILTER_RGB:	 return "RGB";
+	case FILTER_CRT:	 return "CRT";
 	case FILTER_COMPOSITE:	 return "COMP";
-	case FILTER_FAKELOTTES:	 return "FLOT";
-	case FILTER_BLURPI:	 return "BLURPI";
-	case FILTER_EASYMODE:	 return "EASY";
-	case FILTER_APERTURE:	 return "APERT";
-	case FILTER_HYLLIAN:	 return "HYLL";
-	case FILTER_ONETAP:	 return "1TAP";
-	case FILTER_NTSCSIMPLE:	 return "NTSCS";
-	case FILTER_CRTPI:	 return "CRTPI";
-	case FILTER_HYLLORIG:	 return "HYLO";
-	case FILTER_ZFAST:	 return "ZFAST";
 	default:		 return "NOFLT";
 	}
 }
@@ -50,20 +40,10 @@ const char *CKernel::FilterName (unsigned nFilter)
 {
 	switch (nFilter)
 	{
-	case FILTER_SCAN_LIGHT:	 return "SCANLINES_LIGHT";
-	case FILTER_SCAN_MEDIUM: return "SCANLINES";
-	case FILTER_SCAN_STRONG: return "SCANLINES_STRONG";
+	case FILTER_FAST:	 return "FAST";
+	case FILTER_RGB:	 return "RGB";
+	case FILTER_CRT:	 return "CRT";
 	case FILTER_COMPOSITE:	 return "COMPOSITE";
-	case FILTER_FAKELOTTES:	 return "FAKELOTTES";
-	case FILTER_BLURPI:	 return "BLURPI";
-	case FILTER_EASYMODE:	 return "EASYMODE";
-	case FILTER_APERTURE:	 return "APERTURE";
-	case FILTER_HYLLIAN:	 return "HYLLIAN";
-	case FILTER_ONETAP:	 return "1TAP";
-	case FILTER_NTSCSIMPLE:	 return "NTSC_SIMPLE";
-	case FILTER_CRTPI:	 return "CRT_PI";
-	case FILTER_HYLLORIG:	 return "HYLLIAN_ORIG";
-	case FILTER_ZFAST:	 return "ZFAST";
 	default:		 return "NONE";
 	}
 }
@@ -97,8 +77,8 @@ void CKernel::ApplyVideoMode (void)
 		}
 		else
 		{
-			Log ("COMPOSITE: not enough memory for the filter, scanlines instead", COLOR_ERR);
-			m_nFilter = FILTER_SCAN_MEDIUM;
+			Log ("COMPOSITE: not enough memory for the filter, FAST instead", COLOR_ERR);
+			m_nFilter = FILTER_FAST;
 		}
 	}
 	FrameSetComposite (m_nFilter == FILTER_COMPOSITE);
@@ -207,21 +187,17 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "region=USA"))	m_nRegion = REGION_US;
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
-	if (strstr (Text, "filter=COMPOSITE"))			m_nFilter = FILTER_COMPOSITE;
-	else if (strstr (Text, "filter=APERTURE"))		m_nFilter = FILTER_APERTURE;
-	else if (strstr (Text, "filter=HYLLIAN_ORIG"))		m_nFilter = FILTER_HYLLORIG;
-	else if (strstr (Text, "filter=HYLLIAN"))		m_nFilter = FILTER_HYLLIAN;
-	else if (strstr (Text, "filter=CRT_PI"))		m_nFilter = FILTER_CRTPI;
-	else if (strstr (Text, "filter=ZFAST"))			m_nFilter = FILTER_ZFAST;
-	else if (strstr (Text, "filter=SCANLINES_LIGHT"))	m_nFilter = FILTER_SCAN_LIGHT;
-	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
-	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
+	if (strstr (Text, "filter=COMPOSITE"))		m_nFilter = FILTER_COMPOSITE;
+	else if (strstr (Text, "filter=RGB"))		m_nFilter = FILTER_RGB;
+	else if (strstr (Text, "filter=CRT"))		m_nFilter = FILTER_CRT;
+	else if (strstr (Text, "filter=FAST")
+		 || strstr (Text, "filter=SCANLINES"))	m_nFilter = FILTER_FAST;	// (and 1.2.0's LIGHT, STRONG)
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
 	if (strstr (Text, "bezel=off"))			m_nBezel = 0;
 	else if (strstr (Text, "bezel=full"))		m_nBezel = BEZEL_GRID | BEZEL_INFO;
 	else if (strstr (Text, "bezel=grid"))		m_nBezel = BEZEL_GRID;
 	else if (strstr (Text, "bezel=text"))		m_nBezel = BEZEL_INFO;
-	// (multicore and Pi 3 scanlines: decided after LoadConfig)
+	// (multicore and Pi 3 TV filters: decided after LoadConfig)
 	// USB pads polled every 1 ms; usbpoll=500 / 250: 2 / 4 ms; usbpoll=native:
 	// the device's own interval
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
@@ -274,7 +250,7 @@ void CKernel::SaveConfig (void)
 	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\ncpu=%s\r\nfilter=%s\r\n%s",
 		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
-	if (m_nBezel != (BEZEL_GRID | BEZEL_INFO))
+	if (m_nBezel != BEZEL_GRID)
 	{
 		strcat (Text, "bezel=");
 		strcat (Text, BezelName (m_nBezel, FALSE));

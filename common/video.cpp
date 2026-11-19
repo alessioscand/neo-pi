@@ -230,7 +230,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 			if (   m_nScale % k == 0
 			    && m_nDispW % k == 0 && m_nDispH % k == 0
 			    && (m_nFilter == FILTER_NONE || m_nScale / k >= 2)
-			    && (!FILTER_IS_CRT (m_nFilter) || m_nScale / k >= 4))	// TEST: CPU at 4x at least
+			    && (!FILTER_IS_SHADER (m_nFilter) || m_nScale / k >= 4))	// RGB, CRT: 4 rows a line at least
 			{
 				m_nK = k;
 				break;
@@ -251,9 +251,9 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 		}
 	}
 
-	TvSync ();		// TEST: core 2 may be drawing a CRT line
-	CrtFxSetup (FILTER_IS_CRT (m_nFilter) ? m_nFilter - FILTER_FAKELOTTES + CRTFX_FAKELOTTES : CRTFX_NONE,
-		    m_nM, m_bRLow);	// TEST
+	TvSync ();		// core 2 may be drawing a line
+	CrtFxSetup (m_nFilter == FILTER_RGB ? CRTFX_RGB : m_nFilter == FILTER_CRT ? CRTFX_CRT : CRTFX_NONE,
+		    m_nM, m_bRLow);
 
 	unsigned nGameW = GAME_W * m_nM, nGameH = GAME_H * m_nM;
 	m_nGameX = (m_nWidth - nGameW) / 2;
@@ -270,17 +270,22 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	// outside it, then nSideShift game pixels further
 	const unsigned nSize = m_bBands ? 0 : 1;
 	m_nFrame = g_Theme.nFrame[nSize];
+	// 1080p with a fabric: the frame half a small diamond further out, the
+	// fabric still through the corners it had
+	const int nPad = m_nFrame > 0 && nSize == 0 ? g_Theme.nFabric / 8 : 0;
+	m_nFrame += nPad;
 	const int nRoom = (int) (m_nGameY / m_nM) - 2;
 	if (m_nFrame > nRoom) m_nFrame = nRoom > 0 ? nRoom : 0;
+	const int nBase = m_nFrame > nPad ? m_nFrame - nPad : m_nFrame;
 	m_nSideGap = (m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2 : m_nGap)
 		   + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
 
 	// the background's points: the framebuffer's pixels, or the game's
 	m_nBgK = g_Theme.bPixel ? m_nM : 1;
 	m_nBgM = m_nM / m_nBgK;
-	if (m_nBgK == 1 && m_nK == 1 && m_nM % 2 == 0 && FILTER_IS_CRT (m_nFilter))
+	if (m_nBgK == 1 && m_nK == 1 && m_nM % 2 == 0 && FILTER_IS_SHADER (m_nFilter))
 	{
-		m_nBgK = 2;			// TEST: the bezel as with the HVS at 2x
+		m_nBgK = 2;			// RGB, CRT: the bezel as with the HVS at 2x
 		m_nBgM = m_nM / 2;
 	}
 
@@ -288,8 +293,8 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	// fabric the left and top ones move out onto the lattice
 	{
 		const int M = (int) m_nBgM, t = (M + 1) / 2;
-		m_nFrameR = GAME_W / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
-		m_nFrameB = GAME_H / 2 * M - 1 + m_nFrame * M + (M - t) / 2;
+		m_nFrameR = GAME_W / 2 * M - 1 + nBase * M + (M - t) / 2;
+		m_nFrameB = GAME_H / 2 * M - 1 + nBase * M + (M - t) / 2;
 		m_nFrameL = m_nFrameR + 1;		// the mirror image
 		m_nFrameT = m_nFrameB + 1;
 		m_nGridX0 = m_nGridY0 = 0;
@@ -301,6 +306,11 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 			m_nGridX0 = m_nFrameR;
 			m_nGridY0 = m_nFrameB;
 		}
+		const int nOut = (m_nFrame - nBase) * M;
+		m_nFrameR += nOut;
+		m_nFrameB += nOut;
+		m_nFrameL += nOut;
+		m_nFrameT += nOut;
 	}
 	m_bSide = m_nGameX >= m_nSideGap + m_nGap + 40 * U;
 	if (!m_bSide)
@@ -421,6 +431,7 @@ void CVideoOut::DrawText (unsigned nBuffer, unsigned nCol, unsigned nRow, const 
 	}
 }
 
+// RGB, CRT: the picture's rows in a buffer
 struct TCrtCtx { u32 *pBase; unsigned nPitch; };
 static u32 *CrtRow (void *pCtx, unsigned nRow)
 {
@@ -442,10 +453,8 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 	const unsigned M = m_nM;
 	const unsigned nGameW = GAME_W * M;
 
-	// scanlines: bottom rows of each group darker (2 of 4 at 4x, 1 of 2 or 3)
-	// (COMPOSITE: none; the game lines come through DrawNtscLine, this draws
-	// the menus over the paused game)
-	if (bFilter && FILTER_IS_CRT (m_nFilter) && CrtFxActive ())
+	// RGB, CRT: the shader's M rows (crtfx.h)
+	if (bFilter && FILTER_IS_SHADER (m_nFilter) && CrtFxActive ())
 	{
 		TCrtCtx Ctx = {Row (nBuffer, m_nGameY) + m_nGameX, (unsigned) (Row (nBuffer, 1) - Row (nBuffer, 0))};
 		CrtFxLine (pSource, y, CrtRow, &Ctx);
@@ -453,8 +462,10 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 		return;
 	}
 
-	const unsigned nDarkRows = bFilter && m_nFilter >= FILTER_SCAN_LIGHT && m_nFilter <= FILTER_SCAN_STRONG
-				   ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
+	// FAST: bottom rows of each group darker (2 of 4 at 4x, 1 of 2 or 3)
+	// (COMPOSITE: none; the game lines come through DrawNtscLine, this draws
+	// the menus over the paused game)
+	const unsigned nDarkRows = bFilter && m_nFilter == FILTER_FAST ? (M >= 4 ? M / 2 : (M >= 2 ? 1 : 0)) : 0;
 
 	// expand one source line horizontally into cached memory, converting
 	// the game's XRGB8888 (R high) to the framebuffer order if needed
@@ -488,30 +499,12 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 
 	if (nDarkRows)
 	{
-		// shifts and masks only (75% = 50% + 25%)
-		const u32 *pL = pLine;
-		u32 *pD = pDark;
-		switch (m_nFilter)
+		// FAST: 50%, a shift and a mask
+		const u32 *__restrict pL = pLine;
+		u32 *__restrict pD = pDark;
+		for (unsigned x = 0; x < nGameW; x++)
 		{
-		case FILTER_SCAN_LIGHT:
-			for (unsigned x = 0; x < nGameW; x++)
-			{
-				u32 c = pL[x];
-				pD[x] = 0xFF000000u | (((c >> 1) & 0x007F7F7Fu) + ((c >> 2) & 0x003F3F3Fu));
-			}
-			break;
-		case FILTER_SCAN_STRONG:
-			for (unsigned x = 0; x < nGameW; x++)
-			{
-				pD[x] = 0xFF000000u | ((pL[x] >> 2) & 0x003F3F3Fu);
-			}
-			break;
-		default:
-			for (unsigned x = 0; x < nGameW; x++)
-			{
-				pD[x] = 0xFF000000u | ((pL[x] >> 1) & 0x007F7F7Fu);
-			}
-			break;
+			pD[x] = 0xFF000000u | ((pL[x] >> 1) & 0x007F7F7Fu);
 		}
 	}
 	for (unsigned s = 0; s < M; s++)

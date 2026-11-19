@@ -1,11 +1,11 @@
 //
-// crtfx.cpp - TEST: CPU ports of libretro CRT shaders (see crtfx.h)
+// crtfx.cpp - TV FILTER RGB and CRT (see crtfx.h)
 //
-// Sources: libretro/slang-shaders crt/shaders/{fakelottes, crt-blurPi,
-// crt-easymode, crt-aperture, hyllian/crt-hyllian-fast (HYLLIAN+, see below), crt-Ntap/crt-1tap}.slang,
-// ntsc/shaders/ntsc-simple/ntsc_simple.slang, default
-// parameters, curvature off. At an integer scale every weight depends only on
-// the sub-column or sub-row: they are worked out once per scale.
+// Sources: libretro/slang-shaders crt/shaders/hyllian/crt-hyllian-fast.slang
+// and crt/shaders/crt-pi.slang. At an integer scale M the columns x M + p of
+// a game pixel x share the weights of phase p, and the rows of a game line
+// are symmetric: weights are worked out once per scale, the loops run per
+// phase (vectorized) and each pair of rows s, M - 1 - s is written by one loop.
 //
 #include "crtfx.h"
 #include "screen.h"
@@ -14,125 +14,35 @@
 
 #define MAXM	8
 #define MAXOW	(GAME_W * MAXM)
-#define SLOTS	4
-#define ARRS	6
-#define TABN	16384
-#define NT_TAPS	11
-#define NT_PAD	5
-#define NT_W	(2 * GAME_W)
-#define NT_PH	(NT_W + GAME_H + 2 * NT_PAD)
+#define PAD	3			// game pixels repeated past each edge
 
 static unsigned s_nFx, s_M, s_OW;
 static unsigned s_rs, s_bs;
-static float s_U8[256];			// 0..1
-static float s_Lin[256];		// per shader: input gamma
-static float s_Tab[TABN];		// per shader: a power curve, s_TabMax
-static float s_TabMax;
-static u8 s_Out[TABN];			// per shader: output gamma, 0..s_OutMax
-static float s_OutMax;
 
-// per sub-column (whole row of screen pixels, OW)
-static short s_Tap[MAXOW];		// first source pixel
-static float s_W[4][MAXOW];		// weights
-static short s_Tap2[MAXOW];		// a second filter (aperture: sharp)
-static float s_W2[4][MAXOW];
-static short s_Tap3[MAXOW];		// a third (aperture: glow)
-static float s_W3[3][MAXOW > 4096 ? MAXOW : 4096];
-static float s_Mask[3][MAXOW];
-// per sub-row
-static int   s_RowLine[MAXM];		// first line used, relative to L
-static float s_RowF[MAXM];		// weight of the second line
-static int   s_RowLine2[MAXM];
-static float s_RowF2[MAXM];
-static float s_RowK[MAXM];		// scanline factor
-static float s_RowW[3][MAXM];		// aperture: glow, 3 lines
+// per phase
+static int s_Off[MAXM];			// first game pixel, from x
+static float s_W4[MAXM][4];		// RGB: weights of pixels -1..2
+static u16 s_W8[MAXM];			// CRT: weight of the first pixel, Q8
+// per column
+static u16 s_MQ[3][MAXOW];		// RGB: mask ^ (1 / 2.2), Q8
+// per row (and column)
+static u16 s_RowK[MAXM];		// RGB: scanline ^ (1 / 2.2), Q7
+static u16 s_K[(MAXM + 1) / 2][3][MAXOW];	// CRT: scanline x mask, Q7
+// RGB: g ^ (2.4 / 2.2), Q15, for g = i / 3276 (up to 1.25: overshoot kept)
+static u16 s_Gamma[4096];
 
-struct TSlot
-{
-	int nLine;
-	float *pA[ARRS];
-	u16 *pQ[ARRS];
-};
-static TSlot s_Slot[SLOTS];
-static unsigned s_nNext;
-static float *s_pTmp[8];
-
-// fixed point helpers (per shader)
-static u32 s_T32[4096];			// hyllian: two curves on 12 bits
-static int s_HOff[MAXM];		// hyllian: per phase, source offset
-static float s_HW4[MAXM][4];		// and weights of pixels -1..2
-static u16 s_Ix[MAXM][GAME_W];		// hyllian: table index, per phase
-static u32 s_TT[MAXOW];
-static u16 s_S16[3][GAME_W + 2 * 3];	// crtpi, zfast: one source line, planar
-static int s_LOff[MAXM];		// per phase: source offset, weight of it (Q8)
-static u16 s_LW[MAXM];
-static u16 s_LP[MAXM][GAME_W];		// per phase results
-static u16 s_K16[MAXM][3][MAXOW];	// per row and column factors (Q7)
-static u32 s_RowQ[MAXM][8];		// per row factors
-
-static u32 s_O[3][MAXOW];		// one row, per channel
-static float s_FF[MAXM][2][3][MAXOW];	// fakelottes: mask x scanline ^ (1 / 2.2) x 255
-static u8 s_Lit[MAXOW];
-static u16 s_MQ[3][MAXOW];		// hyllian: mask ^ (1 / 2.2), 8.8			// easymode: lit channel
+// one game line
+static float s_F[3][GAME_W + 2 * PAD];	// RGB: 0..1, planar
+static u16 s_S[3][GAME_W + 2 * PAD];	// CRT: 0..255, planar
+static u16 s_P[MAXM][GAME_W];		// per phase
+static u16 s_T[MAXOW];			// RGB: s_Gamma per column
+static u16 s_Q[3][MAXOW];		// per column: RGB q, CRT h
 
 static u64 s_nSum, s_nMax;
 static unsigned s_nCalls;
 
-static float Clamp (float v, float a, float b)	{ return v < a ? a : (v > b ? b : v); }
-
-static void Tables (float fGammaIn, float fTabPow, float fTabMax, float fOutPow, float fOutMul, float fOutMax)
-{
-	for (unsigned i = 0; i < 256; i++)
-	{
-		s_U8[i] = i / 255.0f;
-		s_Lin[i] = powf (i / 255.0f, fGammaIn);
-	}
-	s_TabMax = fTabMax;
-	for (unsigned i = 0; i < TABN; i++)
-	{
-		s_Tab[i] = powf (i * fTabMax / (TABN - 1), fTabPow);
-	}
-	s_OutMax = fOutMax;
-	for (unsigned i = 0; i < TABN; i++)
-	{
-		float v = powf (i * fOutMax / (TABN - 1), fOutPow) * fOutMul * 255.0f + 0.5f;
-		s_Out[i] = (u8) (v > 255.0f ? 255 : v);
-	}
-}
-
-static inline float Pow (float v)
-{
-	if (v <= 0.0f) return 0.0f;
-	if (v >= s_TabMax) v = s_TabMax;
-	return s_Tab[(unsigned) (v * ((TABN - 1) / s_TabMax))];
-}
-
-static inline u32 Out (float r, float g, float b)
-{
-	const float k = (TABN - 1) / s_OutMax;
-	unsigned ir = r <= 0 ? 0 : (r >= s_OutMax ? TABN - 1 : (unsigned) (r * k));
-	unsigned ig = g <= 0 ? 0 : (g >= s_OutMax ? TABN - 1 : (unsigned) (g * k));
-	unsigned ib = b <= 0 ? 0 : (b >= s_OutMax ? TABN - 1 : (unsigned) (b * k));
-	return 0xFF000000u | (u32) s_Out[ir] << s_rs | (u32) s_Out[ig] << 8 | (u32) s_Out[ib] << s_bs;
-}
-
-static float Lanczos2 (float x)		// 2 sin(pi x) sin(pi x / 2) / (pi x)^2
-{
-	float c = 3.141592653589f * x;
-	c = fabsf (c) < 1e-5f ? 1e-5f : fabsf (c);
-	return 2.0f * sinf (c) * sinf (c * 0.5f) / (c * c);
-}
-
-static float Curve (float x, float sharp)	// crt-easymode's curve_distance
-{
-	float xs = x >= 0.5f ? 1.0f : 0.0f;
-	float d = 0.25f - (x - xs) * (x - xs);
-	float c = 0.5f - sqrtf (d > 0 ? d : 0) * (x < 0.5f ? 1.0f : (x > 0.5f ? -1.0f : 0.0f));
-	return x + (c - x) * sharp;
-}
-
-
-// ---- setup -------------------------------------------------------------------
+static inline float Clamp (float v, float a, float b)	{ return v < a ? a : (v > b ? b : v); }
+static inline u16 Sat (u16 v)				{ return v > 255 ? 255 : v; }
 
 void CrtFxSetup (unsigned nFx, unsigned M, boolean bRLow)
 {
@@ -144,263 +54,57 @@ void CrtFxSetup (unsigned nFx, unsigned M, boolean bRLow)
 	{
 		return;
 	}
-	if (!s_Slot[0].pA[0])
-	{
-		for (unsigned i = 0; i < SLOTS; i++)
-			for (unsigned a = 0; a < ARRS; a++)
-			{
-				s_Slot[i].pA[a] = new float[MAXOW];
-				s_Slot[i].pQ[a] = new u16[MAXOW];
-			}
-		for (unsigned a = 0; a < 8; a++)
-			s_pTmp[a] = new float[MAXOW];
-	}
 	SharedStore (s_nFx, (unsigned) CRTFX_NONE);
 	s_M = M;
 	s_OW = GAME_W * M;
 	const unsigned OW = s_OW;
-	for (unsigned i = 0; i < SLOTS; i++) s_Slot[i].nLine = -100;
-
-	for (unsigned j = 0; j < OW; j++)
-		for (unsigned c = 0; c < 3; c++)
-			s_Mask[c][j] = 1.0f;
 
 	switch (nFx)
 	{
-	case CRTFX_HYLLIAN:
-	case CRTFX_HYLLORIG:
-	{
-		// HYLLIAN+: crt-hyllian-fast with SHARPER (Hermite), SCANLINES 0.9,
-		// mask 0.8 / 1.2, BRIGHTBOOST 1.5, gamma 2.4 / 2.2; bright pixels
-		// widen the beam: w = (v - 0.25) / 0.75 x 0.9. HYLLORIG: the defaults
-		// (Catmull-Rom, SCANLINES 0.72, mask 0.5 / 1, no widening). Columns
-		// x M + p of a source pixel x share the offset and weights of phase p.
-		const boolean bPlus = nFx == CRTFX_HYLLIAN;
-		const float fSL = bPlus ? 0.9f : 0.72f, fLo = bPlus ? 0.8f : 0.5f, fHi = bPlus ? 1.2f : 1.0f;
-		Tables (1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+	case CRTFX_RGB:
+		// Catmull-Rom across in gamma space, then GAMMA_INPUT 2.4, SCANLINES
+		// 0.72, BRIGHTBOOST 1.5, mask 0.5 (green / magenta), OUTPUT 2.2: all
+		// but the first separable, out = g ^ (2.4 / 2.2) x row x mask
 		for (unsigned p = 0; p < M; p++)
 		{
 			float sx = (p + 0.5f) / M - 0.49999f, b = floorf (sx), f = sx - b;
 			float f2 = f * f, f3 = f2 * f;
-			s_HOff[p] = (int) b;
-			if (bPlus)
-			{
-				s_HW4[p][0] = 0;
-				s_HW4[p][1] = 2.0f * f3 - 3.0f * f2 + 1.0f;
-				s_HW4[p][2] = -2.0f * f3 + 3.0f * f2;
-				s_HW4[p][3] = 0;
-			}
-			else
-			{
-				s_HW4[p][0] = -0.5f * f3 + f2 - 0.5f * f;
-				s_HW4[p][1] = 1.5f * f3 - 2.5f * f2 + 1.0f;
-				s_HW4[p][2] = -1.5f * f3 + 2.0f * f2 + 0.5f * f;
-				s_HW4[p][3] = 0.5f * f3 - 0.5f * f2;
-			}
+			s_Off[p] = (int) b;
+			s_W4[p][0] = -0.5f * f3 + f2 - 0.5f * f;
+			s_W4[p][1] = 1.5f * f3 - 2.5f * f2 + 1.0f;
+			s_W4[p][2] = -1.5f * f3 + 2.0f * f2 + 0.5f * f;
+			s_W4[p][3] = 0.5f * f3 - 0.5f * f2;
 		}
 		for (unsigned j = 0; j < OW; j++)
 		{
-			int mf = (int) floorf (j + 0.5f - 0.49999f * M);
-			boolean odd = (mf & 1) != 0;
-			const u16 lo = (u16) (powf (fLo, 1.0f / 2.2f) * 256.0f + 0.5f);
-			const u16 hi = (u16) (powf (fHi, 1.0f / 2.2f) * 256.0f + 0.5f);
-			s_MQ[0][j] = s_MQ[2][j] = odd ? lo : hi;
-			s_MQ[1][j] = odd ? hi : lo;
+			const boolean bOdd = ((int) floorf (j + 0.5f - 0.49999f * M) & 1) != 0;
+			const u16 lo = (u16) (powf (0.5f, 1.0f / 2.2f) * 256.0f + 0.5f), hi = 256;
+			s_MQ[0][j] = s_MQ[2][j] = bOdd ? lo : hi;
+			s_MQ[1][j] = bOdd ? hi : lo;
 		}
 		for (unsigned s = 0; s < M; s++)
 		{
 			float fy = (s + 0.5f) / M;
-			float d1 = Clamp (1.5f - fSL - fabsf (fy - 0.5f), 0.0f, 1.0f);
-			float kd = powf (d1 * d1 * (3.0f + 1.5f - 2.0f * d1), 1.0f / 2.2f);
-			s_RowQ[s][0] = (u32) (kd * 128.0f + 0.5f);		// Q7
-			s_RowQ[s][1] = kd < 1.0f && bPlus ? 128 - s_RowQ[s][0] : 0;
+			float d1 = Clamp (1.5f - 0.72f - fabsf (fy - 0.5f), 0.0f, 1.0f);
+			float k = powf (d1 * d1 * (3.0f + 1.5f - 2.0f * d1), 1.0f / 2.2f);
+			s_RowK[s] = (u16) (k * 128.0f + 0.5f);
 		}
-		for (unsigned i = 0; i < 4096; i++)	// g ^ (2.4 / 2.2) | beam widening << 16
+		for (unsigned i = 0; i < 4096; i++)
 		{
-			float g = i / (bPlus ? 4095.0f : 3276.0f), v = powf (g, 2.4f);	// HYLLORIG: g up to 1.25
-
-			float w = bPlus ? Clamp ((v - 0.25f) / 0.75f, 0.0f, 1.0f) * 0.9f : 0.0f;
-			s_T32[i] = (u32) (powf (g, 2.4f / 2.2f) * 32767.0f + 0.5f)
-				 | (u32) (w * 32768.0f + 0.5f) << 16;
-		}
-		break;
-	}
-
-	case CRTFX_EASYMODE:
-		// dilation on (c * c), gamma 2.0 / (1 + 1) = 1, output 1 / 1.8 x 1.2,
-		// mask 0.3 RGB, sharpness H 0.5, V 1.0, beam 1.5, brightness 0.35..0.65
-		Tables (2.0f, 1.0f, 1.0f, 1.0f / 1.8f, 1.2f, 1.0f);
-		for (unsigned j = 0; j < OW; j++)
-		{
-			float px = (j + 0.5f) / M - 0.5f;
-			float b = floorf (px), d = px - b;
-			s_Tap[j] = (short) (b - 1);
-			float cx = Curve (d, 0.25f);
-			float w0 = Lanczos2 (1.0f + cx), w1 = Lanczos2 (cx), w2 = Lanczos2 (1.0f - cx), w3 = Lanczos2 (2.0f - cx);
-			float n = w0 + w1 + w2 + w3;
-			s_W[0][j] = w0 / n; s_W[1][j] = w1 / n; s_W[2][j] = w2 / n; s_W[3][j] = w3 / n;
-			unsigned dot = j % 3;
-			s_Lit[j] = (u8) dot;
-			for (unsigned c = 0; c < 3; c++) s_Mask[c][j] = c == dot ? 1.0f : 0.7f;
-		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			float py = (s + 0.5f) / M - 0.5f;
-			float b = floorf (py);
-			s_RowLine[s] = (int) b;
-			s_RowF[s] = Curve (py - b, 1.0f);
-			float cs = cosf (2.0f * 3.141592653589f * (s + 0.5f) / M) * 0.5f + 0.5f;
-			s_RowK[s] = 1.0f - powf (cs, 1.5f);
-			s_RowQ[s][0] = (u32) (s_RowF[s] * 256.0f + 0.5f);
-
+			s_Gamma[i] = (u16) (powf (i / 3276.0f, 2.4f / 2.2f) * 32767.0f + 0.5f);
 		}
 		break;
 
-	case CRTFX_APERTURE:
-		// gamma 2.4 / 2.4, brightness 1.5, glow 0.5 x 0.5, halation 0.1,
-		// diffusion 0.05, mask 2 colours 0.3, beam 0.5..1.5 shape 2.5, sharp 1 / 3
-		Tables (2.4f, 1.0f / 2.5f, 1.0f, 1.0f / 2.4f, 1.0f, 1.0f);
-		for (unsigned j = 0; j < OW; j++)
-		{
-			float pcx = (j + 0.5f) / M;
-			// soft: Lanczos at the source's pixels, 2 taps (pairs summed)
-			float p = pcx - 0.5f, b = floorf (p), d = p - b;
-			s_Tap[j] = (short) b;
-			float w0 = Lanczos2 (d + 1), w1 = Lanczos2 (d), w2 = Lanczos2 (d - 1), w3 = Lanczos2 (d - 2);
-			float n = w0 + w1 + w2 + w3;
-			s_W[0][j] = (w0 + w1) / n; s_W[1][j] = (w2 + w3) / n;
-			// sharp: the same at 3x, nearest source pixels
-			p = pcx * 3.0f - 0.5f; b = floorf (p); d = p - b;
-			int t1 = (int) floorf ((b + 0.5f) / 3.0f), t2 = (int) floorf ((b + 1.5f) / 3.0f);
-			s_Tap2[j] = (short) t1;
-			w0 = Lanczos2 (d + 1); w1 = Lanczos2 (d); w2 = Lanczos2 (d - 1); w3 = Lanczos2 (d - 2);
-			n = w0 + w1 + w2 + w3;
-			s_W2[0][j] = (w0 + w1) / n; s_W2[1][j] = (w2 + w3) / n;
-			s_W2[2][j] = (float) (t2 - t1);			// 0 or 1
-			// glow: gaussian over 3 pixels
-			float dist = -(pcx - floorf (pcx) - 0.5f);
-			s_Tap3[j] = (short) (floorf (pcx) - 1);
-			float g[3], gs = 0;
-			for (int k = 0; k < 3; k++) { float x = (dist + k - 1) / 0.5f; g[k] = exp2f (-x * x); gs += g[k]; }
-			for (int k = 0; k < 3; k++) s_W3[k][j] = g[k] / gs;
-			boolean i0 = (j % 2) == 0;		// (1,0,1) / (0,1,0) at 0.3: x1.3 / x0.7
-			s_Mask[0][j] = s_Mask[2][j] = i0 ? 1.3f : 0.7f;
-			s_Mask[1][j] = i0 ? 0.7f : 1.3f;
-		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			float off = (M % 2) ? 0.0f : 0.5f / M;
-			float cvh = (s + 0.5f) / M - off;		// in L's line
-			float b = floorf (cvh), fr = cvh - b;
-			s_RowLine[s] = (int) b;
-			s_RowK[s] = fabsf (2.0f * fr - 1.0f);		// |2 xx - 1|
-			float dist = -(fr - 0.5f), g[3], gs = 0;
-			for (int k = 0; k < 3; k++) { float x = (dist + k - 1) / 0.5f; g[k] = exp2f (-x * x); gs += g[k]; }
-			for (int k = 0; k < 3; k++) s_RowW[k][s] = g[k] / gs;
-		}
-		break;
-
-	case CRTFX_FAKELOTTES:
-		// shadowMask 1, maskDark 0.5, maskLight 1.5, gamma 2.5 / 2.2,
-		// scanlines 0.95 + 0.40 sin
-		Tables (1.0f, 2.5f, 1.0f, 1.0f / 2.2f, 1.0f, 1.0f);
-		for (unsigned j = 0; j < OW; j++)
-		{
-			float x = (j + 0.5f) / M - 0.5f, b = floorf (x);
-			s_Tap[j] = (short) b;
-			s_W[1][j] = x - b;
-		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			float y = (s + 0.5f) / M - 0.5f, b = floorf (y);
-			s_RowLine[s] = (int) b;
-			s_RowF[s] = y - b;
-			s_RowK[s] = 0.95f + 0.40f * sinf (2.0f * 3.141592653589f * ((s + 0.5f) / M - 0.25f));
-			s_RowQ[s][0] = (u32) (s_RowF[s] * 256.0f + 0.5f);
-			for (unsigned d = 0; d < 2; d++)
-				for (unsigned l = 0; l < 2; l++)
-				{
-					float v = (d ? 0.5f : 1.5f) * (l ? 1.5f : 0.5f) * s_RowK[s];
-					s_RowQ[s][1 + d * 2 + l] = (u32) (powf (v, 1.0f / 2.2f) * 255.0f + 0.5f);
-				}
-		}
-		for (unsigned sr = 0; sr < M; sr++)
-			for (unsigned par = 0; par < 2; par++)
-				for (unsigned j = 0; j < OW; j++)
-				{
-					unsigned odd = (j % 6) < 3, dark = ((par + odd) & 1) == 0, lit = j % 3;
-					for (unsigned ch = 0; ch < 3; ch++)
-						s_FF[sr][par][ch][j] = (float) s_RowQ[sr][1 + dark * 2 + (ch == lit)];
-				}
-		break;
-
-	case CRTFX_ONETAP:
-		// MIN_THICK 0.1, MAX_THICK 0.95, H_SMOOTH 0.8, V_SMOOTH 1, SUBPX_POS 0.31,
-		// THICK_FALLOFF 0.45; linear filtering at the sigmoid's x
-		Tables (1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-		for (unsigned j = 0; j < OW; j++)
-		{
-			float sx = (j + 0.5f) / M - 0.5f, b = floorf (sx), x = 2.0f * (sx - b) - 1.0f;
-			const float hs = 6.0f + (1.0f - 6.0f) * 0.8f;
-			s_Tap[j] = (short) b;
-			s_W[1][j] = 0.5f + 0.5f * hs * x / sqrtf (1.0f + (hs * hs - 1.0f) * x * x);
-		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			float y = (s + 0.5f) / M - 0.31f, b = floorf (y);
-			s_RowLine[s] = (int) b;				// L or L-1
-			float lo = y - 0.5f / M, hi = y + 0.5f / M;	// beam window
-			s_RowK[s] = floorf (hi) - floorf (lo);
-			s_RowF[s] = hi - floorf (hi);
-			s_RowF2[s] = lo - floorf (lo);
-		}
-		for (unsigned i = 0; i < 4096; i++)		// beam width
-		{
-			float w = 0.1f + (0.95f - 0.1f) * powf (i / 4095.0f, 0.45f);
-			s_W3[0][i] = w > 1.0f ? 1.0f : w;
-		}
-		break;
-
-	case CRTFX_NTSCSIMPLE:
-		// SNES mode, composite cable: 11 taps at 2x, luma Blackman 0.24,
-		// chroma 0.06, gain 1.5; no scanlines, linear 2x -> M
-		Tables (1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-		for (unsigned j = 0; j < OW; j++)
-		{
-			float x = (j + 0.5f) * 2.0f / M - 0.5f, b = floorf (x);
-			s_Tap[j] = (short) b;
-			s_W[1][j] = x - b;
-		}
-		{
-			float sy = 0, sc = 0;
-			for (unsigned n = 0; n < NT_TAPS; n++)
-			{
-				const float tau = 6.283185307f;
-				float wy = (0.5f - 0.24f) - 0.5f * cosf (tau * n / NT_TAPS) + 0.24f * cosf (2 * tau * n / NT_TAPS);
-				float wc = (0.5f - 0.06f) - 0.5f * cosf (tau * n / NT_TAPS) + 0.06f * cosf (2 * tau * n / NT_TAPS);
-				s_W[0][n] = wy; s_W[2][n] = wc; sy += wy; sc += wc;
-			}
-			for (unsigned n = 0; n < NT_TAPS; n++) { s_W[0][n] /= sy; s_W[2][n] = s_W[2][n] / sc * 1.5f; }
-			for (unsigned k = 0; k < NT_PH; k++)	// phase (k - pad) x pi x 0.6666
-			{
-				float ph = ((float) k - NT_PAD) * 3.141592653589f * 0.6666f;
-				s_W2[0][k] = cosf (ph);
-				s_W2[1][k] = sinf (ph);
-			}
-		}
-		break;
-
-	case CRTFX_CRTPI:
-		// crt-pi defaults (no gamma, no SHARPER): linear across, SCANLINE_WEIGHT
-		// 6, gap 0.12, multisample, BLOOM_FACTOR 1.5, trinitron mask 0.7.
-		// The own line only (the original blends the next one near the gaps).
+	case CRTFX_CRT:
+		// linear across, SCANLINE_WEIGHT 6, SCANLINE_GAP_BRIGHTNESS 0.12,
+		// MULTISAMPLE, BLOOM_FACTOR 1.5, trinitron mask 0.7, no gamma
 		for (unsigned p = 0; p < M; p++)
 		{
 			float x = (p + 0.5f) / M - 0.5f, b = floorf (x);
-			s_LOff[p] = (int) b;
-			s_LW[p] = (u16) ((1.0f - (x - b)) * 256.0f + 0.5f);
+			s_Off[p] = (int) b;
+			s_W8[p] = (u16) ((1.0f - (x - b)) * 256.0f + 0.5f);
 		}
-		for (unsigned s = 0; s < M; s++)
+		for (unsigned s = 0; s < (M + 1) / 2; s++)
 		{
 			float dy = (s + 0.5f) / M - 0.5f, fw = 1.0f / (3.0f * M), w = 0;
 			for (int k = -1; k <= 1; k++)
@@ -414,58 +118,8 @@ void CrtFxSetup (unsigned nFx, unsigned M, boolean bRLow)
 				float wm = fmodf ((j + 0.5f) / 3.0f, 1.0f);
 				unsigned lit = wm < 1.0f / 3 ? 0 : (wm < 2.0f / 3 ? 1 : 2);
 				for (unsigned c = 0; c < 3; c++)
-					s_K16[s][c][j] = (u16) (w * (c == lit ? 1.0f : 0.7f) * 128.0f + 0.5f);
+					s_K[s][c][j] = (u16) (w * (c == lit ? 1.0f : 0.7f) * 128.0f + 0.5f);
 			}
-		}
-		break;
-
-	case CRTFX_ZFAST:
-		// zfast_crt_finemask defaults (no gamma): BLURSCALEX 0.3, LOWLUMSCAN 6,
-		// HILUMSCAN 8, BRIGHTBOOST 1.25, MASK_DARK 0.25, MASK_FADE 0.8. The own
-		// line only (the original blends the next one near the gaps).
-		for (unsigned p = 0; p < M; p++)
-		{
-			float c = (p + 0.5f) / M, i = floorf (c) + 0.5f, f = c - i;
-			float q = i + 4.0f * f * f * f;
-			float x = q + (c - q) * 0.3f - 0.5f, b = floorf (x);
-			s_LOff[p] = (int) b;
-			s_LW[p] = (u16) ((1.0f - (x - b)) * 256.0f + 0.5f);
-		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			float fy = (s + 0.5f) / M - 0.5f, Y = fy * fy, YY = Y * Y;
-			float w1 = 1.25f - 6.0f * (Y - 2.05f * YY);
-			float w2 = 1.0f - 8.0f * (YY - 2.8f * YY * Y);
-			s_RowQ[s][0] = (u32) (w2 * 128.0f + 0.5f);
-			for (unsigned j = 0; j < OW; j++)
-			{
-				float m = fmodf (j * -0.4999f, 1.0f);
-				if (m < 0) m += 1.0f;
-				s_K16[s][0][j] = (u16) (w1 * (m < 0.5f ? 0.75f : 1.0f) * 128.0f + 0.5f);
-			}
-		}
-		break;
-
-	case CRTFX_BLURPI:
-		// scanlineGain 0.30, rgbExtraGain 0.10, blurGain 0.15, blurRadius 1.5
-		Tables (1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
-		for (unsigned j = 0; j < OW; j++)
-		{
-			float x = (j + 0.5f) / M - 0.5f, b = floorf (x);
-			s_Tap[j] = (short) b;   s_W[1][j] = x - b;
-			x -= 1.5f; b = floorf (x);
-			s_Tap2[j] = (short) b;  s_W2[1][j] = x - b;
-			x += 3.0f; b = floorf (x);
-			s_Tap3[j] = (short) b;  s_W3[1][j] = x - b;
-		}
-		for (unsigned s = 0; s < M; s++)
-		{
-			float y = (s + 0.5f) / M - 0.5f, b = floorf (y);
-			s_RowLine[s] = (int) b;  s_RowF[s] = y - b;
-			y += 1.5f; b = floorf (y);
-			s_RowLine2[s] = (int) b; s_RowF2[s] = y - b;
-			s_RowQ[s][0] = (u32) (s_RowF[s] * 256.0f + 0.5f);
-			s_RowQ[s][1] = (u32) (s_RowF2[s] * 256.0f + 0.5f);
 		}
 		break;
 
@@ -481,610 +135,157 @@ unsigned CrtFxActive (void)
 	return SharedLoad (s_nFx);
 }
 
-static inline boolean NoLag (unsigned nFx)
-{
-	return nFx == CRTFX_HYLLIAN || nFx == CRTFX_HYLLORIG || nFx == CRTFX_ONETAP || nFx == CRTFX_NTSCSIMPLE
-	       || nFx == CRTFX_CRTPI || nFx == CRTFX_ZFAST;
-}
-
-boolean CrtFxLag (void)
-{
-	unsigned n = SharedLoad (s_nFx);
-	return n != CRTFX_NONE && !NoLag (n);
-}
-
-static unsigned s_nField;		// ntsc-simple: frame parity
-
-// ---- one source line, horizontally ---------------------------------------------
-
-static const u32 *s_pFrame;
-static int s_nNewest;
-
-static inline const u32 *SrcLine (int L)
-{
-	if (L < 0) L = 0;
-	if (L > s_nNewest) L = s_nNewest;
-	return s_pFrame + (GAME_SRC_Y + L) * GAME_SRC_PITCH + GAME_SRC_X;
-}
-
-static inline unsigned Px (int x)
-{
-	return x < 0 ? 0 : (x >= (int) GAME_W ? GAME_W - 1 : (unsigned) x);
-}
-
-#define CH(p, c)	(((p) >> (16 - 8 * (c))) & 0xFF)
-#define PAD	3
-static float s_SP[3][GAME_W + 2 * PAD];		// one source line, planar, edges repeated
-
-static void Planar (const u32 *p, const float *pTab)
-{
-	for (unsigned x = 0; x < GAME_W; x++)
-	{
-		u32 c = p[x];
-		s_SP[0][x + PAD] = pTab[(c >> 16) & 0xFF];
-		s_SP[1][x + PAD] = pTab[(c >> 8) & 0xFF];
-		s_SP[2][x + PAD] = pTab[c & 0xFF];
-	}
-	for (unsigned ch = 0; ch < 3; ch++)
-		for (unsigned i = 0; i < PAD; i++)
-		{
-			s_SP[ch][i] = s_SP[ch][PAD];
-			s_SP[ch][GAME_W + PAD + i] = s_SP[ch][GAME_W + PAD - 1];
-		}
-}
-
-// crtpi, zfast: two taps per phase, 8 bits; phases interleaved into columns
-template <unsigned MM>
-static void Interleave (u16 *__restrict h)
+// phases to columns
+template <unsigned MM, typename T>
+static void Interleave (T *__restrict h, const T (*P)[GAME_W])
 {
 	for (unsigned x = 0; x < GAME_W; x++)
 		for (unsigned p = 0; p < MM; p++)
-			h[x * MM + p] = s_LP[p][x];
+			h[x * MM + p] = P[p][x];
 }
 
-static void LinLine (const u32 *p, u16 **pQ)
+template <typename T>
+static void Columns (T *__restrict h, const T (*P)[GAME_W], unsigned M)
+{
+	switch (M)
+	{
+	case 2:	Interleave<2> (h, P);	break;
+	case 3:	Interleave<3> (h, P);	break;
+	case 4:	Interleave<4> (h, P);	break;
+	default:
+		for (unsigned x = 0; x < GAME_W; x++)
+			for (unsigned p = 0; p < M; p++)
+				h[x * M + p] = P[p][x];
+		break;
+	}
+}
+
+// RGB: q = g ^ (2.4 / 2.2) x mask ^ (1 / 2.2) per column, Q8 (0..326)
+static void LineRgb (const u32 *pSrc)
+{
+	const unsigned M = s_M, OW = s_OW;
+	for (unsigned x = 0; x < GAME_W; x++)
+	{
+		const u32 c = pSrc[x];
+		s_F[0][x + PAD] = ((c >> 16) & 0xFF) / 255.0f;
+		s_F[1][x + PAD] = ((c >> 8) & 0xFF) / 255.0f;
+		s_F[2][x + PAD] = (c & 0xFF) / 255.0f;
+	}
+	for (unsigned ch = 0; ch < 3; ch++)
+	{
+		float *f = s_F[ch];
+		for (unsigned i = 0; i < PAD; i++)
+		{
+			f[i] = f[PAD];
+			f[GAME_W + PAD + i] = f[GAME_W + PAD - 1];
+		}
+		for (unsigned p = 0; p < M; p++)
+		{
+			const float *__restrict a = f + PAD + s_Off[p] - 1;
+			const float w0 = s_W4[p][0], w1 = s_W4[p][1], w2 = s_W4[p][2], w3 = s_W4[p][3];
+			u16 *__restrict ix = s_P[p];
+			for (unsigned x = 0; x < GAME_W; x++)
+			{
+				float v = w0 * a[x] + w1 * a[x + 1] + w2 * a[x + 2] + w3 * a[x + 3];
+				v = v < 0.0f ? 0.0f : (v > 1.25f ? 1.25f : v);
+				ix[x] = (u16) (v * 3276.0f + 0.5f);
+			}
+		}
+		u16 *__restrict t = s_T;		// gather (not vectorized)
+		for (unsigned x = 0; x < GAME_W; x++)
+			for (unsigned p = 0; p < M; p++)
+				*t++ = s_Gamma[s_P[p][x]];
+		const u16 *__restrict tt = s_T, *__restrict mq = s_MQ[ch];
+		u16 *__restrict q = s_Q[ch];
+		for (unsigned j = 0; j < OW; j++)
+			q[j] = (u16) (((u32) tt[j] * mq[j]) >> 15);
+	}
+}
+
+// CRT: h, linear across, per column (0..255)
+static void LineCrt (const u32 *pSrc)
 {
 	const unsigned M = s_M;
 	for (unsigned x = 0; x < GAME_W; x++)
 	{
-		u32 c = p[x];
-		s_S16[0][x + 3] = (u16) ((c >> 16) & 0xFF);
-		s_S16[1][x + 3] = (u16) ((c >> 8) & 0xFF);
-		s_S16[2][x + 3] = (u16) (c & 0xFF);
+		const u32 c = pSrc[x];
+		s_S[0][x + PAD] = (u16) ((c >> 16) & 0xFF);
+		s_S[1][x + PAD] = (u16) ((c >> 8) & 0xFF);
+		s_S[2][x + PAD] = (u16) (c & 0xFF);
 	}
 	for (unsigned ch = 0; ch < 3; ch++)
 	{
-		for (unsigned i = 0; i < 3; i++)
+		u16 *s = s_S[ch];
+		for (unsigned i = 0; i < PAD; i++)
 		{
-			s_S16[ch][i] = s_S16[ch][3];
-			s_S16[ch][GAME_W + 3 + i] = s_S16[ch][GAME_W + 2];
+			s[i] = s[PAD];
+			s[GAME_W + PAD + i] = s[GAME_W + PAD - 1];
 		}
-		for (unsigned ph = 0; ph < M; ph++)
+		for (unsigned p = 0; p < M; p++)
 		{
-			const u16 *__restrict a = s_S16[ch] + 3 + s_LOff[ph];
-			const u16 wa = s_LW[ph], wb = (u16) (256 - wa);
-			u16 *__restrict o = s_LP[ph];
+			const u16 *__restrict a = s + PAD + s_Off[p];
+			const u16 wa = s_W8[p], wb = (u16) (256 - wa);
+			u16 *__restrict o = s_P[p];
 			for (unsigned x = 0; x < GAME_W; x++)
 				o[x] = (u16) ((u16) (a[x] * wa + a[x + 1] * wb + 128) >> 8);
 		}
-		u16 *h = pQ[ch];
-		switch (M)
-		{
-		case 3:	Interleave<3> (h);	break;
-		case 4:	Interleave<4> (h);	break;
-		default:
-			for (unsigned x = 0; x < GAME_W; x++)
-				for (unsigned ph = 0; ph < M; ph++)
-					h[x * M + ph] = s_LP[ph][x];
-			break;
-		}
+		Columns (s_Q[ch], (const u16 (*)[GAME_W]) s_P, M);
 	}
 }
 
-static void HLine (int L, float **pA, u16 **pQ)
+// rows s and M - 1 - s of game line y (16-bit lanes)
+static void Rows (unsigned y, TCrtRowFn pRow, void *pCtx)
 {
-	const u32 *p = SrcLine (L);
-	const unsigned OW = s_OW;
-	switch (s_nFx)
+	const unsigned M = s_M, OW = s_OW, rs = s_rs, bs = s_bs;
+	const u16 *__restrict q0 = s_Q[0], *__restrict q1 = s_Q[1], *__restrict q2 = s_Q[2];
+	for (unsigned s = 0; s < (M + 1) / 2; s++)
 	{
-	case CRTFX_HYLLIAN:		// Hermite (or Catmull-Rom) in gamma space, per phase
-	case CRTFX_HYLLORIG:
-	{
-		Planar (p, s_U8);
-		const unsigned M = s_M;
-		for (unsigned ch = 0; ch < 3; ch++)
+		u32 *__restrict d0 = pRow (pCtx, y * M + s);
+		u32 *__restrict d1 = pRow (pCtx, y * M + M - 1 - s);
+		const boolean bTwo = M - 1 - s != s;
+		if (s_nFx == CRTFX_RGB)
 		{
-			const float *sp = s_SP[ch] + PAD;
-			for (unsigned ph = 0; ph < M; ph++)
-			{
-				const float *__restrict a = sp + s_HOff[ph];
-				u16 *__restrict ix = s_Ix[ph];
-				if (s_nFx == CRTFX_HYLLIAN)		// 2 taps, in 0..1
-				{
-					const float wa = s_HW4[ph][1], wb = s_HW4[ph][2];
-					for (unsigned x = 0; x < GAME_W; x++)
-						ix[x] = (u16) ((wa * a[x] + wb * a[x + 1]) * 4095.0f + 0.5f);
-				}
-				else					// 4 taps, clamped
-				{
-					const float w0 = s_HW4[ph][0], w1 = s_HW4[ph][1], w2 = s_HW4[ph][2], w3 = s_HW4[ph][3];
-					a--;					// pixel -1
-					for (unsigned x = 0; x < GAME_W; x++)
-					{
-						float v = w0 * a[x] + w1 * a[x + 1] + w2 * a[x + 2] + w3 * a[x + 3];
-						v = v < 0.0f ? 0.0f : (v > 1.25f ? 1.25f : v);	// overshoot kept
-						ix[x] = (u16) (v * 3276.0f + 0.5f);
-					}
-				}
-			}
-			u32 *__restrict t = s_TT;
-			for (unsigned x = 0; x < GAME_W; x++)
-				for (unsigned ph = 0; ph < M; ph++)
-					*t++ = s_T32[s_Ix[ph][x]];
-			const u32 *__restrict tt = s_TT;
-			const u16 *__restrict mq = s_MQ[ch];
-			u16 *__restrict q = pQ[ch], *__restrict w = pQ[3 + ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				q[j] = (u16) (((tt[j] & 0xFFFF) * mq[j]) >> 15);	// 0..278: x 194 fits 16 bits
-				w[j] = (u16) (tt[j] >> 23);				// 0..230
-			}
-		}
-		break;
-	}
-
-	case CRTFX_CRTPI:
-	case CRTFX_ZFAST:
-		LinLine (p, pQ);
-		break;
-
-	case CRTFX_EASYMODE:		// Lanczos on c * c, clamped to the middle pair
-		Planar (p, s_Lin);
-		for (unsigned ch = 0; ch < 3; ch++)
-		{
-			const float *sp = s_SP[ch] + PAD;
-			float *q = pA[ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				const float *t = sp + s_Tap[j];
-				float m1 = t[1], m2 = t[2];
-				float v = s_W[0][j] * t[0] + s_W[1][j] * m1 + s_W[2][j] * m2 + s_W[3][j] * t[3];
-				float lo = m1 < m2 ? m1 : m2, hi = m1 < m2 ? m2 : m1;
-				q[j] = Clamp (v, lo, hi);
-			}
-		}
-		break;
-
-	case CRTFX_APERTURE:		// glow, horizontally (the line's own data: AperLine)
-		Planar (p, s_Lin);
-		for (unsigned ch = 0; ch < 3; ch++)
-		{
-			const float *sp = s_SP[ch] + PAD;
-			float *a = pA[ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				const float *t = sp + s_Tap3[j];
-				a[j] = s_W3[0][j] * t[0] + s_W3[1][j] * t[1] + s_W3[2][j] * t[2];
-			}
-		}
-		break;
-
-	case CRTFX_FAKELOTTES:		// bilinear, gamma space
-		Planar (p, s_U8);
-		for (unsigned ch = 0; ch < 3; ch++)
-		{
-			const float *sp = s_SP[ch] + PAD;
-			float *a = pA[ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				const float *t = sp + s_Tap[j];
-				a[j] = t[0] + (t[1] - t[0]) * s_W[1][j];
-			}
-		}
-		break;
-
-	case CRTFX_ONETAP:		// signal ^ 2 and beam width
-		Planar (p, s_U8);
-		for (unsigned ch = 0; ch < 3; ch++)
-		{
-			const float *sp = s_SP[ch] + PAD;
-			float *a = pA[ch], *w = pA[3 + ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				const float *t = sp + s_Tap[j];
-				float v = t[0] + (t[1] - t[0]) * s_W[1][j];
-				a[j] = v * v;
-				w[j] = s_W3[0][(unsigned) (v * 4095.0f + 0.5f)];
-			}
-		}
-		break;
-
-	case CRTFX_NTSCSIMPLE:		// modulate at 2x, demodulate, filter; then 2x -> M
-	{
-		static float Y[NT_W + 2 * NT_PAD], C[NT_W + 2 * NT_PAD], S[NT_W + 2 * NT_PAD], Out[3][NT_W + 1];
-		const int L0 = L < 0 ? 0 : L;
-		const float sg = s_nField ? -1.0f : 1.0f;	// + pi on odd frames
-		for (int i = 0; i < (int) NT_W + 2 * NT_PAD; i++)
-		{
-			int x = i - NT_PAD;
-			u32 c = p[Px (x >> 1)];
-			float r = s_U8[(c >> 16) & 0xFF], g = s_U8[(c >> 8) & 0xFF], b = s_U8[c & 0xFF];
-			float yy = 0.299f * r + 0.587f * g + 0.114f * b;
-			float ii = 0.596f * r - 0.274f * g - 0.322f * b;
-			float qq = 0.211f * r - 0.523f * g + 0.312f * b;
-			unsigned k = (unsigned) (i + L0);		// phase (x + L) x cycles
-			float cs = s_W2[0][k] * sg, sn = s_W2[1][k] * sg;
-			float sig = yy + ii * cs + qq * sn;
-			Y[i] = sig; C[i] = sig * cs; S[i] = sig * sn;
-		}
-		for (unsigned x = 0; x < NT_W; x++)
-		{
-			float y = 0, ci = 0, cq = 0;
-			for (unsigned n = 0; n < NT_TAPS; n++)
-			{
-				y += Y[x + n] * s_W[0][n];
-				ci += C[x + n] * s_W[2][n];
-				cq += S[x + n] * s_W[2][n];
-			}
-			float r = y + 0.956f * ci + 0.621f * cq;
-			float g = y - 0.272f * ci - 0.647f * cq;
-			float b = y - 1.106f * ci + 1.703f * cq;
-			Out[0][x] = Clamp (r, 0, 1) * 255.0f;
-			Out[1][x] = Clamp (g, 0, 1) * 255.0f;
-			Out[2][x] = Clamp (b, 0, 1) * 255.0f;
-		}
-		for (unsigned ch = 0; ch < 3; ch++)
-		{
-			Out[ch][NT_W] = Out[ch][NT_W - 1];
-			u16 *q = pQ[ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				int t = s_Tap[j];
-				const float *o = Out[ch] + (t < 0 ? 0 : t);
-				float v = t < 0 ? o[0] : o[0] + (o[1] - o[0]) * s_W[1][j];
-				q[j] = (u16) (v + 0.5f);
-			}
-		}
-		break;
-	}
-
-	case CRTFX_BLURPI:		// x 128 (x 255): centre + left/right (same rows); centre for below
-		Planar (p, s_U8);
-		for (unsigned ch = 0; ch < 3; ch++)
-		{
-			const float *sp = s_SP[ch] + PAD;
-			u16 *q = pQ[ch], *q2 = pQ[3 + ch];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				const float *t = sp + s_Tap[j], *l = sp + s_Tap2[j], *r = sp + s_Tap3[j];
-				float cc = t[0] + (t[1] - t[0]) * s_W[1][j];
-				float ll = l[0] + (l[1] - l[0]) * s_W2[1][j];
-				float rr = r[0] + (r[1] - r[0]) * s_W3[1][j];
-				q[j] = (u16) ((0.97625f * cc + 0.0375f * (ll + rr)) * (255.0f * 128.0f) + 0.5f);
-				q2[j] = (u16) (0.0375f * cc * (255.0f * 128.0f) + 0.5f);
-			}
-		}
-		break;
-	}
-}
-
-static TSlot *Get (int L)
-{
-	if (L < 0) L = 0;
-	if (L > s_nNewest) L = s_nNewest;
-	for (unsigned i = 0; i < SLOTS; i++)
-		if (s_Slot[i].nLine == L)
-			return &s_Slot[i];
-	TSlot *pS = &s_Slot[s_nNext];
-	s_nNext = (s_nNext + 1) % SLOTS;
-	pS->nLine = L;
-	HLine (L, pS->pA, pS->pQ);
-	return pS;
-}
-
-// aperture: the line's own soft / sharp picture and beam widths
-static void AperLine (int L)
-{
-	Planar (SrcLine (L), s_Lin);
-	for (unsigned ch = 0; ch < 3; ch++)
-	{
-		const float *sp = s_SP[ch] + PAD;
-		float *c0 = s_pTmp[ch];
-		for (unsigned j = 0; j < s_OW; j++)
-		{
-			const float *t = sp + s_Tap[j], *t2 = sp + s_Tap2[j];
-			float soft = s_W[0][j] * t[0] + s_W[1][j] * t[1];
-			float sharp = s_W2[0][j] * t2[0] + s_W2[1][j] * t2[(int) s_W2[2][j]];
-			float pr = soft * sharp;
-			c0[j] = pr > 0 ? sqrtf (pr) : 0.0f;
-			s_pTmp[3 + ch][j] = 1.0f / (0.5f + Pow (soft));
-		}
-	}
-}
-
-// ---- rows ----------------------------------------------------------------------
-
-static inline u32 Pack (u32 r, u32 g, u32 b)
-{
-	return 0xFF000000u | r << s_rs | g << 8 | b << s_bs;
-}
-
-static inline u32 Sat (u32 v)	{ return v > 255 ? 255 : v; }
-static inline u16 Sat16 (u16 v)	{ return v > 255 ? 255 : v; }
-
-static void PackRow (u32 *__restrict pDst)
-{
-	const u32 *__restrict r = s_O[0], *__restrict g = s_O[1], *__restrict b = s_O[2];
-	const unsigned rs = s_rs, bs = s_bs;
-	for (unsigned j = 0; j < s_OW; j++)
-		pDst[j] = 0xFF000000u | r[j] << rs | g[j] << 8 | b[j] << bs;
-}
-
-static void Rows (int L, TCrtRowFn pRow, void *pCtx)
-{
-	const unsigned M = s_M, OW = s_OW;
-	if (s_nFx == CRTFX_APERTURE)
-	{
-		AperLine (L);
-	}
-	if (s_nFx == CRTFX_NTSCSIMPLE)		// all rows alike
-	{
-		u16 **Q = Get (L)->pQ;
-		for (unsigned ch = 0; ch < 3; ch++)
-			for (unsigned j = 0; j < OW; j++)
-				s_O[ch][j] = Q[ch][j];
-		for (unsigned s = 0; s < M; s++)	// (no reads from the framebuffer)
-			PackRow (pRow (pCtx, L * M + s));
-		return;
-	}
-	for (unsigned s = 0; s < M; s++)
-	{
-		u32 *pDst = pRow (pCtx, L * M + s);
-		if ((s_nFx == CRTFX_HYLLIAN || s_nFx == CRTFX_HYLLORIG || s_nFx == CRTFX_CRTPI || s_nFx == CRTFX_ZFAST)
-		    && s >= (M + 1) / 2)				// rows are symmetric: done
-		{
-			break;
-		}
-		switch (s_nFx)
-		{
-		case CRTFX_ONETAP:
-		{
-			float **A = Get (L + s_RowLine[s])->pA;
-			const float na = s_RowK[s], fh = s_RowF[s] - 0.5f, fl = s_RowF2[s] - 0.5f, k = 255.0f * 255.0f * M;
-			for (unsigned ch = 0; ch < 3; ch++)
-			{
-				const float *__restrict a = A[ch], *__restrict w = A[3 + ch];
-				u32 *__restrict o = s_O[ch];
-				for (unsigned j = 0; j < OW; j++)
-				{
-					float wd = w[j], h = 0.5f * wd;
-					float th = fh + h, tl = fl + h;
-					th = th < 0 ? 0 : (th > wd ? wd : th);
-					tl = tl < 0 ? 0 : (tl > wd ? wd : tl);
-					float area = na * wd + th - tl;
-					float v = sqrtf (a[j] * area * k);
-					o[j] = (u32) ((v > 255.0f ? 255.0f : v) + 0.5f);
-				}
-			}
-			PackRow (pDst);
-			break;
-		}
-		case CRTFX_CRTPI:		// h x (row x mask), Q7; rows s and M - 1 - s alike
-		case CRTFX_ZFAST:		// h x mix (row x mask, row, brightness), Q7
-		{
-			u16 **Q = Get (L)->pQ;
-			const u16 *__restrict h0 = Q[0], *__restrict h1 = Q[1], *__restrict h2 = Q[2];
-			const u32 rs = s_rs, bs = s_bs;
-			u32 *__restrict d0 = pDst;
-			u32 *__restrict d1 = pRow (pCtx, L * M + M - 1 - s);
-			const boolean bTwo = M - 1 - s != s;
-			if (s_nFx == CRTFX_CRTPI)
-			{
-				const u16 *__restrict k0 = s_K16[s][0], *__restrict k1 = s_K16[s][1], *__restrict k2 = s_K16[s][2];
-				#define PI_CH(h, k)	((u32) Sat16 ((u16) ((u16) (h * k) >> 7)))
-				#define PI_PX(j)	(0xFF000000u | PI_CH (h0[j], k0[j]) << rs | PI_CH (h1[j], k1[j]) << 8 \
-							 | PI_CH (h2[j], k2[j]) << bs)
-				if (bTwo)
-					for (unsigned j = 0; j < OW; j++) { u32 v = PI_PX (j); d0[j] = v; d1[j] = v; }
-				else
-					for (unsigned j = 0; j < OW; j++) d0[j] = PI_PX (j);
-				#undef PI_PX
-				#undef PI_CH
-			}
+			const u16 k = s_RowK[s];
+			#define RGB_CH(q)	((u32) Sat ((u16) ((u16) (q * k) >> 7)))
+			#define RGB_PX(j)	(0xFF000000u | RGB_CH (q0[j]) << rs | RGB_CH (q1[j]) << 8 | RGB_CH (q2[j]) << bs)
+			if (bTwo)
+				for (unsigned j = 0; j < OW; j++) { const u32 v = RGB_PX (j); d0[j] = v; d1[j] = v; }
 			else
-			{
-				const u16 *__restrict a = s_K16[s][0];
-				const s16 b = (s16) s_RowQ[s][0];
-				// t = (r + g + b) / 3 x 0.8, Q8; f = a + (b - a) t, Q7
-				#define ZF_F(j)		((u16) (a[j] + (s16) ((s16) ((s16) (b - (s16) a[j]) \
-							 * (s16) ((u16) (((u16) ((h0[j] + h1[j] + h2[j]) >> 1)) * 137) >> 8)) >> 8)))
-				#define ZF_CH(h, f)	((u32) Sat16 ((u16) ((u16) (h * f) >> 7)))
-				#define ZF_PX(j, f)	(0xFF000000u | ZF_CH (h0[j], f) << rs | ZF_CH (h1[j], f) << 8 \
-							 | ZF_CH (h2[j], f) << bs)
-				if (bTwo)
-					for (unsigned j = 0; j < OW; j++) { u16 f = ZF_F (j); u32 v = ZF_PX (j, f); d0[j] = v; d1[j] = v; }
-				else
-					for (unsigned j = 0; j < OW; j++) { u16 f = ZF_F (j); d0[j] = ZF_PX (j, f); }
-				#undef ZF_PX
-				#undef ZF_CH
-				#undef ZF_F
-			}
-			break;
+				for (unsigned j = 0; j < OW; j++) d0[j] = RGB_PX (j);
+			#undef RGB_PX
+			#undef RGB_CH
 		}
-		case CRTFX_HYLLIAN:		// rows s and M - 1 - s alike: one loop writes both
-		case CRTFX_HYLLORIG:
+		else
 		{
-			u16 **Q = Get (L)->pQ;
-			const u16 *__restrict q0 = Q[0], *__restrict q1 = Q[1], *__restrict q2 = Q[2];
-			const u16 *__restrict w0 = Q[3], *__restrict w1 = Q[4], *__restrict w2 = Q[5];
-			const u16 kd = (u16) s_RowQ[s][0], kr = (u16) s_RowQ[s][1];	// 16-bit lanes
-			const u32 rs = s_rs, bs = s_bs;
-			u32 *__restrict d0 = pDst;
-			u32 *__restrict d1 = pRow (pCtx, L * M + M - 1 - s);
-			#define HYL_CH(q, w) \
-				((u32) Sat16 ((u16) ((u16) (q * (u16) (kd + (u16) ((u16) (kr * w) >> 8))) >> 7)))
-			#define HYL_PX(j) \
-				(0xFF000000u | HYL_CH (q0[j], w0[j]) << rs | HYL_CH (q1[j], w1[j]) << 8 | HYL_CH (q2[j], w2[j]) << bs)
-			if (M - 1 - s != s)
-			{
-				for (unsigned j = 0; j < OW; j++)
-				{
-					u32 v = HYL_PX (j);
-					d0[j] = v;
-					d1[j] = v;
-				}
-			}
+			const u16 *__restrict k0 = s_K[s][0], *__restrict k1 = s_K[s][1], *__restrict k2 = s_K[s][2];
+			#define CRT_CH(h, k)	((u32) Sat ((u16) ((u16) (h * k) >> 7)))
+			#define CRT_PX(j)	(0xFF000000u | CRT_CH (q0[j], k0[j]) << rs | CRT_CH (q1[j], k1[j]) << 8 \
+						 | CRT_CH (q2[j], k2[j]) << bs)
+			if (bTwo)
+				for (unsigned j = 0; j < OW; j++) { const u32 v = CRT_PX (j); d0[j] = v; d1[j] = v; }
 			else
-			{
-				for (unsigned j = 0; j < OW; j++)
-					d0[j] = HYL_PX (j);
-			}
-			#undef HYL_PX
-			#undef HYL_CH
-			break;
-		}
-		case CRTFX_EASYMODE:
-		{
-			float **A = Get (L + s_RowLine[s])->pA, **B = Get (L + s_RowLine[s] + 1)->pA;
-			const float f = s_RowF[s], sw = s_RowK[s];
-			const float *__restrict a0 = A[0], *__restrict a1 = A[1], *__restrict a2 = A[2];
-			const float *__restrict b0 = B[0], *__restrict b1 = B[1], *__restrict b2 = B[2];
-			const float *__restrict m0 = s_Mask[0], *__restrict m1 = s_Mask[1], *__restrict m2 = s_Mask[2];
-			u32 *__restrict o0 = s_O[0], *__restrict o1 = s_O[1], *__restrict o2 = s_O[2];
-			for (unsigned j = 0; j < OW; j++)
-			{
-				float r = a0[j] + (b0[j] - a0[j]) * f;
-				float g = a1[j] + (b1[j] - a1[j]) * f;
-				float b = a2[j] + (b2[j] - a2[j]) * f;
-				float mx = r > g ? r : g;
-				mx = mx > b ? mx : b;
-				float br = (mx + 0.2126f * r + 0.7152f * g + 0.0722f * b) * 0.5f;
-				br = br < 0.35f ? 0.35f : (br > 0.65f ? 0.65f : br);
-				float k = sw + (1.0f - sw) * br;
-				// (x) ^ (1 / 1.8) x 1.2: sqrt, then u ^ 1.111 as a cubic
-				float u, y;
-				u = sqrtf (r * k * m0[j]);
-				y = u * (0.77054346f + u * (0.3851755f - 0.15856206f * u)) * (1.2f * 255.0f);
-				o0[j] = (u32) ((y > 255.0f ? 255.0f : y) + 0.5f);
-				u = sqrtf (g * k * m1[j]);
-				y = u * (0.77054346f + u * (0.3851755f - 0.15856206f * u)) * (1.2f * 255.0f);
-				o1[j] = (u32) ((y > 255.0f ? 255.0f : y) + 0.5f);
-				u = sqrtf (b * k * m2[j]);
-				y = u * (0.77054346f + u * (0.3851755f - 0.15856206f * u)) * (1.2f * 255.0f);
-				o2[j] = (u32) ((y > 255.0f ? 255.0f : y) + 0.5f);
-			}
-			PackRow (pDst);
-			break;
-		}
-		case CRTFX_APERTURE:
-		{
-			int l0 = L + s_RowLine[s];
-			float **G0 = Get (l0 - 1)->pA, **G1 = Get (l0)->pA, **G2 = Get (l0 + 1)->pA;
-			const float w0 = s_RowW[0][s], w1 = s_RowW[1][s], w2 = s_RowW[2][s], as = s_RowK[s];
-			for (unsigned ch = 0; ch < 3; ch++)
-			{
-				const float *__restrict g0 = G0[ch], *__restrict g1 = G1[ch], *__restrict g2 = G2[ch];
-				const float *__restrict c0 = s_pTmp[ch], *__restrict ibp = s_pTmp[3 + ch], *__restrict m = s_Mask[ch];
-				u32 *__restrict o = s_O[ch];
-				for (unsigned j = 0; j < OW; j++)
-				{
-					float glow = w0 * g0[j] + w1 * g1[j] + w2 * g2[j];
-					float ib = ibp[j];
-					float t = 1.0f - as * ib;
-					t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
-					float col = c0[j] * t * t * (3.0f - 2.0f * t) * ib;
-					glow -= col;
-					glow = glow < 0.0f ? 0.0f : (glow > 1.0f ? 1.0f : glow);
-					col += glow * glow * 0.1f;
-					float x = (col * m[j] + glow * 0.05f) * 1.5f;		// BRIGHTNESS
-					x = x > 1.0f ? 1.0f : x;
-					// x ^ (1 / 2.4) = w ^ (5 / 3), w = x ^ (1 / 4), as a cubic
-					float w = sqrtf (sqrtf (x));
-					float y = w * (0.13752100f + w * (1.10003058f - 0.24060162f * w)) * 255.0f;
-					o[j] = (u32) ((y > 255.0f ? 255.0f : y) + 0.5f);
-				}
-			}
-			PackRow (pDst);
-			break;
-		}
-		case CRTFX_FAKELOTTES:
-		{
-			float **A = Get (L + s_RowLine[s])->pA, **B = Get (L + s_RowLine[s] + 1)->pA;
-			const float f = s_RowF[s];
-			const unsigned par = (L * M + s) & 1;
-			for (unsigned ch = 0; ch < 3; ch++)
-			{
-				const float *__restrict a = A[ch], *__restrict b = B[ch], *__restrict F = s_FF[s][par][ch];
-				u32 *__restrict o = s_O[ch];
-				for (unsigned j = 0; j < OW; j++)
-				{
-					float x = a[j] + (b[j] - a[j]) * f;
-					float y = x * (0.72467291f + x * (0.45745973f - 0.18540175f * x));	// x ^ (2.5 / 2.2)
-					float v = y * F[j];
-					v = v > 255.0f ? 255.0f : v;
-					o[j] = (u32) (v + 0.5f);
-				}
-			}
-			PackRow (pDst);
-			break;
-		}
-		case CRTFX_BLURPI:
-		{
-			u16 **A = Get (L + s_RowLine[s])->pQ, **B = Get (L + s_RowLine[s] + 1)->pQ;
-			u16 **C = Get (L + s_RowLine2[s])->pQ, **D = Get (L + s_RowLine2[s] + 1)->pQ;
-			const int f = (int) s_RowQ[s][0], f2 = (int) s_RowQ[s][1];
-			const int k = ((L * M + s) & 1) ? 256 : 179;		// 0.7 on even rows
-			for (unsigned ch = 0; ch < 3; ch++)
-			{
-				const u16 *__restrict a = A[ch], *__restrict b = B[ch], *__restrict c = C[3 + ch], *__restrict d = D[3 + ch];
-				u32 *__restrict o = s_O[ch];
-				for (unsigned j = 0; j < OW; j++)
-				{
-					int v = a[j] + (((int) b[j] - (int) a[j]) * f >> 8) + c[j] + (((int) d[j] - (int) c[j]) * f2 >> 8);
-					v = (v * k) >> 15;
-					o[j] = (u32) (v < 0 ? 0 : (v > 255 ? 255 : v));
-				}
-			}
-			PackRow (pDst);
-			break;
-		}
+				for (unsigned j = 0; j < OW; j++) d0[j] = CRT_PX (j);
+			#undef CRT_PX
+			#undef CRT_CH
 		}
 	}
 }
 
 void CrtFxLine (const u32 *pFrame, unsigned y, TCrtRowFn pRow, void *pCtx)
 {
-	if (!SharedLoad (s_nFx))
+	const unsigned nFx = SharedLoad (s_nFx);
+	if (nFx == CRTFX_NONE || y >= GAME_H)
 	{
 		return;
 	}
-	u64 t0 = Ticks ();
-	s_pFrame = pFrame;
-	s_nNewest = (int) y;
-	const unsigned nFx = SharedLoad (s_nFx);
-	if (y == 0)
-	{
-		for (unsigned i = 0; i < SLOTS; i++) s_Slot[i].nLine = -100;
-		s_nField ^= 1;
-	}
-	if (NoLag (nFx))
-	{
-		for (unsigned i = 0; i < SLOTS; i++)
-			if (s_Slot[i].nLine == (int) y) s_Slot[i].nLine = -100;
-		Rows ((int) y, pRow, pCtx);
-	}
-	else if (y > 0)
-	{
-		// lines below the newest were clamped to it: forget them
-		for (unsigned i = 0; i < SLOTS; i++)
-			if (s_Slot[i].nLine >= (int) y) s_Slot[i].nLine = -100;
-		Rows ((int) y - 1, pRow, pCtx);
-	}
-	if (y == GAME_H - 1 && !NoLag (nFx))
-	{
-		Rows ((int) y, pRow, pCtx);
-	}
-	u64 d = Ticks () - t0;
+	const u64 t0 = Ticks ();
+	const u32 *pSrc = pFrame + (GAME_SRC_Y + y) * GAME_SRC_PITCH + GAME_SRC_X;
+	if (nFx == CRTFX_RGB)
+		LineRgb (pSrc);
+	else
+		LineCrt (pSrc);
+	Rows (y, pRow, pCtx);
+	const u64 d = Ticks () - t0;
 	s_nSum += d;
 	if (d > s_nMax) s_nMax = d;
 	s_nCalls++;
@@ -1092,7 +293,7 @@ void CrtFxLine (const u32 *pFrame, unsigned y, TCrtRowFn pRow, void *pCtx)
 
 void CrtFxTakeStats (unsigned *pSumUs, unsigned *pMaxUs, unsigned *pCalls)
 {
-	u64 f = TicksFreq ();
+	const u64 f = TicksFreq ();
 	*pSumUs = (unsigned) (s_nSum * 1000000 / f);
 	*pMaxUs = (unsigned) (s_nMax * 1000000 / f);
 	*pCalls = s_nCalls;
