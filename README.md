@@ -23,7 +23,7 @@ Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've drea
 
 **Custom audio resampler.** The NEO·GEO's sound chip runs at about 56 kHz, while HDMI wants 48 kHz. Rather than relying on a general-purpose converter, neo-pi uses a lightweight, purpose-built alternative: same clean sound, a fraction of the work (on a Pi 3, Geolith's standard Speex resampler took about 15% of every frame).
 
-**User experience.** The rest came down to a few deliberate choices. Display options are kept to a minimum: integer scaling is always on, and the only available filters are scanlines and an NTSC composite look. No tweaking, no distractions — just play.
+**User experience.** The rest came down to a few deliberate choices. Display options are kept to a minimum: integer scaling is always on, and the TV FILTER option has just four looks: simple scanlines, an RGB monitor, a CRT TV and an NTSC composite connection. No tweaking, no distractions — just play.
 
 Save states are limited to a single slot per game. Enough to take the edge off the challenge (think of some of the notoriously brutal bosses in The King of Fighters), without losing the tension that makes arcade games so exciting.
 
@@ -43,11 +43,15 @@ Save states are limited to a single slot per game. Enough to take the edge off t
 
 - Integer scaling with square pixels at 1080p or 720p, handled by the Pi's hardware scaler.
 
-- Optional scanlines in three strengths: light, medium and strong. They're drawn as part of the frame, with no additional lag.
+- TV FILTER, with no additional lag:
+  - FAST: simple scanlines, drawn as part of the frame.
+  - RGB: the look of an RGB monitor, from Hyllian's crt-hyllian-fast shader.
+  - CRT: a CRT TV with its RGB mask, from davej's crt-pi shader.
+  - COMPOSITE: blargg's NTSC filter, recreating the look of a composite video connection on an old TV.
 
-- Blargg's NTSC filter, recreating the look of a composite video connection on an old TV. Each line is processed on a separate core, without slowing down the game.
+  RGB, CRT and COMPOSITE process each line on a separate core as soon as it is drawn, without slowing down the game.
 
-- Bezel: the *NEOfabric*, a dark, Japanese-inspired woven texture framing the picture. At 1080p, it also shows the game's title, developer and release year above the picture, with a carefully laid-out button reference below, covering 144 games. OPTIONS offers four levels: FULL, GRID, TEXT and OFF, for those who prefer a cleaner, no-frills look.
+- Bezel: the *NEOfabric*, a dark, Japanese-inspired woven texture framing the picture. At 1080p, it also shows the game's title, developer and release year above the picture, with a carefully laid-out button reference below, covering 144 games. OPTIONS offers four levels: FULL, GRID (the default), TEXT and OFF, for those who prefer a cleaner, no-frills look.
 
 **Convenience**
 
@@ -120,7 +124,7 @@ Everything neo-pi writes stays in the `neopi` folder: `saves/` (save states, MVS
 | `beamracing=off` | double buffer instead of beam racing (more lag) |
 | `framedelay=off` | no automatic frame delay |
 | `framedelay=5` | fixed frame delay in ms (1-12; too much = stutter) |
-| `multicore=off` | everything on one core (heavier; on a Pi 3, no scanlines or COMPOSITE) |
+| `multicore=off` | everything on one core (heavier; on a Pi 3, TV FILTER stays OFF) |
 | `usbpoll=500` | poll pads every 2 ms instead of every 1 ms (if a pad misbehaves at 1000 Hz) |
 | `usbpoll=250` | poll pads every 4 ms |
 | `usbpoll=native` | poll pads at the rate they ask for instead of every 1 ms |
@@ -153,6 +157,7 @@ neo-pi was cobbled together by Alessio Scanderebech and his much-maligned progra
 | Zip and PNG | miniz by Rich Geldreich |
 | Fonts | "Matinee" (menus) and "Lander" (text around the picture) from [ZX Origins](https://damieng.com/typography/zx-origins/) by Damien Guard |
 | NTSC filter | by Shay Green (blargg) |
+| RGB and CRT filters | ported from libretro's slang shaders: crt-hyllian-fast by Hyllian, crt-pi by davej |
 
 
 ## License

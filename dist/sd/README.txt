@@ -108,18 +108,21 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
                 where the original hardware slows down. Some games may
                 behave differently; NORMAL is the accurate setting. On a
                 Pi 3, TURBO may slow down the heaviest games.
-  SCANLINES     OFF / LIGHT / MEDIUM / STRONG / COMPOSITE. COMPOSITE has no
-                scanlines: blargg's NTSC filter gives the look of a
-                composite video connection of the time. Each line is
-                filtered as soon as it is drawn, on its own CPU core: no
-                added lag. On a Pi 3 the scanlines and COMPOSITE need
-                multicore: with multicore=off this item shows MULTICORE
-                OFF.
+  TV FILTER     OFF    the plain picture
+                FAST   simple scanlines, the lightest
+                RGB    an RGB monitor (Hyllian's crt-hyllian-fast)
+                CRT    a CRT TV with its RGB mask (davej's crt-pi)
+                COMPOSITE  blargg's NTSC filter: the look of a composite
+                       video connection of the time
+                RGB, CRT and COMPOSITE filter each line as soon as it is
+                drawn, on its own CPU core: no added lag. On a Pi 3 the
+                filters need multicore: with multicore=off this item
+                shows MULTICORE OFF.
   BEZEL         The space around the picture:
                 OFF    black
                 TEXT   game information and basic controls on black
                        (at 1080p)
-                GRID   the woven background and a frame
+                GRID   the woven background and a frame (the default)
                 FULL   the complete bezel, with game information above
                        the picture and button assignments below (at
                        1080p)
