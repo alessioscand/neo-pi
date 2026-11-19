@@ -6,6 +6,7 @@
 #include "theme.h"
 #include "fbmap.h"
 #include "crtfx.h"
+#include "tvcore.h"
 #include <circle/bcmpropertytags.h>
 #include <circle/font.h>
 #include <circle/util.h>
@@ -250,6 +251,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 		}
 	}
 
+	TvSync ();		// TEST: core 2 may be drawing a CRT line
 	CrtFxSetup (FILTER_IS_CRT (m_nFilter) ? m_nFilter - FILTER_FAKELOTTES + CRTFX_FAKELOTTES : CRTFX_NONE,
 		    m_nM, m_bRLow);	// TEST
 

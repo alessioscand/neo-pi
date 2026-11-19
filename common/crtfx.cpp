@@ -2,7 +2,7 @@
 // crtfx.cpp - TEST: CPU ports of libretro CRT shaders (see crtfx.h)
 //
 // Sources: libretro/slang-shaders crt/shaders/{fakelottes, crt-blurPi,
-// crt-easymode, crt-aperture, hyllian/crt-hyllian-fast, crt-Ntap/crt-1tap}.slang,
+// crt-easymode, crt-aperture, hyllian/crt-hyllian-fast (HYLLIAN+, see below), crt-Ntap/crt-1tap}.slang,
 // ntsc/shaders/ntsc-simple/ntsc_simple.slang, default
 // parameters, curvature off. At an integer scale every weight depends only on
 // the sub-column or sub-row: they are worked out once per scale.
@@ -58,7 +58,16 @@ static unsigned s_nNext;
 static float *s_pTmp[8];
 
 // fixed point helpers (per shader)
-static u16 s_T12[4096];			// a curve on 12 bits, 0..65535
+static u32 s_T32[4096];			// hyllian: two curves on 12 bits
+static int s_HOff[MAXM];		// hyllian: per phase, source offset
+static float s_HW4[MAXM][4];		// and weights of pixels -1..2
+static u16 s_Ix[MAXM][GAME_W];		// hyllian: table index, per phase
+static u32 s_TT[MAXOW];
+static u16 s_S16[3][GAME_W + 2 * 3];	// crtpi, zfast: one source line, planar
+static int s_LOff[MAXM];		// per phase: source offset, weight of it (Q8)
+static u16 s_LW[MAXM];
+static u16 s_LP[MAXM][GAME_W];		// per phase results
+static u16 s_K16[MAXM][3][MAXOW];	// per row and column factors (Q7)
 static u32 s_RowQ[MAXM][8];		// per row factors
 
 static u32 s_O[3][MAXOW];		// one row, per channel
@@ -159,36 +168,63 @@ void CrtFxSetup (unsigned nFx, unsigned M, boolean bRLow)
 	switch (nFx)
 	{
 	case CRTFX_HYLLIAN:
-		// MASK_INTENSITY 0.5, gamma 2.4 / 2.2, BRIGHTBOOST 1.5, SCANLINES 0.72
-		Tables (1.0f, 2.4f, 1.25f, 1.0f / 2.2f, 1.0f, 1.0f);
+	case CRTFX_HYLLORIG:
+	{
+		// HYLLIAN+: crt-hyllian-fast with SHARPER (Hermite), SCANLINES 0.9,
+		// mask 0.8 / 1.2, BRIGHTBOOST 1.5, gamma 2.4 / 2.2; bright pixels
+		// widen the beam: w = (v - 0.25) / 0.75 x 0.9. HYLLORIG: the defaults
+		// (Catmull-Rom, SCANLINES 0.72, mask 0.5 / 1, no widening). Columns
+		// x M + p of a source pixel x share the offset and weights of phase p.
+		const boolean bPlus = nFx == CRTFX_HYLLIAN;
+		const float fSL = bPlus ? 0.9f : 0.72f, fLo = bPlus ? 0.8f : 0.5f, fHi = bPlus ? 1.2f : 1.0f;
+		Tables (1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		for (unsigned p = 0; p < M; p++)
+		{
+			float sx = (p + 0.5f) / M - 0.49999f, b = floorf (sx), f = sx - b;
+			float f2 = f * f, f3 = f2 * f;
+			s_HOff[p] = (int) b;
+			if (bPlus)
+			{
+				s_HW4[p][0] = 0;
+				s_HW4[p][1] = 2.0f * f3 - 3.0f * f2 + 1.0f;
+				s_HW4[p][2] = -2.0f * f3 + 3.0f * f2;
+				s_HW4[p][3] = 0;
+			}
+			else
+			{
+				s_HW4[p][0] = -0.5f * f3 + f2 - 0.5f * f;
+				s_HW4[p][1] = 1.5f * f3 - 2.5f * f2 + 1.0f;
+				s_HW4[p][2] = -1.5f * f3 + 2.0f * f2 + 0.5f * f;
+				s_HW4[p][3] = 0.5f * f3 - 0.5f * f2;
+			}
+		}
 		for (unsigned j = 0; j < OW; j++)
 		{
-			float sx = (j + 0.5f) / M - 0.49999f;
-			float b = floorf (sx), f = sx - b;
-			s_Tap[j] = (short) (b - 1);
-			float f2 = f * f, f3 = f2 * f;		// Catmull-Rom
-			s_W[0][j] = -0.5f * f3 + f2 - 0.5f * f;
-			s_W[1][j] = 1.5f * f3 - 2.5f * f2 + 1.0f;
-			s_W[2][j] = -1.5f * f3 + 2.0f * f2 + 0.5f * f;
-			s_W[3][j] = 0.5f * f3 - 0.5f * f2;
 			int mf = (int) floorf (j + 0.5f - 0.49999f * M);
 			boolean odd = (mf & 1) != 0;
-			s_Mask[0][j] = s_Mask[2][j] = odd ? 0.5f : 1.0f;
-			s_Mask[1][j] = odd ? 1.0f : 0.5f;
-			for (unsigned c = 0; c < 3; c++)
-				s_MQ[c][j] = s_Mask[c][j] < 1.0f ? 187 : 256;	// 0.5 ^ (1 / 2.2)
+			const u16 lo = (u16) (powf (fLo, 1.0f / 2.2f) * 256.0f + 0.5f);
+			const u16 hi = (u16) (powf (fHi, 1.0f / 2.2f) * 256.0f + 0.5f);
+			s_MQ[0][j] = s_MQ[2][j] = odd ? lo : hi;
+			s_MQ[1][j] = odd ? hi : lo;
 		}
 		for (unsigned s = 0; s < M; s++)
 		{
 			float fy = (s + 0.5f) / M;
-			float d1 = Clamp (1.5f - 0.72f - fabsf (fy - 0.5f), 0.0f, 1.0f);
-			s_RowK[s] = d1 * d1 * (3.0f + 1.5f - 2.0f * d1);
-			s_RowLine[s] = 0;
-			s_RowQ[s][0] = (u32) (powf (s_RowK[s], 1.0f / 2.2f) * 255.0f + 0.5f);
+			float d1 = Clamp (1.5f - fSL - fabsf (fy - 0.5f), 0.0f, 1.0f);
+			float kd = powf (d1 * d1 * (3.0f + 1.5f - 2.0f * d1), 1.0f / 2.2f);
+			s_RowQ[s][0] = (u32) (kd * 128.0f + 0.5f);		// Q7
+			s_RowQ[s][1] = kd < 1.0f && bPlus ? 128 - s_RowQ[s][0] : 0;
 		}
-		for (unsigned i = 0; i < 4096; i++)		// v ^ 2.4 ^ (1 / 2.2)
-			s_T12[i] = (u16) (powf (i / 4095.0f, 2.4f / 2.2f) * 65535.0f + 0.5f);
+		for (unsigned i = 0; i < 4096; i++)	// g ^ (2.4 / 2.2) | beam widening << 16
+		{
+			float g = i / (bPlus ? 4095.0f : 3276.0f), v = powf (g, 2.4f);	// HYLLORIG: g up to 1.25
+
+			float w = bPlus ? Clamp ((v - 0.25f) / 0.75f, 0.0f, 1.0f) * 0.9f : 0.0f;
+			s_T32[i] = (u32) (powf (g, 2.4f / 2.2f) * 32767.0f + 0.5f)
+				 | (u32) (w * 32768.0f + 0.5f) << 16;
+		}
 		break;
+	}
 
 	case CRTFX_EASYMODE:
 		// dilation on (c * c), gamma 2.0 / (1 + 1) = 1, output 1 / 1.8 x 1.2,
@@ -354,6 +390,62 @@ void CrtFxSetup (unsigned nFx, unsigned M, boolean bRLow)
 		}
 		break;
 
+	case CRTFX_CRTPI:
+		// crt-pi defaults (no gamma, no SHARPER): linear across, SCANLINE_WEIGHT
+		// 6, gap 0.12, multisample, BLOOM_FACTOR 1.5, trinitron mask 0.7.
+		// The own line only (the original blends the next one near the gaps).
+		for (unsigned p = 0; p < M; p++)
+		{
+			float x = (p + 0.5f) / M - 0.5f, b = floorf (x);
+			s_LOff[p] = (int) b;
+			s_LW[p] = (u16) ((1.0f - (x - b)) * 256.0f + 0.5f);
+		}
+		for (unsigned s = 0; s < M; s++)
+		{
+			float dy = (s + 0.5f) / M - 0.5f, fw = 1.0f / (3.0f * M), w = 0;
+			for (int k = -1; k <= 1; k++)
+			{
+				float d = dy + k * fw, v = 1.0f - d * d * 6.0f;
+				w += v > 0.12f ? v : 0.12f;
+			}
+			w = w / 3.0f * 1.5f;
+			for (unsigned j = 0; j < OW; j++)
+			{
+				float wm = fmodf ((j + 0.5f) / 3.0f, 1.0f);
+				unsigned lit = wm < 1.0f / 3 ? 0 : (wm < 2.0f / 3 ? 1 : 2);
+				for (unsigned c = 0; c < 3; c++)
+					s_K16[s][c][j] = (u16) (w * (c == lit ? 1.0f : 0.7f) * 128.0f + 0.5f);
+			}
+		}
+		break;
+
+	case CRTFX_ZFAST:
+		// zfast_crt_finemask defaults (no gamma): BLURSCALEX 0.3, LOWLUMSCAN 6,
+		// HILUMSCAN 8, BRIGHTBOOST 1.25, MASK_DARK 0.25, MASK_FADE 0.8. The own
+		// line only (the original blends the next one near the gaps).
+		for (unsigned p = 0; p < M; p++)
+		{
+			float c = (p + 0.5f) / M, i = floorf (c) + 0.5f, f = c - i;
+			float q = i + 4.0f * f * f * f;
+			float x = q + (c - q) * 0.3f - 0.5f, b = floorf (x);
+			s_LOff[p] = (int) b;
+			s_LW[p] = (u16) ((1.0f - (x - b)) * 256.0f + 0.5f);
+		}
+		for (unsigned s = 0; s < M; s++)
+		{
+			float fy = (s + 0.5f) / M - 0.5f, Y = fy * fy, YY = Y * Y;
+			float w1 = 1.25f - 6.0f * (Y - 2.05f * YY);
+			float w2 = 1.0f - 8.0f * (YY - 2.8f * YY * Y);
+			s_RowQ[s][0] = (u32) (w2 * 128.0f + 0.5f);
+			for (unsigned j = 0; j < OW; j++)
+			{
+				float m = fmodf (j * -0.4999f, 1.0f);
+				if (m < 0) m += 1.0f;
+				s_K16[s][0][j] = (u16) (w1 * (m < 0.5f ? 0.75f : 1.0f) * 128.0f + 0.5f);
+			}
+		}
+		break;
+
 	case CRTFX_BLURPI:
 		// scanlineGain 0.30, rgbExtraGain 0.10, blurGain 0.15, blurRadius 1.5
 		Tables (1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
@@ -391,7 +483,8 @@ unsigned CrtFxActive (void)
 
 static inline boolean NoLag (unsigned nFx)
 {
-	return nFx == CRTFX_HYLLIAN || nFx == CRTFX_ONETAP || nFx == CRTFX_NTSCSIMPLE;
+	return nFx == CRTFX_HYLLIAN || nFx == CRTFX_HYLLORIG || nFx == CRTFX_ONETAP || nFx == CRTFX_NTSCSIMPLE
+	       || nFx == CRTFX_CRTPI || nFx == CRTFX_ZFAST;
 }
 
 boolean CrtFxLag (void)
@@ -440,26 +533,109 @@ static void Planar (const u32 *p, const float *pTab)
 		}
 }
 
+// crtpi, zfast: two taps per phase, 8 bits; phases interleaved into columns
+template <unsigned MM>
+static void Interleave (u16 *__restrict h)
+{
+	for (unsigned x = 0; x < GAME_W; x++)
+		for (unsigned p = 0; p < MM; p++)
+			h[x * MM + p] = s_LP[p][x];
+}
+
+static void LinLine (const u32 *p, u16 **pQ)
+{
+	const unsigned M = s_M;
+	for (unsigned x = 0; x < GAME_W; x++)
+	{
+		u32 c = p[x];
+		s_S16[0][x + 3] = (u16) ((c >> 16) & 0xFF);
+		s_S16[1][x + 3] = (u16) ((c >> 8) & 0xFF);
+		s_S16[2][x + 3] = (u16) (c & 0xFF);
+	}
+	for (unsigned ch = 0; ch < 3; ch++)
+	{
+		for (unsigned i = 0; i < 3; i++)
+		{
+			s_S16[ch][i] = s_S16[ch][3];
+			s_S16[ch][GAME_W + 3 + i] = s_S16[ch][GAME_W + 2];
+		}
+		for (unsigned ph = 0; ph < M; ph++)
+		{
+			const u16 *__restrict a = s_S16[ch] + 3 + s_LOff[ph];
+			const u16 wa = s_LW[ph], wb = (u16) (256 - wa);
+			u16 *__restrict o = s_LP[ph];
+			for (unsigned x = 0; x < GAME_W; x++)
+				o[x] = (u16) ((u16) (a[x] * wa + a[x + 1] * wb + 128) >> 8);
+		}
+		u16 *h = pQ[ch];
+		switch (M)
+		{
+		case 3:	Interleave<3> (h);	break;
+		case 4:	Interleave<4> (h);	break;
+		default:
+			for (unsigned x = 0; x < GAME_W; x++)
+				for (unsigned ph = 0; ph < M; ph++)
+					h[x * M + ph] = s_LP[ph][x];
+			break;
+		}
+	}
+}
+
 static void HLine (int L, float **pA, u16 **pQ)
 {
 	const u32 *p = SrcLine (L);
 	const unsigned OW = s_OW;
 	switch (s_nFx)
 	{
-	case CRTFX_HYLLIAN:		// cubic in gamma space; v ^ 2.4 ^ (1 / 2.2) x mask ^ (1 / 2.2)
+	case CRTFX_HYLLIAN:		// Hermite (or Catmull-Rom) in gamma space, per phase
+	case CRTFX_HYLLORIG:
+	{
 		Planar (p, s_U8);
+		const unsigned M = s_M;
 		for (unsigned ch = 0; ch < 3; ch++)
 		{
 			const float *sp = s_SP[ch] + PAD;
-			u16 *q = pQ[ch];
+			for (unsigned ph = 0; ph < M; ph++)
+			{
+				const float *__restrict a = sp + s_HOff[ph];
+				u16 *__restrict ix = s_Ix[ph];
+				if (s_nFx == CRTFX_HYLLIAN)		// 2 taps, in 0..1
+				{
+					const float wa = s_HW4[ph][1], wb = s_HW4[ph][2];
+					for (unsigned x = 0; x < GAME_W; x++)
+						ix[x] = (u16) ((wa * a[x] + wb * a[x + 1]) * 4095.0f + 0.5f);
+				}
+				else					// 4 taps, clamped
+				{
+					const float w0 = s_HW4[ph][0], w1 = s_HW4[ph][1], w2 = s_HW4[ph][2], w3 = s_HW4[ph][3];
+					a--;					// pixel -1
+					for (unsigned x = 0; x < GAME_W; x++)
+					{
+						float v = w0 * a[x] + w1 * a[x + 1] + w2 * a[x + 2] + w3 * a[x + 3];
+						v = v < 0.0f ? 0.0f : (v > 1.25f ? 1.25f : v);	// overshoot kept
+						ix[x] = (u16) (v * 3276.0f + 0.5f);
+					}
+				}
+			}
+			u32 *__restrict t = s_TT;
+			for (unsigned x = 0; x < GAME_W; x++)
+				for (unsigned ph = 0; ph < M; ph++)
+					*t++ = s_T32[s_Ix[ph][x]];
+			const u32 *__restrict tt = s_TT;
+			const u16 *__restrict mq = s_MQ[ch];
+			u16 *__restrict q = pQ[ch], *__restrict w = pQ[3 + ch];
 			for (unsigned j = 0; j < OW; j++)
 			{
-				const float *t = sp + s_Tap[j];
-				float v = s_W[0][j] * t[0] + s_W[1][j] * t[1] + s_W[2][j] * t[2] + s_W[3][j] * t[3];
-				unsigned i = v <= 0 ? 0 : (v >= 1 ? 4095 : (unsigned) (v * 4095.0f + 0.5f));
-				q[j] = (u16) ((s_T12[i] * s_MQ[ch][j]) >> 8);
+				q[j] = (u16) (((tt[j] & 0xFFFF) * mq[j]) >> 15);	// 0..278: x 194 fits 16 bits
+				w[j] = (u16) (tt[j] >> 23);				// 0..230
 			}
 		}
+		break;
+	}
+
+	case CRTFX_CRTPI:
+	case CRTFX_ZFAST:
+		LinLine (p, pQ);
 		break;
 
 	case CRTFX_EASYMODE:		// Lanczos on c * c, clamped to the middle pair
@@ -634,6 +810,7 @@ static inline u32 Pack (u32 r, u32 g, u32 b)
 }
 
 static inline u32 Sat (u32 v)	{ return v > 255 ? 255 : v; }
+static inline u16 Sat16 (u16 v)	{ return v > 255 ? 255 : v; }
 
 static void PackRow (u32 *__restrict pDst)
 {
@@ -663,7 +840,8 @@ static void Rows (int L, TCrtRowFn pRow, void *pCtx)
 	for (unsigned s = 0; s < M; s++)
 	{
 		u32 *pDst = pRow (pCtx, L * M + s);
-		if (s_nFx == CRTFX_HYLLIAN && s >= (M + 1) / 2)	// rows are symmetric: done
+		if ((s_nFx == CRTFX_HYLLIAN || s_nFx == CRTFX_HYLLORIG || s_nFx == CRTFX_CRTPI || s_nFx == CRTFX_ZFAST)
+		    && s >= (M + 1) / 2)				// rows are symmetric: done
 		{
 			break;
 		}
@@ -691,25 +869,78 @@ static void Rows (int L, TCrtRowFn pRow, void *pCtx)
 			PackRow (pDst);
 			break;
 		}
-		case CRTFX_HYLLIAN:
+		case CRTFX_CRTPI:		// h x (row x mask), Q7; rows s and M - 1 - s alike
+		case CRTFX_ZFAST:		// h x mix (row x mask, row, brightness), Q7
 		{
 			u16 **Q = Get (L)->pQ;
-			const u32 k = s_RowQ[s][0];
-			for (unsigned ch = 0; ch < 3; ch++)
+			const u16 *__restrict h0 = Q[0], *__restrict h1 = Q[1], *__restrict h2 = Q[2];
+			const u32 rs = s_rs, bs = s_bs;
+			u32 *__restrict d0 = pDst;
+			u32 *__restrict d1 = pRow (pCtx, L * M + M - 1 - s);
+			const boolean bTwo = M - 1 - s != s;
+			if (s_nFx == CRTFX_CRTPI)
 			{
-				const u16 *__restrict q = Q[ch];
-				u32 *__restrict o = s_O[ch];
-				for (unsigned j = 0; j < OW; j++)
-				{
-					u32 v = (q[j] * k) >> 16;
-					o[j] = v > 255 ? 255 : v;
-				}
+				const u16 *__restrict k0 = s_K16[s][0], *__restrict k1 = s_K16[s][1], *__restrict k2 = s_K16[s][2];
+				#define PI_CH(h, k)	((u32) Sat16 ((u16) ((u16) (h * k) >> 7)))
+				#define PI_PX(j)	(0xFF000000u | PI_CH (h0[j], k0[j]) << rs | PI_CH (h1[j], k1[j]) << 8 \
+							 | PI_CH (h2[j], k2[j]) << bs)
+				if (bTwo)
+					for (unsigned j = 0; j < OW; j++) { u32 v = PI_PX (j); d0[j] = v; d1[j] = v; }
+				else
+					for (unsigned j = 0; j < OW; j++) d0[j] = PI_PX (j);
+				#undef PI_PX
+				#undef PI_CH
 			}
-			PackRow (pDst);
+			else
+			{
+				const u16 *__restrict a = s_K16[s][0];
+				const s16 b = (s16) s_RowQ[s][0];
+				// t = (r + g + b) / 3 x 0.8, Q8; f = a + (b - a) t, Q7
+				#define ZF_F(j)		((u16) (a[j] + (s16) ((s16) ((s16) (b - (s16) a[j]) \
+							 * (s16) ((u16) (((u16) ((h0[j] + h1[j] + h2[j]) >> 1)) * 137) >> 8)) >> 8)))
+				#define ZF_CH(h, f)	((u32) Sat16 ((u16) ((u16) (h * f) >> 7)))
+				#define ZF_PX(j, f)	(0xFF000000u | ZF_CH (h0[j], f) << rs | ZF_CH (h1[j], f) << 8 \
+							 | ZF_CH (h2[j], f) << bs)
+				if (bTwo)
+					for (unsigned j = 0; j < OW; j++) { u16 f = ZF_F (j); u32 v = ZF_PX (j, f); d0[j] = v; d1[j] = v; }
+				else
+					for (unsigned j = 0; j < OW; j++) { u16 f = ZF_F (j); d0[j] = ZF_PX (j, f); }
+				#undef ZF_PX
+				#undef ZF_CH
+				#undef ZF_F
+			}
+			break;
+		}
+		case CRTFX_HYLLIAN:		// rows s and M - 1 - s alike: one loop writes both
+		case CRTFX_HYLLORIG:
+		{
+			u16 **Q = Get (L)->pQ;
+			const u16 *__restrict q0 = Q[0], *__restrict q1 = Q[1], *__restrict q2 = Q[2];
+			const u16 *__restrict w0 = Q[3], *__restrict w1 = Q[4], *__restrict w2 = Q[5];
+			const u16 kd = (u16) s_RowQ[s][0], kr = (u16) s_RowQ[s][1];	// 16-bit lanes
+			const u32 rs = s_rs, bs = s_bs;
+			u32 *__restrict d0 = pDst;
+			u32 *__restrict d1 = pRow (pCtx, L * M + M - 1 - s);
+			#define HYL_CH(q, w) \
+				((u32) Sat16 ((u16) ((u16) (q * (u16) (kd + (u16) ((u16) (kr * w) >> 8))) >> 7)))
+			#define HYL_PX(j) \
+				(0xFF000000u | HYL_CH (q0[j], w0[j]) << rs | HYL_CH (q1[j], w1[j]) << 8 | HYL_CH (q2[j], w2[j]) << bs)
 			if (M - 1 - s != s)
 			{
-				PackRow (pRow (pCtx, L * M + M - 1 - s));
+				for (unsigned j = 0; j < OW; j++)
+				{
+					u32 v = HYL_PX (j);
+					d0[j] = v;
+					d1[j] = v;
+				}
 			}
+			else
+			{
+				for (unsigned j = 0; j < OW; j++)
+					d0[j] = HYL_PX (j);
+			}
+			#undef HYL_PX
+			#undef HYL_CH
 			break;
 		}
 		case CRTFX_EASYMODE:

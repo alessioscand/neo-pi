@@ -28,21 +28,25 @@
 #define FILTER_HYLLIAN	   9
 #define FILTER_ONETAP	   10
 #define FILTER_NTSCSIMPLE  11
-#define FILTER_COUNT	12
-#define FILTER_IS_CRT(f)   ((f) >= FILTER_FAKELOTTES && (f) <= FILTER_NTSCSIMPLE)
+#define FILTER_CRTPI	   12
+#define FILTER_ZFAST	   13
+#define FILTER_HYLLORIG	   14
+#define FILTER_COUNT	15
+#define FILTER_IS_CRT(f)   ((f) >= FILTER_FAKELOTTES && (f) <= FILTER_HYLLORIG)
 
 // TEST: the order of the menu and of Select + left / right
 static inline unsigned FilterStep (unsigned f, int nDir)
 {
-	static const unsigned char Order[FILTER_COUNT] =
+	static const unsigned char Order[] =
 	{
-		FILTER_NONE, FILTER_SCAN_MEDIUM, FILTER_HYLLIAN, FILTER_ONETAP, FILTER_EASYMODE, FILTER_APERTURE,
-		FILTER_COMPOSITE, FILTER_NTSCSIMPLE,
-		FILTER_SCAN_LIGHT, FILTER_SCAN_STRONG, FILTER_FAKELOTTES, FILTER_BLURPI
+		FILTER_NONE, FILTER_SCAN_MEDIUM, FILTER_ZFAST, FILTER_HYLLORIG, FILTER_HYLLIAN, FILTER_CRTPI,
+		FILTER_COMPOSITE
 	};
+	const unsigned n = sizeof Order;
 	unsigned i = 0;
-	while (i < FILTER_COUNT && Order[i] != f) i++;
-	return Order[(i + FILTER_COUNT + (unsigned) nDir) % FILTER_COUNT];
+	while (i < n && Order[i] != f) i++;
+	if (i == n) i = 0;
+	return Order[(i + n + (unsigned) nDir) % n];
 }
 
 // What is around the picture: with a game, OPTIONS > BEZEL; with none, the grid

@@ -241,8 +241,9 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		Items[SmRegion].bDisabled = m_nSystem == SYS_UNI;
 		Items[SmCpu].pValue = m_nCpuSpeed == CPU_TURBO ? "TURBO" : "NORMAL";
 		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE",
-								     "FAKELOTTES", "CRT-BLURPI", "CRT-EASYMODE", "CRT-APERTURE", "CRT-HYLLIAN",
-								     "CRT-1TAP", "NTSC-SIMPLE"};
+								     "FAKELOTTES", "CRT-BLURPI", "CRT-EASYMODE", "CRT-APERTURE", "HYLLIAN+",
+								     "CRT-1TAP", "NTSC-SIMPLE",
+								     "CRT-PI", "ZFAST", "HYLLIAN"};
 		// not allowed only on a Pi 3 with multicore=off
 		// ("MULTICORE ONLY" does not fit next to SCANLINES)
 		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "MULTICORE OFF";

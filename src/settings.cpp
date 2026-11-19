@@ -39,6 +39,9 @@ const char *CKernel::FilterShort (unsigned nFilter)
 	case FILTER_HYLLIAN:	 return "HYLL";
 	case FILTER_ONETAP:	 return "1TAP";
 	case FILTER_NTSCSIMPLE:	 return "NTSCS";
+	case FILTER_CRTPI:	 return "CRTPI";
+	case FILTER_HYLLORIG:	 return "HYLO";
+	case FILTER_ZFAST:	 return "ZFAST";
 	default:		 return "NOFLT";
 	}
 }
@@ -58,6 +61,9 @@ const char *CKernel::FilterName (unsigned nFilter)
 	case FILTER_HYLLIAN:	 return "HYLLIAN";
 	case FILTER_ONETAP:	 return "1TAP";
 	case FILTER_NTSCSIMPLE:	 return "NTSC_SIMPLE";
+	case FILTER_CRTPI:	 return "CRT_PI";
+	case FILTER_HYLLORIG:	 return "HYLLIAN_ORIG";
+	case FILTER_ZFAST:	 return "ZFAST";
 	default:		 return "NONE";
 	}
 }
@@ -77,7 +83,7 @@ void CKernel::VideoModeTag (char *pOut, size_t nSize)
 
 void CKernel::ApplyVideoMode (void)
 {
-	if (m_nFilter == FILTER_COMPOSITE && !TvReady ())
+	if (m_nFilter == FILTER_COMPOSITE && !FrameTvTables ())
 	{
 		// the filter's tables, built the first time COMPOSITE is used
 		unsigned t0 = CTimer::GetClockTicks ();
@@ -202,13 +208,11 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
 	if (strstr (Text, "filter=COMPOSITE"))			m_nFilter = FILTER_COMPOSITE;
-	else if (strstr (Text, "filter=FAKELOTTES"))		m_nFilter = FILTER_FAKELOTTES;
-	else if (strstr (Text, "filter=BLURPI"))		m_nFilter = FILTER_BLURPI;
-	else if (strstr (Text, "filter=EASYMODE"))		m_nFilter = FILTER_EASYMODE;
 	else if (strstr (Text, "filter=APERTURE"))		m_nFilter = FILTER_APERTURE;
+	else if (strstr (Text, "filter=HYLLIAN_ORIG"))		m_nFilter = FILTER_HYLLORIG;
 	else if (strstr (Text, "filter=HYLLIAN"))		m_nFilter = FILTER_HYLLIAN;
-	else if (strstr (Text, "filter=1TAP"))			m_nFilter = FILTER_ONETAP;
-	else if (strstr (Text, "filter=NTSC_SIMPLE"))		m_nFilter = FILTER_NTSCSIMPLE;
+	else if (strstr (Text, "filter=CRT_PI"))		m_nFilter = FILTER_CRTPI;
+	else if (strstr (Text, "filter=ZFAST"))			m_nFilter = FILTER_ZFAST;
 	else if (strstr (Text, "filter=SCANLINES_LIGHT"))	m_nFilter = FILTER_SCAN_LIGHT;
 	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
 	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;

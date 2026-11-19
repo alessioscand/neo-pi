@@ -701,7 +701,7 @@ void CKernel::PlayDrawBands (void)
 	if (!P.bMenu)		// TEST: the filter's name when there is no message
 	{
 		static const char *Names[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE",
-			"FAKELOTTES", "BLURPI", "EASYMODE", "APERTURE", "HYLLIAN", "1TAP", "NTSC\nSIMPLE"};	// 10 chars at 720p
+			"FAKELOTTES", "BLURPI", "EASYMODE", "APERTURE", "HYLLIAN+", "1TAP", "NTSC\nSIMPLE", "CRT-PI", "ZFAST", "HYLLIAN"};	// 10 chars at 720p
 		char Label[40];
 		snprintf (Label, sizeof Label, "TV FILTER\n%s", Names[m_nFilter]);
 		const CScreen::TTextSpan Span = {P.nToast ? P.Toast : Label, UI_WHITE};

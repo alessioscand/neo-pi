@@ -25,6 +25,7 @@ unsigned g_nAudioFrames;
 
 static CScreen *s_pVideo = 0;
 static u32 s_Line[GAME_W * 8], s_Dark[GAME_W * 8];	// core 1's scanline buffers
+#define TV_CRT	0xFFFFu			// TEST: a TvPost phase, CRT shader
 static u32 s_TvLine[2][GAME_W * 8];		// core 2's, and the caller's without it
 
 // read by core 1 for each line
@@ -99,6 +100,8 @@ void FrameAudioStart (boolean bSpeex)
 
 // ---- picture ----------------------------------------------------------------
 
+static void CrtRaceDone (unsigned nRow);
+
 // core 1: a finished line goes straight to the screen (with the scanlines),
 // or to core 2 with COMPOSITE
 static void LineDone (unsigned nScanline)
@@ -113,27 +116,49 @@ static void LineDone (unsigned nScanline)
 		TvPost (g_VideoBuf + nScanline * GAME_SRC_PITCH + GAME_SRC_X,
 			(s_nTvBurst + nRow) % COMP_PHASES, nRow, SharedLoad (s_bRaced));
 	}
+	else if (CrtFxActive () && TvWorkerAlive ())	// TEST: CRT shaders on core 2 too
+	{
+		TvPost (g_VideoBuf + nScanline * GAME_SRC_PITCH + GAME_SRC_X, TV_CRT, nRow,
+			SharedLoad (s_bRaced));
+	}
 	else
 	{
 		s_pVideo->DrawGameLine (g_VideoBuf, nRow, s_Line, s_Dark);
 		if (SharedLoad (s_bRaced))
 		{
-			if (CrtFxLag ())	// TEST: one line behind
-			{
-				if (nRow > 0) RaceRowDone (nRow - 1);
-				if (nRow == GAME_H - 1) RaceRowDone (nRow);
-			}
-			else
-			{
-				RaceRowDone (nRow);
-			}
+			CrtRaceDone (nRow);
 		}
+	}
+}
+
+// TEST: a CRT shader's line (core 2): drawn from the game's frame
+static boolean s_bTvCrt = FALSE;
+
+static void CrtRaceDone (unsigned nRow)
+{
+	if (CrtFxLag ())		// one line behind
+	{
+		if (nRow > 0) RaceRowDone (nRow - 1);
+		if (nRow == GAME_H - 1) RaceRowDone (nRow);
+	}
+	else
+	{
+		RaceRowDone (nRow);
 	}
 }
 
 // core 2 (or the caller without it, nSide 1): a filtered line
 static void TvLineOut (unsigned nRow, const u32 *pNtsc, boolean bRace, unsigned nSide)
 {
+	if (s_bTvCrt)
+	{
+		s_pVideo->DrawGameLine (g_VideoBuf, nRow, s_TvLine[nSide], s_TvLine[nSide]);
+		if (bRace)
+		{
+			CrtRaceDone (nRow);
+		}
+		return;
+	}
 	s_pVideo->DrawNtscLine (nRow, pNtsc, COMP_OUT_W, s_TvLine[nSide]);
 	if (bRace)
 	{
@@ -147,7 +172,16 @@ static void *s_pTables = 0;
 
 static void CompositeLine (const void *pSource, unsigned nPhase, u32 *pOut)
 {
-	composite_line (s_pTables, (const unsigned *) pSource, GAME_W, nPhase, pOut);
+	s_bTvCrt = nPhase == TV_CRT;		// TEST: or a CRT shader's line
+	if (!s_bTvCrt)
+	{
+		composite_line (s_pTables, (const unsigned *) pSource, GAME_W, nPhase, pOut);
+	}
+}
+
+boolean FrameTvTables (void)
+{
+	return s_pTables != 0;
 }
 
 boolean FrameTvInit (void)
@@ -160,8 +194,8 @@ boolean FrameTvInit (void)
 			return FALSE;
 		}
 		composite_init (p, 0);
+		TvSync ();
 		s_pTables = p;
-		TvSetFilter (CompositeLine);
 	}
 	return TRUE;
 }
@@ -170,6 +204,7 @@ void FrameSetup (CScreen *pVideo)
 {
 	s_pVideo = pVideo;
 	TvSetOutput (TvLineOut);
+	TvSetFilter (CompositeLine);
 	geo_lspc_set_buffer (g_VideoBuf);
 	geo_mixer_set_buffer (g_AudioBuf);
 	geo_mixer_set_callback (AudioCallback);
@@ -178,6 +213,10 @@ void FrameSetup (CScreen *pVideo)
 void FrameSync (void)
 {
 	McSync ();
+	if (!s_bComposite && CrtFxActive ())
+	{
+		TvSync ();			// TEST: core 2's CRT lines
+	}
 	if (s_bComposite)
 	{
 		TvSync ();			// and core 2 its lines
