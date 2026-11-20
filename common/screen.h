@@ -93,7 +93,7 @@ public:
 	virtual void SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId) = 0;
 
 	// Text beside the picture ('\n': new line, long lines wrap): left column
-	// right-aligned, bottom-aligned (status, NO PAD); right column top-aligned
+	// right-aligned, bottom-aligned (status); right column top-aligned
 	// (messages); too narrow (4:3): the bands below / above. No spans: clear.
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
 	virtual void DrawSideText (boolean bRight, const TTextSpan *pSpans, unsigned nSpans) = 0;

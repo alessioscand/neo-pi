@@ -1,5 +1,16 @@
-neo-pi 1.2.0 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
+neo-pi 1.2.1 - Bare-metal NEOGEO emulator for Raspberry Pi 3 and 4
 ============================================================================
+
+WHAT'S NEW IN 1.2.1
+
+  - OPTIONS > SCANLINES is now TV FILTER, with four looks: FAST (the
+    simple scanlines), RGB (an RGB monitor, from Hyllian's
+    crt-hyllian-fast), CRT (a CRT TV with its RGB mask, from davej's
+    crt-pi) and COMPOSITE. RGB and CRT are drawn line by line on their
+    own CPU core: no added lag.
+  - BEZEL is GRID by default. At 1080p the frame sits a little further
+    from the picture; at 720p it is centred again.
+  - Smaller fixes and tidying.
 
 WHAT'S NEW IN 1.2.0
 
@@ -34,8 +45,7 @@ START-UP
     game starts at once. GAME LIST in the in-game menu still opens the
     list.
   - Game list: Up/Down to choose, Left/Right to jump by 8, A or Start to
-    play, D for OPTIONS. A long title scrolls. With no pad connected,
-    NO PAD on the left.
+    play, D for OPTIONS. A long title scrolls.
   - Benchmark: an empty file named neopi/BENCH (no extension) runs one on
     the selected game before normal play: 30 seconds of the game's demo,
     then 60 seconds measured. Do not touch anything. Results in
