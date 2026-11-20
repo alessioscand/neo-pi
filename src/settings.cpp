@@ -28,9 +28,9 @@ const char *CKernel::FilterShort (unsigned nFilter)
 {
 	switch (nFilter)
 	{
-	case FILTER_SCAN_LIGHT:	 return "SCAN-L";
-	case FILTER_SCAN_MEDIUM: return "SCAN-M";
-	case FILTER_SCAN_STRONG: return "SCAN-S";
+	case FILTER_FAST:	 return "FAST";
+	case FILTER_RGB:	 return "RGB";
+	case FILTER_CRT:	 return "CRT";
 	case FILTER_COMPOSITE:	 return "COMP";
 	default:		 return "NOFLT";
 	}
@@ -40,9 +40,9 @@ const char *CKernel::FilterName (unsigned nFilter)
 {
 	switch (nFilter)
 	{
-	case FILTER_SCAN_LIGHT:	 return "SCANLINES_LIGHT";
-	case FILTER_SCAN_MEDIUM: return "SCANLINES";
-	case FILTER_SCAN_STRONG: return "SCANLINES_STRONG";
+	case FILTER_FAST:	 return "FAST";
+	case FILTER_RGB:	 return "RGB";
+	case FILTER_CRT:	 return "CRT";
 	case FILTER_COMPOSITE:	 return "COMPOSITE";
 	default:		 return "NONE";
 	}
@@ -63,7 +63,7 @@ void CKernel::VideoModeTag (char *pOut, size_t nSize)
 
 void CKernel::ApplyVideoMode (void)
 {
-	if (m_nFilter == FILTER_COMPOSITE && !TvReady ())
+	if (m_nFilter == FILTER_COMPOSITE && !FrameTvTables ())
 	{
 		// the filter's tables, built the first time COMPOSITE is used
 		unsigned t0 = CTimer::GetClockTicks ();
@@ -77,8 +77,8 @@ void CKernel::ApplyVideoMode (void)
 		}
 		else
 		{
-			Log ("COMPOSITE: not enough memory for the filter, scanlines instead", COLOR_ERR);
-			m_nFilter = FILTER_SCAN_MEDIUM;
+			Log ("COMPOSITE: not enough memory for the filter, FAST instead", COLOR_ERR);
+			m_nFilter = FILTER_FAST;
 		}
 	}
 	FrameSetComposite (m_nFilter == FILTER_COMPOSITE);
@@ -187,16 +187,17 @@ void CKernel::LoadConfig (void)
 	if (strstr (Text, "region=USA"))	m_nRegion = REGION_US;
 	if (strstr (Text, "region=JAPAN"))	m_nRegion = REGION_JP;
 	if (strstr (Text, "region=ASIA"))	m_nRegion = REGION_AS;
-	if (strstr (Text, "filter=COMPOSITE"))			m_nFilter = FILTER_COMPOSITE;
-	else if (strstr (Text, "filter=SCANLINES_LIGHT"))	m_nFilter = FILTER_SCAN_LIGHT;
-	else if (strstr (Text, "filter=SCANLINES_STRONG"))	m_nFilter = FILTER_SCAN_STRONG;
-	else if (strstr (Text, "filter=SCANLINES"))		m_nFilter = FILTER_SCAN_MEDIUM;
+	if (strstr (Text, "filter=COMPOSITE"))		m_nFilter = FILTER_COMPOSITE;
+	else if (strstr (Text, "filter=RGB"))		m_nFilter = FILTER_RGB;
+	else if (strstr (Text, "filter=CRT"))		m_nFilter = FILTER_CRT;
+	else if (strstr (Text, "filter=FAST")
+		 || strstr (Text, "filter=SCANLINES"))	m_nFilter = FILTER_FAST;	// (and 1.2.0's LIGHT, STRONG)
 	if (strstr (Text, "scaler=cpu"))	m_bHVS = FALSE;
 	if (strstr (Text, "bezel=off"))			m_nBezel = 0;
 	else if (strstr (Text, "bezel=full"))		m_nBezel = BEZEL_GRID | BEZEL_INFO;
 	else if (strstr (Text, "bezel=grid"))		m_nBezel = BEZEL_GRID;
 	else if (strstr (Text, "bezel=text"))		m_nBezel = BEZEL_INFO;
-	// (multicore and Pi 3 scanlines: decided after LoadConfig)
+	// (multicore and Pi 3 TV filters: decided after LoadConfig)
 	// USB pads polled every 1 ms; usbpoll=500 / 250: 2 / 4 ms; usbpoll=native:
 	// the device's own interval
 	if (strstr (Text, "usbpoll=native"))	g_nUSBInterruptPollMs = 0;
@@ -249,7 +250,7 @@ void CKernel::SaveConfig (void)
 	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\ncpu=%s\r\nfilter=%s\r\n%s",
 		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
-	if (m_nBezel != (BEZEL_GRID | BEZEL_INFO))
+	if (m_nBezel != BEZEL_GRID)
 	{
 		strcat (Text, "bezel=");
 		strcat (Text, BezelName (m_nBezel, FALSE));

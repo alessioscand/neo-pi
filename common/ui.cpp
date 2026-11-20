@@ -158,13 +158,11 @@ void CUI::Logo (int y)
 	}
 }
 
-// a panel: a 2-pixel frame inside an outline
+// a panel: a 1-pixel frame (as thick as the font's strokes)
 void CUI::Panel (int x0, int y0, int x1, int y1)
 {
-	Fill (x0, y0, x1 - x0 + 1, y1 - y0 + 1, g_Theme.nFrame2);
-	Fill (x0 + 1, y0 + 1, x1 - x0 - 1, y1 - y0 - 1, g_Theme.nFrame1);
-	Fill (x0 + 3, y0 + 3, x1 - x0 - 5, y1 - y0 - 5, g_Theme.nFrame2);
-	Fill (x0 + 4, y0 + 4, x1 - x0 - 7, y1 - y0 - 7, g_Theme.nPanel);
+	Fill (x0, y0, x1 - x0 + 1, y1 - y0 + 1, g_Theme.nFrame1);
+	Fill (x0 + 1, y0 + 1, x1 - x0 - 1, y1 - y0 - 1, g_Theme.nPanel);
 }
 
 void CUI::Separator (int x0, int x1, int y)
@@ -369,9 +367,13 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 		Logo (nTop);
 	}
 	Panel (32, y0, UI_W - 33, y0 + nListH - 1);
-	Fill (37, y0 + 67, UI_W - 74, 23, T.nBand);
-	Fill (37, y0 + 67, UI_W - 74, 1, T.nFrame2);
-	Fill (37, y0 + 89, UI_W - 74, 1, T.nFrame2);
+	Fill (33, y0 + 1, UI_W - 66, 1, T.nFrame1);		// 2 pixels, as the logo's
+	Fill (33, y0 + nListH - 2, UI_W - 66, 1, T.nFrame1);
+	Fill (33, y0 + 1, 1, nListH - 2, T.nFrame1);
+	Fill (UI_W - 34, y0 + 1, 1, nListH - 2, T.nFrame1);
+	Fill (38, y0 + 67, UI_W - 76, 23, T.nBand);	// as wide as the bottom row, lit edges
+	Fill (38, y0 + 67, UI_W - 76, 1, T.nTitle);
+	Fill (38, y0 + 89, UI_W - 76, 1, T.nTitle);
 
 	// the selected title, twice as tall (a long one scrolls in the band),
 	// 4 above and below it, fading away
@@ -389,13 +391,13 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 			const int nExtra = (int) strlen (pName) * 8 - nListW;
 			if (nExtra <= 0)
 			{
-				CText (y0 + 70, pName, UI_WHITE, 2, TRUE);
+				CText (y0 + 69, pName, UI_WHITE, 2, TRUE);
 			}
 			else
 			{
 				m_nClipX0 = nListX;
 				m_nClipX1 = nListX + nListW;
-				Text (nListX - ScrollOffset (nExtra, nTicks), y0 + 70, pName, UI_WHITE, 2, TRUE);
+				Text (nListX - ScrollOffset (nExtra, nTicks), y0 + 69, pName, UI_WHITE, 2, TRUE);
 				m_nClipX0 = 0;
 				m_nClipX1 = UI_W;
 			}
@@ -411,7 +413,6 @@ void CUI::DrawList (const TGameEntry *pGames, unsigned nCount, unsigned nSel,
 
 	// the bottom row, in the theme's colour and font for it: what the
 	// selected game is, and where it is in the list
-	Fill (37, y0 + 143, UI_W - 74, 1, T.nFrame2);
 	char Count[16];
 	{
 		unsigned a = nSel + 1, b = nCount;
@@ -729,31 +730,39 @@ void CUI::DrawCredits (const char *pVersion)
 	const TUITheme &T = g_Theme;
 	memcpy (m_Buf, m_Snapshot, sizeof m_Buf);
 
-	// the panel (its content: the title, the project, the credits and 8
-	// lines below them) and the button as one block in the middle
+	// the panel (its content: the title and the credits) and the button as
+	// one block in the middle; roles on the left, people on the right
 	const unsigned nCredits = T.nCredits < 10 ? T.nCredits : 10;
-	const int nContent = 67 + 9 * (int) nCredits + 8;
+	const int nContent = 30 + 12 * (int) (nCredits + 1) + 4;
 	const int nPanelH = PANEL_FIT (nContent);
 	const int yP = (UI_H - (nPanelH + MENU_GAP + BUTTONS_H)) / 2;
-	const int x0 = 12, x1 = UI_W - 13, y0 = yP + (nPanelH - nContent) / 2;
+	int nRow = 14 + 1 + 6;			// the widest row in characters: AUTHOR's
+	for (unsigned i = 0; i < nCredits; i++)
+	{
+		const int n = (int) (strlen (T.pCredits[i][0]) + 1 + strlen (T.pCredits[i][1]));
+		if (n > nRow) nRow = n;
+	}
+	int x0 = (UI_W - (nRow * 8 + 20)) / 2;	// 10 pixels inside, at most 20 out
+	if (x0 > 20) x0 = 20;
+	if (x0 < 4) x0 = 4;
+	const int x1 = UI_W - 1 - x0, y0 = yP + (nPanelH - nContent) / 2;
 	Panel (x0, yP, x1, yP + nPanelH - 1);
-	CText (y0 + 10, "CREDITS", T.nTitle);
-	Separator (x0, x1, y0 + 22);
 
-	char Title[32];
+	char Title[48];
 	strncpy (Title, T.pName, sizeof Title - 1);
 	Title[sizeof Title - 1] = '\0';
 	strncat (Title, " ", sizeof Title - strlen (Title) - 1);
 	strncat (Title, pVersion, sizeof Title - strlen (Title) - 1);
-	CText (y0 + 28, Title, UI_WHITE, 2, TRUE);
-	CText (y0 + 48, "BY A.SCANDEREBECH", T.nValue);
-	Separator (x0, x1, y0 + 62);
+	CText (y0 + 8, Title, T.nTitle);
+	Separator (x0, x1, y0 + 20);
 
+	Text (x0 + 10, y0 + 30, "AUTHOR", T.nTitle);
+	Text (x1 - 9 - 8 * 14, y0 + 30, "A.SCANDEREBECH", T.nDim);
 	for (unsigned i = 0; i < nCredits; i++)
 	{
-		const int y = y0 + 67 + (int) i * 9;
-		Text (x0 + 12, y, T.pCredits[i][0], Dim (T.nDim, 80));
-		Text (x0 + 12 + 7 * 8, y, T.pCredits[i][1], 0xEBEBEB);
+		const int y = y0 + 42 + (int) i * 12;
+		Text (x0 + 10, y, T.pCredits[i][0], T.nTitle);
+		Text (x1 - 9 - 8 * (int) strlen (T.pCredits[i][1]), y, T.pCredits[i][1], T.nDim);
 	}
 
 	static const TButtonHint Close = {'B', "CLOSE"};

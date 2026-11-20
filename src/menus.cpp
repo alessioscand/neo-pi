@@ -8,22 +8,13 @@ extern "C" {
 #include "geo.h"		// geo_set_div68k (CPU SPEED)
 }
 
-void CKernel::ShowUIFrame (boolean bWait, const char *pTopMessage)
+void CKernel::ShowUIFrame (boolean bWait)
 {
 	UpdateBezel ();
 	// a menu over the grid (no game behind it): no filter, so that its grid
 	// and the border's are one
 	FrameDrawPicture (m_pUI->GetBuffer (), m_nLoaded >= 0 && !m_pUI->ShowsGrid ());
-	if (pTopMessage && pTopMessage[0])
-	{
-		// in the left column, where the status line goes while playing
-		const CScreen::TTextSpan Span = {pTopMessage, UI_ERR};
-		m_Video.DrawSideText (FALSE, &Span, 1);
-	}
-	else
-	{
-		m_Video.DrawSideText (FALSE, 0, 0);	// no status line or message over menus
-	}
+	m_Video.DrawSideText (FALSE, 0, 0);	// no status line or message over menus
 	m_Video.DrawSideText (TRUE, 0, 0);
 	m_Video.Flip ();
 	if (!bWait)
@@ -97,11 +88,10 @@ unsigned CKernel::RunList (unsigned nSel)
 		}
 		nPrev = n;
 
-		const char *pMsg = m_pInput->GetPadCount () == 0 ? "NO PAD" : "";
 		nTicks = nSel == nShown ? nTicks + 1 : 0;
 		nShown = nSel;
 		m_pUI->DrawList (m_pGames, m_nGames, nSel, m_nLoaded >= 0, nTicks);
-		ShowUIFrame (TRUE, pMsg);
+		ShowUIFrame ();
 	}
 }
 
@@ -228,7 +218,7 @@ void CKernel::RunSystemMenu (boolean bInGame)
 			break;
 		}
 
-		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "SCANLINES", "BEZEL", "CONTROLS", "POWER OFF"};
+		static const char *Labels[SmCount] = {"SYSTEM", "REGION", "CPU SPEED", "TV FILTER", "BEZEL", "CONTROLS", "POWER OFF"};
 		TMenuItem Items[SmCount];
 		for (unsigned i = 0; i < SmCount; i++)
 		{
@@ -240,9 +230,9 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		Items[SmRegion].pValue = m_nSystem == SYS_UNI ? "SET IN UNIBIOS" : RegionName (m_nRegion);
 		Items[SmRegion].bDisabled = m_nSystem == SYS_UNI;
 		Items[SmCpu].pValue = m_nCpuSpeed == CPU_TURBO ? "TURBO" : "NORMAL";
-		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "LIGHT", "MEDIUM", "STRONG", "COMPOSITE"};
+		static const char *FilterLabels[FILTER_COUNT] = {"OFF", "FAST", "RGB", "CRT", "COMPOSITE"};
 		// not allowed only on a Pi 3 with multicore=off
-		// ("MULTICORE ONLY" does not fit next to SCANLINES)
+		// ("MULTICORE ONLY" does not fit next to TV FILTER)
 		Items[SmFilter].pValue = m_bFilterAllowed ? FilterLabels[m_nFilter] : "MULTICORE OFF";
 		Items[SmFilter].bDisabled = !m_bFilterAllowed;
 		Items[SmBezel].pValue = BezelName (m_nBezel, TRUE);
@@ -251,6 +241,10 @@ void CKernel::RunSystemMenu (boolean bInGame)
 		if (!pShow[0] && nSel == SmCpu)
 		{
 			pShow = m_nCpuSpeed == CPU_TURBO ? "FEWER SLOWDOWNS" : "AS THE REAL HARDWARE";
+		}
+		else if (!pShow[0] && nSel == SmBezel && (m_nBezel & BEZEL_INFO))
+		{
+			pShow = "TEXT AT 1080P ONLY";	// the title and buttons need the bands
 		}
 		else if (!pShow[0] && (m_nSystem != nOldSystem || m_nRegion != nOldRegion))
 		{

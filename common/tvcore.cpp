@@ -122,7 +122,10 @@ void TvPost (const void *pSource, unsigned nPhase, unsigned nRow, boolean bRace,
 	if (!TvWorkerAlive ())
 	{
 		static TTvLine Line;
-		memcpy (Line.Src, pSource, sizeof Line.Src);
+		if (pSource != 0)
+		{
+			memcpy (Line.Src, pSource, sizeof Line.Src);
+		}
 		Line.nPhase = nPhase;
 		Line.nRow = nRow;
 		Line.bRace = bRace;
@@ -138,7 +141,10 @@ void TvPost (const void *pSource, unsigned nPhase, unsigned nRow, boolean bRace,
 		return;
 	}
 	TTvLine *e = &s_Ring[h & (RING - 1)];
-	memcpy (e->Src, pSource, sizeof e->Src);
+	if (pSource != 0)			// 0: the filter reads the line itself
+	{
+		memcpy (e->Src, pSource, sizeof e->Src);
+	}
 	e->nPhase = nPhase;
 	e->nRow = nRow;
 	e->bRace = bRace;

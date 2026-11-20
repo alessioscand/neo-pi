@@ -73,7 +73,7 @@ CKernel::CKernel (void)
 	m_bSpeex (FALSE),
 	m_bMultiCore (TRUE),
 	m_bFilterAllowed (TRUE),
-	m_nBezel (BEZEL_GRID | BEZEL_INFO),
+	m_nBezel (BEZEL_GRID),
 	m_bVSync (TRUE),
 	m_bStatusOn (FALSE),
 	m_nClearStatus (0)
@@ -146,7 +146,7 @@ TShutdownMode CKernel::Run (void)
 	m_bFilterAllowed = pInfo->GetModelMajor () >= 4;
 	FrameSetup (&m_Video);
 	LoadConfig ();
-	// multicore on a Pi 3: core 0 has the margin for the scanlines (here, not
+	// multicore on a Pi 3: core 0 has the margin for the TV filters (here, not
 	// in LoadConfig: it returns at once when neopi.cfg does not exist yet)
 	if (m_bMultiCore)			m_bFilterAllowed = TRUE;
 	if (!m_bFilterAllowed)			m_nFilter = FILTER_NONE;

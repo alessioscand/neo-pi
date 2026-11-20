@@ -50,13 +50,13 @@ const TUITheme g_Theme =
 	0xFF5050,				// POWER OFF
 	g_FontMatinee, g_FontMatinee, TRUE,	// the list: the BIOS's font when it is loaded
 	g_FontLander,				// around the picture
-	0x5A6478, FALSE,			// the list's bottom row: outline, menu font
+	0x5A6478, TRUE,				// the list's bottom row: outline, the list's font
 	s_Logo, sizeof s_Logo / sizeof s_Logo[0], 2, s_LogoKeys, s_LogoColors,
 	s_Credits, sizeof s_Credits / sizeof s_Credits[0],
 	{8, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
 	{4, 4},					// the columns' text a little further out
 	40,					// a fabric of diamonds, through the frame's corners
-	FALSE,					// thin lines (TRUE: a game pixel wide)
+	TRUE,					// lines a game pixel wide (FALSE: thin)
 	0					// no frame: the dither
 };
 

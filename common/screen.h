@@ -16,12 +16,14 @@
 #define GAME_W           PROJECT_WIDTH
 #define GAME_H           PROJECT_HEIGHT
 
+// TV FILTER, in the menu's order
 #define FILTER_NONE	0
-#define FILTER_SCAN_LIGHT  1	// dark rows at 75%
-#define FILTER_SCAN_MEDIUM 2	// dark rows at 50%
-#define FILTER_SCAN_STRONG 3	// dark rows at 25%
-#define FILTER_COMPOSITE   4	// blargg's NTSC filter (tvcore.h), no dark rows
+#define FILTER_FAST	1	// the bottom half of each game line's rows at 50%
+#define FILTER_RGB	2	// crt-hyllian-fast (crtfx.h)
+#define FILTER_CRT	3	// crt-pi (crtfx.h)
+#define FILTER_COMPOSITE 4	// blargg's NTSC filter (tvcore.h)
 #define FILTER_COUNT	5
+#define FILTER_IS_SHADER(f) ((f) == FILTER_RGB || (f) == FILTER_CRT)
 
 // What is around the picture: with a game, OPTIONS > BEZEL; with none, the grid
 // a pixel of the menus where the screen's grid shows (DrawGame, no filter)
@@ -91,7 +93,7 @@ public:
 	virtual void SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId) = 0;
 
 	// Text beside the picture ('\n': new line, long lines wrap): left column
-	// right-aligned, bottom-aligned (status, NO PAD); right column top-aligned
+	// right-aligned, bottom-aligned (status); right column top-aligned
 	// (messages); too narrow (4:3): the bands below / above. No spans: clear.
 	struct TTextSpan { const char *pText; u32 nColor; };	// colour: 0xRRGGBB
 	virtual void DrawSideText (boolean bRight, const TTextSpan *pSpans, unsigned nSpans) = 0;

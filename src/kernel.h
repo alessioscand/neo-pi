@@ -142,7 +142,7 @@ private:
 	void SavePads (void);
 
 	// menus.cpp
-	void ShowUIFrame (boolean bWait = TRUE, const char *pTopMessage = 0);
+	void ShowUIFrame (boolean bWait = TRUE);
 	unsigned RunList (unsigned nSel);
 	void RunSystemMenu (boolean bInGame);
 	int ChoosePad (void);
