@@ -736,7 +736,16 @@ void CUI::DrawCredits (const char *pVersion)
 	const int nContent = 30 + 12 * (int) (nCredits + 1) + 4;
 	const int nPanelH = PANEL_FIT (nContent);
 	const int yP = (UI_H - (nPanelH + MENU_GAP + BUTTONS_H)) / 2;
-	const int x0 = 20, x1 = UI_W - 21, y0 = yP + (nPanelH - nContent) / 2;
+	int nRow = 14 + 1 + 6;			// the widest row in characters: AUTHOR's
+	for (unsigned i = 0; i < nCredits; i++)
+	{
+		const int n = (int) (strlen (T.pCredits[i][0]) + 1 + strlen (T.pCredits[i][1]));
+		if (n > nRow) nRow = n;
+	}
+	int x0 = (UI_W - (nRow * 8 + 20)) / 2;	// 10 pixels inside, at most 20 out
+	if (x0 > 20) x0 = 20;
+	if (x0 < 4) x0 = 4;
+	const int x1 = UI_W - 1 - x0, y0 = yP + (nPanelH - nContent) / 2;
 	Panel (x0, yP, x1, yP + nPanelH - 1);
 
 	char Title[48];
