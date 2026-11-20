@@ -46,10 +46,10 @@ public:
 		       u32 nFG, u32 nBG) override;
 	void ClearRows (unsigned nBuffer, unsigned nFirstRow, unsigned nRows, u32 nColor) override;
 
-	void DrawGame (const u32 *pSource, boolean bFilter = TRUE) override;
+	void DrawGame (const u32 *pSource, boolean bFilter = TRUE, boolean bCanvas = FALSE) override;
 	void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark) override
 	{
-		DrawGameLineTo (SharedLoad (m_bRacing) ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark, TRUE);
+		DrawGameLineTo (SharedLoad (m_bRacing) ? m_nBack ^ 1 : m_nBack, pSource, y, pLine, pDark, TRUE, FALSE);
 	}
 	void DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine) override;
 	void SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId) override;
@@ -67,7 +67,8 @@ private:
 	unsigned GetColumns (void) const;
 	boolean Allocate (unsigned nWidth, unsigned nHeight);
 	void DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark,
-			     boolean bFilter);
+			     boolean bFilter, boolean bCanvas = FALSE);
+	void RestoreCanvas (unsigned nBuf);		// the border where the canvas was
 	u32 *Row (unsigned nBuffer, unsigned nY) const
 	{
 		return m_pBase + (nBuffer * m_nHeight + nY) * m_nPitchPx;
@@ -135,6 +136,8 @@ private:
 	u32	 m_nTextSum[2][2];		// and what it says (0 = nothing)
 	u32	*m_pBlock;			// a column's text, prepared before the copy
 	u32	*m_pGridPic;			// the grid where the picture goes (the UI's GRID_HOLE)
+	u32	*m_pCanvasPic;			// CANVAS_WIDER: the border under the canvas
+	boolean	 m_bCanvasDrawn;		// and the canvas drawn over it
 
 	u32 Native (u32 c) const		// RGB() (R low) -> framebuffer order
 	{

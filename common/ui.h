@@ -1,6 +1,7 @@
 /*
  * The menus, the same in every project: drawn like the game (its size,
- * XRGB8888), laid out on 304x224 in the middle; the look from theme.h.
+ * XRGB8888), laid out on UI_W x UI_H (304x224, screen.h) in the middle; the
+ * look from theme.h.
  */
 #ifndef COMMON_UI_H
 #define COMMON_UI_H
@@ -9,8 +10,6 @@
 #include "screen.h"
 #include "theme.h"
 
-#define UI_W		304
-#define UI_H		224
 #define UI_ELLIPSIS	"\x1F"	// "..." in one character (names cut short)
 
 // Colours for messages and the status line, the same everywhere (0xRRGGBB)
@@ -35,7 +34,7 @@ struct TMenuItem
 
 struct TButtonHint
 {
-	char		 cButton;	// 'A' 'B' 'C' 'D'
+	char		 cButton;	// 'A' 'B' 'C' 'D', 'S' = SELECT (written)
 	const char	*pText;
 };
 

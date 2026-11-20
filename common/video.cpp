@@ -7,6 +7,7 @@
 #include "fbmap.h"
 #include "crtfx.h"
 #include "tvcore.h"
+#include "composite.h"
 #include <circle/bcmpropertytags.h>
 #include <circle/font.h>
 #include <circle/util.h>
@@ -14,7 +15,7 @@
 #define PROPTAG_RELEASE_BUFFER	0x00048001
 #define PROPTAG_GET_PIXEL_ORDER	0x00040006	// 0 = BGR, 1 = RGB
 
-#define MAX_LINE	(GAME_W * 8)		// longest scaled line we support
+#define MAX_LINE	(CANVAS_W * 8)		// longest scaled line we support
 
 // The border: the theme's grid, as behind the menus, drawn once (never
 // during play), on points (BgPoint): framebuffer pixels, or game pixels with
@@ -98,6 +99,8 @@ CVideoOut::CVideoOut (void)
 	m_bBezelDrawn (FALSE),
 	m_pBlock (0),
 	m_pGridPic (0),
+	m_pCanvasPic (0),
+	m_bCanvasDrawn (FALSE),
 	m_pLine (0),
 	m_pDark (0),
 
@@ -118,6 +121,7 @@ CVideoOut::~CVideoOut (void)
 	delete [] m_pDark;
 	delete [] m_pBlock;
 	delete [] m_pGridPic;
+	delete [] m_pCanvasPic;
 }
 
 boolean CVideoOut::Allocate (unsigned nWidth, unsigned nHeight)
@@ -214,7 +218,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 
 
 	// total integer scale S
-	unsigned sx = m_nDispW / GAME_W, sy = m_nDispH / GAME_H;
+	unsigned sx = m_nDispW / CANVAS_W, sy = m_nDispH / CANVAS_H;	// the menus fit too
 	m_nScale = sx < sy ? sx : sy;
 	if (m_nScale < 1) m_nScale = 1;
 	if (m_nScale > 8) m_nScale = 8;
@@ -274,10 +278,14 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	m_nFrame = g_Theme.nFrame[nSize];
 	// 1080p with a fabric: the frame half a small diamond further out, the
 	// fabric still through the corners it had
-	const int nPad = m_nFrame > 0 && nSize == 0 ? g_Theme.nFabric / 8 : 0;
+	const boolean bMoat = g_Theme.nFrameColour == ThemeGround ();	// an invisible frame
+	const int nPad = m_nFrame > 0 && nSize == 0 && !bMoat ? g_Theme.nFabric / 8 : 0;
 	m_nFrame += nPad;
 	const int nRoom = (int) (m_nGameY / m_nM) - 2;
-	if (m_nFrame > nRoom) m_nFrame = nRoom > 0 ? nRoom : 0;
+	if (m_nFrame > nRoom && !bMoat)		// a moat may go off screen
+	{
+		m_nFrame = nRoom > 0 ? nRoom : 0;
+	}
 	const int nBase = m_nFrame > nPad ? m_nFrame - nPad : m_nFrame;
 	m_nSideGap = (m_nFrame > 0 ? (unsigned) (m_nFrame + 1) * m_nM + m_nGap / 2 : m_nGap)
 		   + (unsigned) g_Theme.nSideShift[nSize] * m_nM;
@@ -300,7 +308,16 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 		m_nFrameL = m_nFrameR + 1;		// the mirror image
 		m_nFrameT = m_nFrameB + 1;
 		m_nGridX0 = m_nGridY0 = 0;
-		if (m_nFrame > 0 && g_Theme.nFabric > 0)
+		if (m_nFrame > 0 && bMoat)
+		{
+			// a moat: no line, the same width on both sides, the grid's
+			// squares from its corner
+			m_nFrameR = m_nFrameL = (GAME_W / 2 + nBase) * M;
+			m_nFrameB = m_nFrameT = (GAME_H / 2 + nBase) * M;
+			m_nGridX0 = m_nFrameR;
+			m_nGridY0 = m_nFrameB;
+		}
+		else if (m_nFrame > 0 && g_Theme.nFabric > 0)
 		{
 			// the small diamonds' lines (a quarter of P): at 3x the large
 			// ones would push the left and top lines up to 2 diamonds out
@@ -339,6 +356,19 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 			m_pGridPic[y * nGameW + x] = GridPixel (m_nGameX + x, m_nGameY + y);
 		}
 	}
+
+	// the border under the menus' canvas, around the picture (FillBorder)
+	if (CANVAS_WIDER)
+	{
+		delete [] m_pCanvasPic;
+		m_pCanvasPic = new u32[CANVAS_W * m_nM * CANVAS_H * m_nM];
+		if (m_pCanvasPic == 0)
+		{
+			return FALSE;
+		}
+		memset (m_pCanvasPic, 0, CANVAS_W * m_nM * CANVAS_H * m_nM * 4);
+	}
+	m_bCanvasDrawn = FALSE;
 
 	// the border: drawn again by the next SetBezel
 	m_bBezelDrawn = FALSE;			// Allocate cleared both buffers
@@ -443,22 +473,34 @@ static u32 *CrtRow (void *pCtx, unsigned nRow)
 	return p->pBase + nRow * p->nPitch;
 }
 
-void CVideoOut::DrawGame (const u32 *pSource, boolean bFilter)
+void CVideoOut::DrawGame (const u32 *pSource, boolean bFilter, boolean bCanvas)
 {
+	if (bCanvas && CANVAS_WIDER)
+	{
+		for (unsigned y = 0; y < CANVAS_H; y++)
+		{
+			DrawGameLineTo (m_nBack, pSource, y, m_pLine, m_pDark, bFilter, TRUE);
+		}
+		m_bCanvasDrawn = TRUE;		// over the border: SetBezel puts it back
+		return;
+	}
 	for (unsigned y = 0; y < GAME_H; y++)
 	{
 		DrawGameLineTo (m_nBack, pSource, y, m_pLine, m_pDark, bFilter);
 	}
 }
 
+// bCanvas (CANVAS_WIDER only): y is a row of the canvas, drawn whole
 void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark,
-				boolean bFilter)
+				boolean bFilter, boolean bCanvas)
 {
 	const unsigned M = m_nM;
-	const unsigned nGameW = GAME_W * M;
+	const unsigned nW = bCanvas ? CANVAS_W : GAME_W;	// game pixels
+	const unsigned nPadX = bCanvas ? CANVAS_PAD_X : 0, nPadY = bCanvas ? CANVAS_PAD_Y : 0;
+	const unsigned nGameW = nW * M;
 
 	// RGB, CRT: the shader's M rows (crtfx.h)
-	if (bFilter && FILTER_IS_SHADER (m_nFilter) && CrtFxActive ())
+	if (bFilter && !bCanvas && FILTER_IS_SHADER (m_nFilter) && CrtFxActive ())
 	{
 		TCrtCtx Ctx = {Row (nBuffer, m_nGameY) + m_nGameX, (unsigned) (Row (nBuffer, 1) - Row (nBuffer, 0))};
 		CrtFxLine (pSource, y, CrtRow, &Ctx);
@@ -473,11 +515,11 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 
 	// expand one source line horizontally into cached memory, converting
 	// the game's XRGB8888 (R high) to the framebuffer order if needed
-	const u32 *pSrc = pSource + (GAME_SRC_Y + y) * GAME_SRC_PITCH + GAME_SRC_X;
+	const u32 *pSrc = pSource + (GAME_SRC_Y + y - nPadY) * GAME_SRC_PITCH + GAME_SRC_X - nPadX;
 	u32 *pDst = pLine;
 	if (m_bRLow)
 	{
-		for (unsigned x = 0; x < GAME_W; x++)
+		for (unsigned x = 0; x < nW; x++)
 		{
 			u32 p = pSrc[x];
 			u32 c = 0xFF000000u | (p & 0x0000FF00u) | ((p >> 16) & 0xFFu) | ((p & 0xFFu) << 16);
@@ -489,7 +531,7 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 	}
 	else
 	{
-		for (unsigned x = 0; x < GAME_W; x++)
+		for (unsigned x = 0; x < nW; x++)
 		{
 			u32 c = 0xFF000000u | pSrc[x];
 			for (unsigned s = 0; s < M; s++)
@@ -499,7 +541,7 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 		}
 	}
 
-	unsigned nDstY = m_nGameY + y * M;
+	unsigned nDstY = m_nGameY + y * M - nPadY * M;
 
 	if (nDarkRows)
 	{
@@ -514,29 +556,51 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 	for (unsigned s = 0; s < M; s++)
 	{
 		const u32 *pSrcLine = s >= M - nDarkRows ? pDark : pLine;
-		u32 *pRow = Row (nBuffer, nDstY + s) + m_nGameX;
+		u32 *pRow = Row (nBuffer, nDstY + s) + m_nGameX - nPadX * M;
 		memcpy (pRow, pSrcLine, nGameW * 4);
+		if (bCanvas)
+		{
+			// the canvas beyond the picture: where the menus show the
+			// background, the border under them (FillBorder)
+			const u32 *pUnder = m_pCanvasPic + (y * M + s) * nGameW;
+			const boolean bPicRow = y >= nPadY && y < nPadY + GAME_H;
+			for (unsigned x = 0; x < nW; x++)
+			{
+				if (   pSrc[x] == GRID_HOLE
+				    && !(bPicRow && x >= nPadX && x < nPadX + GAME_W))
+				{
+					memcpy (pRow + x * M, pUnder + x * M, M * 4);
+				}
+			}
+			if (!bPicRow)
+			{
+				continue;
+			}
+		}
 		if (!bFilter)
 		{
 			// the menus: where they show the background, the screen's own
 			// grid (BEZEL GRID or FULL), which the UI cannot draw; else black
-			const u32 *pGrid = m_pGridPic + (y * M + s) * nGameW;
+			const unsigned nPicY = y - nPadY;
+			const u32 *pGrid = m_pGridPic + (nPicY * M + s) * GAME_W * M;
 			const boolean bGrid = (m_nBezel & BEZEL_GRID) != 0;
+			const u32 *pPicSrc = pSrc + nPadX;
+			u32 *pPicRow = pRow + nPadX * M;
 			for (unsigned x = 0; x < GAME_W; x++)
 			{
-				if (pSrc[x] != GRID_HOLE)
+				if (pPicSrc[x] != GRID_HOLE)
 				{
 					continue;
 				}
 				if (bGrid)
 				{
-					memcpy (pRow + x * M, pGrid + x * M, M * 4);
+					memcpy (pPicRow + x * M, pGrid + x * M, M * 4);
 				}
 				else
 				{
 					for (unsigned i = 0; i < M; i++)
 					{
-						pRow[x * M + i] = 0xFF000000u;
+						pPicRow[x * M + i] = 0xFF000000u;
 					}
 				}
 			}
@@ -548,7 +612,14 @@ void CVideoOut::DrawGameLineTo (unsigned nBuffer, const u32 *pSource, unsigned y
 void CVideoOut::DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine)
 {
 	const unsigned M = m_nM;
-	const unsigned nGameW = GAME_W * M;
+	// the game's line (COMP_OUT_WIDTH (GAME_W) pixels): GAME_W; a longer one
+	// (the menus' canvas): as much wider
+	const unsigned nGameNtscW = COMP_OUT_WIDTH (GAME_W);
+	unsigned nW = (nNtscW * GAME_W + nGameNtscW / 2) / nGameNtscW;
+	if (nW < GAME_W || !CANVAS_WIDER) nW = GAME_W;
+	if (nW > CANVAS_W) nW = CANVAS_W;
+	const unsigned nPadX = (nW - GAME_W) / 2;
+	const unsigned nGameW = nW * M;
 	const unsigned nBuffer = SharedLoad (m_bRacing) ? m_nBack ^ 1 : m_nBack;	// core 2
 
 	// linear interpolation, 16.16: output pixel x samples the filtered line at
@@ -574,7 +645,11 @@ void CVideoOut::DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32
 	unsigned nDstY = m_nGameY + y * M;
 	for (unsigned s = 0; s < M; s++)
 	{
-		memcpy (Row (nBuffer, nDstY + s) + m_nGameX, pLine, nGameW * 4);
+		memcpy (Row (nBuffer, nDstY + s) + m_nGameX - nPadX * M, pLine, nGameW * 4);
+	}
+	if (nPadX)
+	{
+		m_bCanvasDrawn = TRUE;		// over the border: SetBezel puts it back
 	}
 	FbFlush ();			// the line is in memory before the HVS reads it
 }
@@ -651,6 +726,11 @@ u32 CVideoOut::FramePixel (unsigned x, unsigned y, int d) const
 	const boolean bInY = Y > -m_nFrameT - t && Y < m_nFrameB + t;
 	const boolean bLine =    (bInY && ((X >= m_nFrameR && X < m_nFrameR + t) || (X <= -m_nFrameL && X > -m_nFrameL - t)))
 			      || (bInX && ((Y >= m_nFrameB && Y < m_nFrameB + t) || (Y <= -m_nFrameT && Y > -m_nFrameT - t)));
+	if (g_Theme.nFrameColour == ThemeGround ())	// a moat: empty, the grid's whole squares outside
+	{
+		const boolean bIn = X >= -m_nFrameL && X < m_nFrameR && Y >= -m_nFrameT && Y < m_nFrameB;
+		return ToFb (bIn ? ThemeGround () : GridColour (x, y));
+	}
 	if (bLine)
 	{
 		return ToFb (g_Theme.nFrameColour);
@@ -758,11 +838,53 @@ void CVideoOut::FillBorder (unsigned nBuf)
 	{
 		DrawInfoLines (nBuf);
 	}
+	if (nBuf == 0 && m_pCanvasPic)
+	{
+		// what the menus' canvas covers (the picture's part is not used)
+		const unsigned nW = CANVAS_W * m_nM, nH = CANVAS_H * m_nM;
+		const unsigned x0 = m_nGameX - CANVAS_PAD_X * m_nM, y0 = m_nGameY - CANVAS_PAD_Y * m_nM;
+		for (unsigned y = 0; y < nH; y++)
+		{
+			memcpy (m_pCanvasPic + y * nW, Row (0, y0 + y) + x0, nW * 4);
+		}
+	}
+	FbFlush ();
+}
+
+// the border back where the menus' canvas was (the picture is drawn anyway);
+// the text beside the picture drawn again
+void CVideoOut::RestoreCanvas (unsigned nBuf)
+{
+	const unsigned nW = CANVAS_W * m_nM, nH = CANVAS_H * m_nM;
+	const unsigned x0 = m_nGameX - CANVAS_PAD_X * m_nM, y0 = m_nGameY - CANVAS_PAD_Y * m_nM;
+	const unsigned gx0 = CANVAS_PAD_X * m_nM, gx1 = gx0 + GAME_W * m_nM;
+	const unsigned gy0 = CANVAS_PAD_Y * m_nM, gy1 = gy0 + GAME_H * m_nM;
+	for (unsigned y = 0; y < nH; y++)
+	{
+		u32 *p = Row (nBuf, y0 + y) + x0;
+		const u32 *q = m_pCanvasPic + y * nW;
+		if (y >= gy0 && y < gy1)
+		{
+			memcpy (p, q, gx0 * 4);
+			memcpy (p + gx1, q + gx1, (nW - gx1) * 4);
+		}
+		else
+		{
+			memcpy (p, q, nW * 4);
+		}
+	}
+	m_nTextSum[nBuf][0] = m_nTextSum[nBuf][1] = 0;
 	FbFlush ();
 }
 
 void CVideoOut::SetBezel (unsigned nMode, const TBezelInfo *pInfo, unsigned nId)
 {
+	if (m_bGameMode && m_bCanvasDrawn && m_bBezelDrawn)
+	{
+		RestoreCanvas (0);
+		RestoreCanvas (1);
+	}
+	m_bCanvasDrawn = FALSE;
 	if (!m_bGameMode || (m_bBezelDrawn && nMode == m_nBezel && nId == m_nBezelId))
 	{
 		return;

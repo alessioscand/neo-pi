@@ -16,6 +16,17 @@
 #define GAME_W           PROJECT_WIDTH
 #define GAME_H           PROJECT_HEIGHT
 
+// The menus' layout (ui.h) and the canvas they are drawn on: the picture, or
+// more if the menus are larger (nes-pi), centred on it; the game's buffer
+// has room for it around the picture
+#define UI_W             304
+#define UI_H             224
+#define CANVAS_W         (GAME_W > UI_W ? GAME_W : UI_W)
+#define CANVAS_H         (GAME_H > UI_H ? GAME_H : UI_H)
+#define CANVAS_PAD_X     ((CANVAS_W - GAME_W) / 2)
+#define CANVAS_PAD_Y     ((CANVAS_H - GAME_H) / 2)
+#define CANVAS_WIDER     (CANVAS_W > GAME_W || CANVAS_H > GAME_H)
+
 // TV FILTER, in the menu's order
 #define FILTER_NONE	0
 #define FILTER_FAST	1	// the bottom half of each game line's rows at 50%
@@ -26,7 +37,8 @@
 #define FILTER_IS_SHADER(f) ((f) == FILTER_RGB || (f) == FILTER_CRT)
 
 // What is around the picture: with a game, OPTIONS > BEZEL; with none, the grid
-// a pixel of the menus where the screen's grid shows (DrawGame, no filter)
+// a pixel of the menus where the screen's background shows (DrawGame: with no
+// filter; on the canvas around the picture, always)
 #define GRID_HOLE	0x00010203u
 
 #define BEZEL_GRID	1	// the background (theme.h), behind the menus too; else black
@@ -72,12 +84,14 @@ public:
 
 	// The visible GAME_W x GAME_H area into the back buffer; bFilter = FALSE:
 	// no scanlines (the menus with no game behind them)
-	virtual void DrawGame (const u32 *pSource, boolean bFilter = TRUE) = 0;
+	// bCanvas: the menus' whole canvas, beyond the picture if it is wider
+	virtual void DrawGame (const u32 *pSource, boolean bFilter = TRUE, boolean bCanvas = FALSE) = 0;
 	// one line of it, with the caller's scratch lines (GAME_W * 8 pixels each):
 	// called by core 1 as each line is finished
 	virtual void DrawGameLine (const u32 *pSource, unsigned y, u32 *pLine, u32 *pDark) = 0;
 	// COMPOSITE: one filtered line (nNtscW pixels 0x00RRGGBB) stretched to the
-	// game width; pLine = scratch (GAME_W * 8)
+	// game width (COMP_OUT_WIDTH (GAME_W) pixels: GAME_W; a longer line, the menus'
+	// canvas: as much wider); pLine = scratch (CANVAS_W * 8)
 	virtual void DrawNtscLine (unsigned y, const u32 *pNtsc, unsigned nNtscW, u32 *pLine) = 0;
 
 	// The border around the picture: nMode = BEZEL_GRID and / or BEZEL_INFO
