@@ -220,8 +220,10 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 	if (m_nScale > 8) m_nScale = 8;
 
 	// HVS factor k: largest divisor of S that divides the display exactly;
-	// with a filter the CPU must draw at least 2x (m >= 2); at most 2, so
-	// that the text beside the picture can have 2 screen pixels per font pixel
+	// with a filter the CPU must draw at least 2x (m >= 2), with RGB and CRT
+	// 4x (so at 1080p the CPU draws all of it; at 720p, 3x, there is no HVS
+	// anyway and the shaders work with 3 rows a line); at most 2, so that the
+	// text beside the picture can have 2 screen pixels per font pixel
 	m_nK = 1;
 	if (bAllowHVS)
 	{
@@ -230,7 +232,7 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 			if (   m_nScale % k == 0
 			    && m_nDispW % k == 0 && m_nDispH % k == 0
 			    && (m_nFilter == FILTER_NONE || m_nScale / k >= 2)
-			    && (!FILTER_IS_SHADER (m_nFilter) || m_nScale / k >= 4))	// RGB, CRT: 4 rows a line at least
+			    && (!FILTER_IS_SHADER (m_nFilter) || m_nScale / k >= 4))	// RGB, CRT: the HVS only if the CPU still draws 4 rows a line
 			{
 				m_nK = k;
 				break;

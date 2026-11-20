@@ -38,8 +38,10 @@ static u16 s_P[MAXM][GAME_W];		// per phase
 static u16 s_T[MAXOW];			// RGB: s_Gamma per column
 static u16 s_Q[3][MAXOW];		// per column: RGB q, CRT h
 
-static u64 s_nSum, s_nMax;
-static unsigned s_nCalls;
+// statistics: totals and the maximum written by the core that draws, read by
+// core 0 (ReportWindow); a new epoch from core 0 restarts the maximum
+static u64 s_nSum, s_nMax, s_nCalls;
+static unsigned s_nEpoch, s_nSeen;
 
 static inline float Clamp (float v, float a, float b)	{ return v < a ? a : (v > b ? b : v); }
 static inline u16 Sat (u16 v)				{ return v > 255 ? 255 : v; }
@@ -286,18 +288,29 @@ void CrtFxLine (const u32 *pFrame, unsigned y, TCrtRowFn pRow, void *pCtx)
 		LineCrt (pSrc);
 	Rows (y, pRow, pCtx);
 	const u64 d = Ticks () - t0;
-	s_nSum += d;
-	if (d > s_nMax) s_nMax = d;
-	s_nCalls++;
+	SharedStore (s_nSum, s_nSum + d);
+	SharedStore (s_nCalls, s_nCalls + 1);
+	const unsigned nEpoch = SharedLoad (s_nEpoch);
+	if (nEpoch != s_nSeen)
+	{
+		s_nSeen = nEpoch;
+		SharedStore (s_nMax, d);
+	}
+	else if (d > s_nMax)
+	{
+		SharedStore (s_nMax, d);
+	}
 }
 
 void CrtFxTakeStats (unsigned *pSumUs, unsigned *pMaxUs, unsigned *pCalls)
 {
+	static u64 s_nLastSum, s_nLastCalls;	// core 0's: the totals at the last call
 	const u64 f = TicksFreq ();
-	*pSumUs = (unsigned) (s_nSum * 1000000 / f);
-	*pMaxUs = (unsigned) (s_nMax * 1000000 / f);
-	*pCalls = s_nCalls;
-	s_nSum = 0;
-	s_nMax = 0;
-	s_nCalls = 0;
+	const u64 nSum = SharedLoad (s_nSum), nCalls = SharedLoad (s_nCalls);
+	*pSumUs = (unsigned) ((nSum - s_nLastSum) * 1000000 / f);
+	*pMaxUs = (unsigned) (SharedLoad (s_nMax) * 1000000 / f);
+	*pCalls = (unsigned) (nCalls - s_nLastCalls);
+	s_nLastSum = nSum;
+	s_nLastCalls = nCalls;
+	SharedStore (s_nEpoch, s_nEpoch + 1);
 }

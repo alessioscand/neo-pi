@@ -116,8 +116,7 @@ static void LineDone (unsigned nScanline)
 	}
 	else if (CrtFxActive () && TvWorkerAlive ())	// RGB, CRT: on core 2 too
 	{
-		TvPost (g_VideoBuf + nScanline * GAME_SRC_PITCH + GAME_SRC_X, TV_SHADER, nRow,
-			SharedLoad (s_bRaced));
+		TvPost (0, TV_SHADER, nRow, SharedLoad (s_bRaced));	// core 2 reads the line from g_VideoBuf
 	}
 	else
 	{

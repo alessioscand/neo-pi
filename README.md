@@ -41,7 +41,7 @@ Save states are limited to a single slot per game. Enough to take the edge off t
 
 **Picture**
 
-- Integer scaling with square pixels at 1080p or 720p, handled by the Pi's hardware scaler.
+- Integer scaling with square pixels at 1080p or 720p, handled by the Pi's hardware scaler (by the CPU alone with the RGB and CRT filters at 1080p).
 
 - TV FILTER, with no additional lag:
   - FAST: simple scanlines, drawn as part of the frame.

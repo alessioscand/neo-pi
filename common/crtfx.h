@@ -25,7 +25,7 @@ typedef u32 *(*TCrtRowFn) (void *pCtx, unsigned nRow);
 // game line y of pFrame (the emulator's frame) to its M rows
 void CrtFxLine (const u32 *pFrame, unsigned y, TCrtRowFn pRow, void *pCtx);
 
-// time spent in CrtFxLine since the last call
+// time spent in CrtFxLine since the last call (core 0)
 void CrtFxTakeStats (unsigned *pSumUs, unsigned *pMaxUs, unsigned *pCalls);
 
 #endif

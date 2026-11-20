@@ -25,7 +25,8 @@ void TvSetOutput (TTvLineOut *pOut);
 void TvWorkerRun (void);
 boolean TvWorkerAlive (void);
 
-// queues one line: PROJECT_TV_IN_BYTES of source (copied), its colour burst
+// queues one line: PROJECT_TV_IN_BYTES of source (copied; 0 when the filter
+// reads the line itself, as RGB and CRT do), its colour burst
 // phase, its row in the picture, whether the frame is raced, and where the
 // filtered pixels go (0: a scratch line)
 void TvPost (const void *pSource, unsigned nPhase, unsigned nRow, boolean bRace, u32 *pOut = 0);
