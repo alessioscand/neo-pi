@@ -8,8 +8,10 @@ WHAT'S NEW IN 1.2.1
     crt-hyllian-fast), CRT (a CRT TV with its RGB mask, from davej's
     crt-pi) and COMPOSITE. RGB and CRT are drawn line by line on their
     own CPU core: no added lag.
-  - BEZEL is GRID by default. At 1080p the frame sits a little further
-    from the picture; at 720p it is centred again.
+  - A finer look: thin panel frames and a game list framed like the
+    logo.
+  - At 1080p the bezel's frame sits a little further from the picture;
+    at 720p it is centred again.
   - Smaller fixes and tidying.
 
 WHAT'S NEW IN 1.2.0
@@ -132,10 +134,10 @@ OPTIONS MENU (D in the game list, or from the in-game menu)
                 OFF    black
                 TEXT   game information and basic controls on black
                        (at 1080p)
-                GRID   the woven background and a frame (the default)
+                GRID   the woven background and a frame
                 FULL   the complete bezel, with game information above
                        the picture and button assignments below (at
-                       1080p)
+                       1080p; the default)
   CONTROLS      Set up a pad (with several pads, press a button on the one
                 to set up). To skip a function, press a button already
                 assigned.

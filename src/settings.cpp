@@ -250,7 +250,7 @@ void CKernel::SaveConfig (void)
 	snprintf (Text, sizeof Text, "system=%s\r\nregion=%s\r\ncpu=%s\r\nfilter=%s\r\n%s",
 		  SystemName (), RegionName (m_nRegion), m_nCpuSpeed == CPU_TURBO ? "turbo" : "normal",
 		  FilterName (m_nFilter), m_bHVS ? "" : "scaler=cpu\r\n");
-	if (m_nBezel != BEZEL_GRID)
+	if (m_nBezel != (BEZEL_GRID | BEZEL_INFO))
 	{
 		strcat (Text, "bezel=");
 		strcat (Text, BezelName (m_nBezel, FALSE));

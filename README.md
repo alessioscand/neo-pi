@@ -51,7 +51,7 @@ Save states are limited to a single slot per game. Enough to take the edge off t
 
   RGB, CRT and COMPOSITE process each line on a separate core as soon as it is drawn, without slowing down the game.
 
-- Bezel: the *NEOfabric*, a dark, Japanese-inspired woven texture framing the picture. At 1080p, it also shows the game's title, developer and release year above the picture, with a carefully laid-out button reference below, covering 144 games. OPTIONS offers four levels: FULL, GRID (the default), TEXT and OFF, for those who prefer a cleaner, no-frills look.
+- Bezel: the *NEOfabric*, a dark, Japanese-inspired woven texture framing the picture. At 1080p, it also shows the game's title, developer and release year above the picture, with a carefully laid-out button reference below, covering 144 games. OPTIONS offers four levels: FULL (the default), GRID, TEXT and OFF, for those who prefer a cleaner, no-frills look.
 
 **Convenience**
 

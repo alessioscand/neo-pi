@@ -56,7 +56,7 @@ const TUITheme g_Theme =
 	{8, 3}, 0x1E386A, 24,			// a frame, the grid lit near it
 	{4, 4},					// the columns' text a little further out
 	40,					// a fabric of diamonds, through the frame's corners
-	TRUE,					// lines a game pixel wide (FALSE: thin)
+	FALSE,					// thin lines (TRUE: a game pixel wide)
 	0					// no frame: the dither
 };
 
