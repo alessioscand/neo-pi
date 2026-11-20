@@ -302,9 +302,11 @@ boolean CVideoOut::SetGameMode (unsigned nFilter, boolean bAllowHVS)
 		m_nGridX0 = m_nGridY0 = 0;
 		if (m_nFrame > 0 && g_Theme.nFabric > 0)
 		{
-			const int P = g_Theme.nFabric * M;
-			while ((m_nFrameL + m_nFrameR) % P != 0) m_nFrameL++;
-			while ((m_nFrameT + m_nFrameB) % P != 0) m_nFrameT++;
+			// the small diamonds' lines (a quarter of P): at 3x the large
+			// ones would push the left and top lines up to 2 diamonds out
+			const int P = g_Theme.nFabric * M, Q = P % 4 == 0 ? P / 4 : P;
+			while ((m_nFrameL + m_nFrameR) % Q != 0) m_nFrameL++;
+			while ((m_nFrameT + m_nFrameB) % Q != 0) m_nFrameT++;
 			m_nGridX0 = m_nFrameR;
 			m_nGridY0 = m_nFrameB;
 		}
