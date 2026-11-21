@@ -12,6 +12,10 @@ WHAT'S NEW IN 1.2.1
     logo.
   - At 1080p the bezel's frame sits a little further from the picture;
     at 720p it is centred again.
+  - BEZEL TEXT and FULL say TEXT AT 1080P ONLY: the game's title and
+    buttons need the room of a 1080p screen.
+  - NO PAD no longer appears beside the game list (CONTROLS still says
+    when no pad is connected). Simpler credits.
   - Smaller fixes and tidying.
 
 WHAT'S NEW IN 1.2.0
