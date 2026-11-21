@@ -27,7 +27,7 @@ Ever since the days of Raspberry Pi 2 with AdvanceMAME and VGA666 hat, I've drea
 
 Save states are limited to a single slot per game. Enough to take the edge off the challenge (think of some of the notoriously brutal bosses in The King of Fighters), without losing the tension that makes arcade games so exciting.
 
-**One family.** neo-pi has siblings: [s16-pi](https://alessioscand.github.io/s16-pi/) (Sega System 16), [m92-pi](https://alessioscand.github.io/m92-pi/) (Irem M92) and [nes-pi](https://alessioscand.github.io/nes-pi/) (Nintendo NES). They are all built on the same codebase, so improvements to one benefit them all.
+**One family.** neo-pi has siblings: [s16-pi](https://alessioscand.github.io/s16-pi/) (Sega System 16/18), [m92-pi](https://alessioscand.github.io/m92-pi/) (Irem M92) and [nes-pi](https://alessioscand.github.io/nes-pi/) (Nintendo NES). They are all built on the same codebase, so improvements to one benefit them all.
 
 ## Features
 
@@ -82,7 +82,7 @@ Save states are limited to a single slot per game. Enough to take the edge off t
 
 ## Controls
 
-Although wireless gamepads are supported, wired ones are preferable for maximum responsiveness. The first time a pad model is connected, neo-pi asks you to press the buttons you want as A, B, C, D, Start and Select. The d-pad, hat and left stick always work. Second pad connected is Player 2.
+Although wireless gamepads are supported, wired ones are preferable for maximum responsiveness. The first time a pad model is connected, neo-pi asks you to press the buttons you want as A, B, C, D, Select and Start. The d-pad, hat and left stick always work. Second pad connected is Player 2.
 
 | In game | |
 |---|---|
